@@ -1,6 +1,7 @@
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Gameplay.Input.Buffering;
 using PlatformerSandbox.Simulation.CharacterMotor;
+using PlatformerSandbox.Simulation.Diagnostics;
 using PlatformerSandbox.Simulation.Collision.Detection;
 using PlatformerSandbox.Simulation.Motion.Constraints;
 using PlatformerSandbox.Simulation.Motion.Profiles;
@@ -30,13 +31,16 @@ public sealed class MovementGymSession
     private readonly MovingPlatformTrajectory _movingPlatform;
     private readonly JumpReleaseConstraints _jumpRelease = new(1.10);
     private CharacterMovementController _motor;
+    private SimulationFaultPolicy _faultPolicy;
     private readonly BufferedJumpInput _jumpTiming = new(
         new JumpTimingConstraints(CoyoteTimeSeconds, JumpBufferSeconds));
 
     public const double CoyoteTimeSeconds = 0.10;
     public const double JumpBufferSeconds = 0.10;
 
-    public MovementGymSession(MovementGymTuning? tuning = null)
+    public MovementGymSession(
+        MovementGymTuning? tuning = null,
+        SimulationFaultSensitivity faultSensitivity = SimulationFaultSensitivity.Strict)
     {
         // Separated walkable floors form a pit from x=6 to x=8.
         // Platforms and walls expose different collision response cases.
@@ -56,6 +60,7 @@ public sealed class MovementGymSession
             7, Box(5.3, 2.05, 7.35, 2.30),
             new Vector2D(2.4, 0.0), 2.4);
 
+        _faultPolicy = new SimulationFaultPolicy(faultSensitivity);
         Tuning = tuning ?? MovementGymTuning.Baseline;
         _groundMotion = HorizontalMotionSolver.Solve(Tuning.Ground);
         _airMotion = HorizontalMotionSolver.Solve(Tuning.Air);
@@ -71,6 +76,16 @@ public sealed class MovementGymSession
     public MovingPlatformSample MovingPlatform =>
         _movingPlatform.Evaluate(_motor.ElapsedSeconds);
     public bool IsRidingMovingPlatform => _motor.MovingSupportId == _movingPlatform.Id;
+    public SimulationFaultSensitivity FaultSensitivity => _motor.FaultSensitivity;
+    public int LastStepRecoveryCount => _motor.LastStepRecoveries.Count;
+
+    /// <summary>Changes diagnostics only; does not reset the active player.</summary>
+    public void SetFaultSensitivity(SimulationFaultSensitivity sensitivity)
+    {
+        SimulationFaultPolicy policy = new(sensitivity);
+        _motor.SetFaultPolicy(policy);
+        _faultPolicy = policy;
+    }
 
     /// <summary>
     /// Applies both profiles as one operation, then resets the character and
@@ -160,7 +175,8 @@ public sealed class MovementGymSession
         SpawnBounds, _colliders, ground, air, _jump,
         gravityAcceleration: -24.0,
         releaseConstraints: _jumpRelease,
-        movingPlatform: _movingPlatform);
+        movingPlatform: _movingPlatform,
+        faultPolicy: _faultPolicy);
 
     private static Aabb Box(double left, double bottom, double right, double top) =>
         new(new Vector2D(left, bottom), new Vector2D(right, top));

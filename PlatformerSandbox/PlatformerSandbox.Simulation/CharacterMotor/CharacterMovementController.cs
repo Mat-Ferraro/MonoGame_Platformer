@@ -6,6 +6,7 @@ using PlatformerSandbox.Simulation.Motion.Constraints;
 using PlatformerSandbox.Simulation.Motion.Profiles;
 using PlatformerSandbox.Simulation.MovingPlatforms;
 using PlatformerSandbox.Simulation.Motion.Integration;
+using PlatformerSandbox.Simulation.Diagnostics;
 
 namespace PlatformerSandbox.Simulation.CharacterMotor;
 
@@ -33,6 +34,7 @@ public sealed class CharacterMovementController
     private readonly double _gravity;
     private readonly int _maxContactEvents;
     private readonly MovingPlatformTrajectory? _movingPlatform;
+    private SimulationFaultPolicy _faultPolicy;
     private bool _onMovingPlatform;
 
     private Aabb _bounds;
@@ -52,7 +54,8 @@ public sealed class CharacterMovementController
         int maxContactEvents = 8,
         JumpReleaseConstraints? releaseConstraints = null,
         JumpDescentConstraints descentConstraints = default,
-        MovingPlatformTrajectory? movingPlatform = null)
+        MovingPlatformTrajectory? movingPlatform = null,
+        SimulationFaultPolicy? faultPolicy = null)
     {
         if (!initialBounds.IsValid)
             throw new ArgumentException("Initial bounds must be valid.", nameof(initialBounds));
@@ -114,6 +117,7 @@ public sealed class CharacterMovementController
                     "Initial body overlaps the moving platform.");
         }
         _movingPlatform = movingPlatform;
+        _faultPolicy = faultPolicy ?? SimulationFaultPolicy.Development;
         _onMovingPlatform = movingPlatform is not null &&
             MovingPlatformRideSolver.IsSupported(
                 initialBounds, movingPlatform.Evaluate(0.0).Bounds);
@@ -138,6 +142,19 @@ public sealed class CharacterMovementController
     public int JumpsStarted => _jumpsStarted;
     public double ElapsedSeconds => _elapsedSeconds;
     public int? MovingSupportId => _onMovingPlatform ? _movingPlatform?.Id : null;
+    public SimulationFaultSensitivity FaultSensitivity => _faultPolicy.Sensitivity;
+    public IReadOnlyList<SimulationRecoveryRecord> LastStepRecoveries { get; private set; } =
+        Array.Empty<SimulationRecoveryRecord>();
+
+    /// <summary>
+    /// Change diagnostic sensitivity without resetting or modifying physics state.
+    /// Tests and the gym may select the policy independently of Debug/Release.
+    /// </summary>
+    public void SetFaultPolicy(SimulationFaultPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        _faultPolicy = policy;
+    }
 
     /// <summary>
     /// Advance by the scheduler-specified time. jumpPressedThisStep is a
@@ -167,10 +184,14 @@ public sealed class CharacterMovementController
         Aabb nextBounds;
         Vector2D nextVelocity;
         bool nextGrounded;
-        SteerableJumpMotor? nextJump = _jumpMotor;
+        // A child jump motor is mutable. Advance a private working copy so a
+        // later failure (including a landing carry failure) cannot publish
+        // a partially advanced jump while the parent update rolls back.
+        SteerableJumpMotor? nextJump = _jumpMotor?.Fork();
         bool started = false;
         CharacterControlContact[] contacts;
         bool nextMovingSupport = _onMovingPlatform;
+        SimulationFaultSession faultSession = _faultPolicy.StartStep();
 
         if (jumpPressedThisStep && nextJump is null &&
             (_grounded || jumpGraceAuthorized))
@@ -208,12 +229,18 @@ public sealed class CharacterMovementController
                     // later, so there is no visual gap or lost displacement.
                     double landingTime = finalContact.TimeWithinStepSeconds;
                     double remainder = durationSeconds - landingTime;
-                    if (remainder > 0.0)
+                    double landingWorldTime = _elapsedSeconds + landingTime;
+                    // A landing at the very end of the fixed update can leave
+                    // a positive remainder smaller than one ULP of the world
+                    // clock. The rider is already at the contact position;
+                    // there is no representable carry interval to submit.
+                    if (remainder > 0.0 &&
+                        landingWorldTime + remainder > landingWorldTime)
                     {
                         MovingPlatformSample floor = _movingPlatform.Evaluate(
-                            _elapsedSeconds + landingTime);
+                            landingWorldTime);
                         MovingPlatformRideResult ride = MovingPlatformRideSolver.Step(
-                            _movingPlatform, _elapsedSeconds + landingTime,
+                            _movingPlatform, landingWorldTime,
                             remainder, nextBounds,
                             nextVelocity.X - floor.Velocity.X, 0.0);
                         nextBounds = ride.Bounds;
@@ -227,7 +254,7 @@ public sealed class CharacterMovementController
         else
         {
             (nextBounds, nextVelocity, nextGrounded, nextMovingSupport, contacts) =
-                StepFreeOrGround(durationSeconds, direction);
+                StepFreeOrGround(durationSeconds, direction, faultSession);
         }
 
         // Never publish a partially completed update: all potentially failing
@@ -239,12 +266,14 @@ public sealed class CharacterMovementController
         _jumpMotor = nextJump;
         _elapsedSeconds = endTime;
         if (started) _jumpsStarted++;
+        LastStepRecoveries = faultSession.Recoveries;
         return Snapshot(started, durationSeconds, contacts);
     }
 
     private (Aabb Bounds, Vector2D Velocity, bool Grounded,
         bool OnMovingPlatform, CharacterControlContact[] Contacts) StepFreeOrGround(
-        double duration, HorizontalDirection direction)
+        double duration, HorizontalDirection direction,
+        SimulationFaultSession faultSession)
     {
         Aabb bounds = _bounds;
         Vector2D velocity = _velocity;
@@ -296,20 +325,60 @@ public sealed class CharacterMovementController
             }
             if (onMoving && _movingPlatform is not null)
             {
-                double worldNow = _elapsedSeconds + elapsed;
-                MovingPlatformSample floor = _movingPlatform.Evaluate(worldNow);
+                double movingFloorWorldTime = _elapsedSeconds + elapsed;
+                MovingPlatformSample floor = _movingPlatform.Evaluate(movingFloorWorldTime);
                 HorizontalMotionTrajectory relative = _groundMotion.CreateTrajectory(
                     0.0, velocity.X - floor.Velocity.X, direction);
                 double rideDuration = remaining;
                 if (relative.TimeToCruiseSeconds > 0.0)
                     rideDuration = Math.Min(rideDuration, relative.TimeToCruiseSeconds);
                 double localV = velocity.X - floor.Velocity.X;
+                double reversalStopTime = 0.0;
                 if (direction != HorizontalDirection.Neutral &&
                     (int)direction * localV < 0.0)
-                    rideDuration = Math.Min(rideDuration,
-                        Math.Abs(localV) / _groundMotion.ReversalDecelerationRate);
+                {
+                    reversalStopTime =
+                        Math.Abs(localV) / _groundMotion.ReversalDecelerationRate;
+                    rideDuration = Math.Min(rideDuration, reversalStopTime);
+                }
+                if (!(rideDuration > 0.0) || !double.IsFinite(rideDuration))
+                    throw new InvalidOperationException(
+                        "Moving-floor motion has an invalid analytical phase duration.");
+
+                // Ground locomotion is split at cruise/reversal events. A tiny
+                // positive interval can be smaller than one representable
+                // tick of either the local or world clock. Finish the KNOWN
+                // analytical phase without calling the strict ride solver;
+                // then re-plan from its exact boundary velocity.
+                if (elapsed + rideDuration <= elapsed ||
+                    movingFloorWorldTime + rideDuration <= movingFloorWorldTime)
+                {
+                    if (reversalStopTime > 0.0 &&
+                        rideDuration == reversalStopTime)
+                    {
+                        velocity = new Vector2D(floor.Velocity.X, velocity.Y);
+                        continue;
+                    }
+                    if (relative.TimeToCruiseSeconds > 0.0 &&
+                        rideDuration == relative.TimeToCruiseSeconds)
+                    {
+                        velocity = new Vector2D(
+                            floor.Velocity.X + relative.CruiseVelocity, velocity.Y);
+                        continue;
+                    }
+                    if (rideDuration == remaining)
+                    {
+                        // A terminal remainder with no representable clock
+                        // progress has no additional platform displacement.
+                        elapsed = duration;
+                        break;
+                    }
+                    throw new InvalidOperationException(
+                        "Moving-floor event cannot advance either simulation clock.");
+                }
+
                 MovingPlatformRideResult ride = MovingPlatformRideSolver.Step(
-                    _movingPlatform, worldNow, rideDuration, bounds,
+                    _movingPlatform, movingFloorWorldTime, rideDuration, bounds,
                     localV, relative.Evaluate(0.0).Acceleration);
                 if (!(ride.AdvancedSeconds > 0.0))
                     throw new InvalidOperationException("Moving-floor segment did not advance.");
@@ -385,53 +454,107 @@ public sealed class CharacterMovementController
                     bounds, velocity.X, ax, phaseDuration, _obstacles)
                 : null;
             double advance = departure?.TimeSeconds ?? phaseDuration;
-            if (advance <= 0.0 || advance > remaining || elapsed + advance <= elapsed)
+            if (!(advance > 0.0) || advance > remaining || !double.IsFinite(advance))
                 throw new InvalidOperationException(
-                    "Movement event failed to make forward time progress.");
+                    "Movement event has an invalid analytical duration.");
+
+            // A valid local motion-phase duration can be smaller than one ULP
+            // of the absolute world clock. In that case it cannot be sent to
+            // MovingPlatformCollisionDetector: start + duration == start.
+            // Resolve the *known instantaneous phase transition* at this
+            // boundary and re-plan, without removing the detector's strict
+            // validation or integrating a physically significant interval.
+            double worldNow = _elapsedSeconds + elapsed;
+            if (elapsed + advance <= elapsed || worldNow + advance <= worldNow)
+            {
+                if (departure is { } subResolutionEdge &&
+                    subResolutionEdge.TimeSeconds == advance)
+                {
+                    // A platform-edge event is the authoritative reason for
+                    // this tiny phase. Snap to its analytically solved edge.
+                    bounds = bounds.Translated(new Vector2D(
+                        subResolutionEdge.BodyLeftAtDeparture - bounds.Left, 0.0));
+                    grounded = false;
+                    if (++supportDepartures + contacts.Count > _maxContactEvents)
+                        throw new InvalidOperationException("Controller event limit exceeded.");
+                    continue;
+                }
+
+                double reversalStop = direction != HorizontalDirection.Neutral &&
+                    (int)direction * velocity.X < 0.0
+                    ? Math.Abs(velocity.X) / profile.ReversalDecelerationRate
+                    : 0.0;
+                if (reversalStop > 0.0 && reversalStop == advance)
+                {
+                    velocity = new Vector2D(0.0, velocity.Y);
+                    continue;
+                }
+
+                if (reference.TimeToCruiseSeconds > 0.0 &&
+                    reference.TimeToCruiseSeconds == advance)
+                {
+                    velocity = new Vector2D(reference.CruiseVelocity, velocity.Y);
+                    continue;
+                }
+
+                if (advance == remaining)
+                {
+                    // Only an unrepresentable final remainder remains; the
+                    // absolute simulation clock has no distinct event in it.
+                    elapsed = duration;
+                    break;
+                }
+
+                throw new InvalidOperationException(
+                    "Motion event cannot advance either the local or world clock.");
+            }
 
             Vector2D acceleration = new(ax, grounded ? 0.0 : _gravity);
             if (!grounded && _movingPlatform is not null)
             {
-                MovingPlatformSweepHit? movingContact =
-                    MovingPlatformCollisionDetector.SweepFirst(
-                        bounds, velocity, acceleration, _elapsedSeconds + elapsed,
-                        advance, [_movingPlatform]);
-                if (movingContact is { } movingHit)
-                {
-                    ParabolicSweepHit? staticHit =
-                        ParabolicAabbCollisionDetector.SweepFirst(
-                            bounds, velocity, acceleration, advance, _obstacles);
-                    // Same-time contacts are ordered by stable ID.
-                    bool movingFirst = staticHit is null ||
-                        movingHit.TimeSeconds < staticHit.Value.TimeSeconds ||
-                        (movingHit.TimeSeconds == staticHit.Value.TimeSeconds &&
-                         movingHit.PlatformId < staticHit.Value.ColliderId);
-                    if (movingFirst)
-                    {
-                        Vector2D incoming = movingHit.BodyVelocityAtImpact;
-                        Vector2D outgoing = CollisionResponse.Apply(
-                            incoming - movingHit.PlatformVelocityAtImpact,
-                            movingHit.Normal, CollisionResponseMode.Slide) +
-                            movingHit.PlatformVelocityAtImpact;
-                        contacts.Add(new CharacterControlContact(
-                            movingHit.PlatformId, elapsed + movingHit.TimeSeconds,
-                            movingHit.Normal, incoming, outgoing));
-                        if (contacts.Count + supportDepartures > _maxContactEvents)
-                            throw new InvalidOperationException("Controller event limit exceeded.");
+                // Milestone 24 Phase 2B. The shared stepper owns the COMPLETE
+                // accelerated segment: after a static contact it re-queries
+                // BOTH static and moving bodies for every subsequent event.
+                // This prevents a moving impact from being skipped after the
+                // original static accelerated stepper consumed the remainder.
+                int availableContacts = _maxContactEvents - contacts.Count - supportDepartures;
+                if (availableContacts < 1)
+                    throw new InvalidOperationException(
+                        "Controller collision event budget exhausted.");
 
-                        bounds = movingHit.BodyBoundsAtImpact;
-                        velocity = outgoing;
-                        elapsed += movingHit.TimeSeconds;
-                        // Only an approach from ABOVE establishes floor support.
-                        // Side and underside impacts are still real collisions:
-                        // slide in the platform's frame; do not ignore them.
-                        bool landed = movingHit.Normal.Y > 0.0 &&
-                            movingHit.RelativeVelocityAtImpact.Y < 0.0;
-                        grounded = landed;
-                        onMoving = landed;
-                        continue;
-                    }
+                UnifiedAcceleratedStepResult unified =
+                    UnifiedAcceleratedKinematicStepper.Step(
+                        bounds, velocity, acceleration, _elapsedSeconds + elapsed,
+                        advance, _obstacles, [_movingPlatform],
+                        CollisionResponseMode.Slide, availableContacts, faultSession);
+                if (contacts.Count + unified.Contacts.Count + supportDepartures >
+                    _maxContactEvents)
+                    throw new InvalidOperationException(
+                        "Controller collision event limit exceeded.");
+
+                foreach (CharacterControlContact unifiedContact in unified.Contacts)
+                    contacts.Add(new CharacterControlContact(
+                        unifiedContact.ColliderId, elapsed + unifiedContact.TimeWithinStepSeconds,
+                        unifiedContact.Normal, unifiedContact.IncomingVelocity,
+                        unifiedContact.OutgoingVelocity));
+
+                bounds = unified.Bounds;
+                velocity = unified.Velocity;
+                elapsed += unified.AdvancedSeconds;
+                if (unified.MovingFloorId == _movingPlatform.Id)
+                {
+                    // Transfer ownership exactly once at the landing event.
+                    // The next loop iteration carries only the remaining time
+                    // in the platform-local reference frame.
+                    onMoving = true;
+                    grounded = true;
                 }
+                else
+                {
+                    onMoving = false;
+                    grounded = HasFloorSupport(bounds, velocity);
+                }
+                continue;
             }
             AcceleratedKinematicStepResult result = AcceleratedKinematicStepper.Step(
                 bounds, velocity, acceleration, advance, _obstacles,

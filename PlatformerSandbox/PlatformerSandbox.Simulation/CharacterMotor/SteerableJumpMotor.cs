@@ -19,7 +19,7 @@ namespace PlatformerSandbox.Simulation.CharacterMotor;
 ///
 /// Each monotone motion interval uses exact analytical positions and a
 /// continuous face-crossing collision query. No MonoGame or device dependency.
-/// Static AABBs / slide response only. An optional, one-time jump release
+/// Static and moving AABBs / slide response. An optional, one-time jump release
 /// replaces the held reference with the analytically continuous cut profile.
 /// No wall jump, moving world, or same-update ground locomotion after landing.
 /// </summary>
@@ -33,6 +33,7 @@ public sealed class SteerableJumpMotor
     private readonly double _gravity;
     private readonly int _maxContactEvents;
     private readonly MovingPlatformTrajectory? _movingPlatform;
+    private readonly MovingPlatformTrajectory[] _movingPlatformColliders;
     private double _worldTimeSeconds;
 
     private Aabb _bounds;
@@ -108,6 +109,7 @@ public sealed class SteerableJumpMotor
                 movingPlatform.Evaluate(startTimeSeconds).Bounds))
             throw new InvalidOperationException("Jump starts penetrating the moving platform.");
         _movingPlatform = movingPlatform;
+        _movingPlatformColliders = movingPlatform is null ? [] : [movingPlatform];
         _worldTimeSeconds = startTimeSeconds;
         _airMotion = airMotion;
         _flight = flight;
@@ -124,6 +126,13 @@ public sealed class SteerableJumpMotor
     public double FlightElapsedSeconds => _flightElapsedSeconds;
     public bool IsGrounded => _grounded;
     public bool IsEarlyReleased => _flight.IsEarlyReleased;
+
+    /// <summary>
+    /// Copy the mutable jump progress before a parent-controller update.
+    /// The shared dependencies and trajectory profiles are read-only. The
+    /// copied motor commits its progress only when the parent step succeeds.
+    /// </summary>
+    internal SteerableJumpMotor Fork() => (SteerableJumpMotor)MemberwiseClone();
 
     /// <summary>
     /// The direction is a current input command, not a future fixed schedule.
@@ -257,6 +266,7 @@ public sealed class SteerableJumpMotor
             // velocity may also change sign within an otherwise monotone
             // character segment, so split there for the analytical sweep.
             MovingPlatformSample? floorAtStart = null;
+            double relativeTurnSeconds = double.PositiveInfinity;
             if (_movingPlatform is not null)
             {
                 double worldNow = _worldTimeSeconds + elapsed;
@@ -266,13 +276,100 @@ public sealed class SteerableJumpMotor
                 double relativeVx = horizontal.Evaluate(0.0).Velocity -
                                     floorAtStart.Value.Velocity.X;
                 double relativeAx = horizontal.Evaluate(0.0).Acceleration;
-                double relativeTurn = relativeAx == 0.0 ? -1.0 :
+                relativeTurnSeconds = relativeAx == 0.0 ? double.PositiveInfinity :
                     -relativeVx / relativeAx;
-                if (relativeTurn > 0.0 && relativeTurn < segmentDuration)
-                    segmentDuration = relativeTurn;
+                if (relativeTurnSeconds > 0.0 && relativeTurnSeconds < segmentDuration)
+                    segmentDuration = relativeTurnSeconds;
             }
             if (!(segmentDuration > 0.0))
                 throw new InvalidOperationException("Cannot advance an analytical motion event.");
+
+            // A mathematically positive interval is not necessarily a
+            // representable change to the absolute simulation clock. Near a
+            // speed cap, reversal, or apex, the remaining phase may be smaller
+            // than one ULP of world time. Complete that *known* event at this
+            // boundary instead of submitting an impossible duration to the
+            // unified collision scheduler. We do not approximate a sweep.
+            double segmentWorldStart = _worldTimeSeconds + elapsed;
+            if (segmentWorldStart + segmentDuration <= segmentWorldStart ||
+                elapsed + segmentDuration <= elapsed)
+            {
+                bool normalizedEvent = false;
+
+                // At cruise the solver specifies the exact final velocity.
+                // Rebuilding the input trajectory from that value cannot
+                // repeat the same tiny acceleration event indefinitely.
+                if (!blocked && horizontal.TimeToCruiseSeconds > 0.0 &&
+                    horizontal.TimeToCruiseSeconds <= segmentDuration)
+                {
+                    velocity = new Vector2D(horizontal.CruiseVelocity, velocity.Y);
+                    normalizedEvent = true;
+                }
+                else if (!blocked && direction != HorizontalDirection.Neutral &&
+                    (int)direction * velocity.X < 0.0 &&
+                    Math.Abs(velocity.X) / _airMotion.ReversalDecelerationRate
+                        <= segmentDuration)
+                {
+                    // The first phase of a reversal ends exactly at vX=0.
+                    velocity = new Vector2D(0.0, velocity.Y);
+                    normalizedEvent = true;
+                }
+                else if (!blocked && floorAtStart is { } nearbyPlatform &&
+                    relativeTurnSeconds > 0.0 &&
+                    relativeTurnSeconds <= segmentDuration)
+                {
+                    // Relative X motion reaches its extremum when the
+                    // character's X velocity matches the moving surface.
+                    velocity = new Vector2D(nearbyPlatform.Velocity.X, velocity.Y);
+                    normalizedEvent = true;
+                }
+
+                if (verticalReference)
+                {
+                    if (flight.TotalDurationSeconds > flightTime &&
+                        flight.TotalDurationSeconds - flightTime <= segmentDuration)
+                    {
+                        flightTime = flight.TotalDurationSeconds;
+                        velocity = new Vector2D(velocity.X,
+                            flight.Evaluate(flightTime).VerticalVelocity);
+                        verticalReference = false;
+                        normalizedEvent = true;
+                    }
+                    else if (flightTime < flight.ApexTimeSinceTakeoffSeconds &&
+                        flight.ApexTimeSinceTakeoffSeconds - flightTime <= segmentDuration)
+                    {
+                        flightTime = flight.ApexTimeSinceTakeoffSeconds;
+                        velocity = new Vector2D(velocity.X,
+                            flight.Evaluate(flightTime).VerticalVelocity);
+                        normalizedEvent = true;
+                    }
+                    else if (flight.ReleaseTimeSinceTakeoffSeconds is double releaseEvent &&
+                        flightTime < releaseEvent &&
+                        releaseEvent - flightTime <= segmentDuration)
+                    {
+                        flightTime = releaseEvent;
+                        velocity = new Vector2D(velocity.X,
+                            flight.Evaluate(flightTime).VerticalVelocity);
+                        normalizedEvent = true;
+                    }
+                }
+
+                if (normalizedEvent)
+                    continue;
+
+                // A final remainder smaller than one representable clock
+                // increment contains no schedulable movement interval.
+                if (remaining == segmentDuration)
+                {
+                    elapsed = durationSeconds;
+                    continue;
+                }
+
+                // Do not silently skip an unrecognized collision or platform
+                // turnaround. It still needs an explicit event policy.
+                throw new InvalidOperationException(
+                    "An unclassified analytical jump event cannot advance world time.");
+            }
 
             // Capture segment origin for a completely pure analytical curve.
             double startFlightTime = flightTime;
@@ -299,38 +396,15 @@ public sealed class SteerableJumpMotor
                     new Vector2D(x.Velocity, yFree.Velocity));
             }
 
-            AnalyticalSweepHit? hit = AnalyticalAabbCollisionDetector.SweepFirst(
-                bounds, Evaluate, segmentDuration, _obstacles);
-            bool onMoving = false;
-            if (_movingPlatform is not null && floorAtStart is { } movingStart)
-            {
-                Vector2D platformVelocity = movingStart.Velocity;
-                MotionSample2D EvaluateRelative(double t)
-                {
-                    MotionSample2D bodySample = Evaluate(t);
-                    return new MotionSample2D(
-                        bodySample.Position - platformVelocity * t,
-                        bodySample.Velocity - platformVelocity);
-                }
-                var movingCollider = new StaticAabbCollider(
-                    _movingPlatform.Id, movingStart.Bounds);
-                AnalyticalSweepHit? relativeHit =
-                    AnalyticalAabbCollisionDetector.SweepFirst(
-                        bounds, EvaluateRelative, segmentDuration, [movingCollider]);
-                if (relativeHit is { } contact &&
-                    (hit is null || contact.TimeSeconds < hit.Value.TimeSeconds ||
-                     (contact.TimeSeconds == hit.Value.TimeSeconds &&
-                      contact.ColliderId < hit.Value.ColliderId)))
-                {
-                    MotionSample2D bodyAtImpact = Evaluate(contact.TimeSeconds);
-                    hit = new AnalyticalSweepHit(contact.ColliderId,
-                        contact.TimeSeconds, contact.Normal,
-                        contact.MovingBoundsAtImpact.Translated(
-                            platformVelocity * contact.TimeSeconds),
-                        bodyAtImpact.Velocity);
-                    onMoving = true;
-                }
-            }
+            // One authoritative query chooses between static geometry and
+            // moving platforms. This motion phase was already split at X/Y
+            // reversals and platform turnarounds above, satisfying the
+            // monotonic analytical-query contract. The scheduler reports the
+            // impact surface velocity for reference-frame collision response.
+            UnifiedCollisionHit? hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+                bounds, Evaluate, _worldTimeSeconds + elapsed,
+                segmentDuration, _obstacles, _movingPlatformColliders);
+            bool onMoving = hit is { IsMovingPlatform: true };
             if (hit is null)
             {
                 MotionSample2D sample = Evaluate(segmentDuration);
@@ -357,13 +431,13 @@ public sealed class SteerableJumpMotor
             elapsed += impactTime;
             if (verticalReference)
                 flightTime += impactTime;
-            bounds = hit.Value.MovingBoundsAtImpact;
-            Vector2D incoming = hit.Value.VelocityAtImpact;
+            bounds = hit.Value.BodyBoundsAtImpact;
+            Vector2D incoming = hit.Value.BodyVelocityAtImpact;
             Vector2D outgoing;
-            if (onMoving && floorAtStart is { } movingFloor)
+            if (onMoving)
                 outgoing = CollisionResponse.Apply(
-                    incoming - movingFloor.Velocity, hit.Value.Normal,
-                    CollisionResponseMode.Slide) + movingFloor.Velocity;
+                    incoming - hit.Value.SurfaceVelocityAtImpact, hit.Value.Normal,
+                    CollisionResponseMode.Slide) + hit.Value.SurfaceVelocityAtImpact;
             else
                 outgoing = CollisionResponse.Apply(
                     incoming, hit.Value.Normal, CollisionResponseMode.Slide);

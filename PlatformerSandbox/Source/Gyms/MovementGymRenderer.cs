@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Gameplay.Movement.Gyms;
+using PlatformerSandbox.Simulation.Diagnostics;
 
 namespace PlatformerSandbox.Gyms;
 
@@ -73,7 +74,12 @@ internal static class MovementGymRenderer
         batch.Draw(pixel, player, gym.IsGrounded ? GroundedPlayer : AirbornePlayer);
         DrawOutline(batch, pixel, player, Color.White * 0.7f);
 
-        // Compact, text-free indicators: ground (left), jump (middle), paused (right).
+        // Movement-state lights retain their original meaning and position.
+        // Fault mode is a SEPARATELY LABELED, persistent in-game HUD below them.
+        // Read the authoritative mode every Draw; no cached/lagging selection.
+        DrawFaultModeHud(batch, pixel, gym);
+
+        // Compact state indicators: ground, jumping, paused, moving-floor.
         batch.Draw(pixel, new Rectangle(18, 18, 15, 15),
             gym.IsGrounded ? GroundedPlayer : new Color(62, 74, 92));
         batch.Draw(pixel, new Rectangle(39, 18, 15, 15),
@@ -82,6 +88,28 @@ internal static class MovementGymRenderer
             paused ? new Color(244, 105, 112) : new Color(62, 74, 92));
         batch.Draw(pixel, new Rectangle(81, 18, 15, 15),
             gym.IsRidingMovingPlatform ? MovingFloor : new Color(62, 74, 92));
+    }
+
+    private static void DrawFaultModeHud(
+        SpriteBatch batch, Texture2D pixel, MovementGymSession gym)
+    {
+        Color modeColor = gym.FaultSensitivity switch
+        {
+            SimulationFaultSensitivity.Strict => new Color(255, 113, 113),
+            SimulationFaultSensitivity.Diagnostic => new Color(255, 194, 93),
+            SimulationFaultSensitivity.Resilient => new Color(74, 218, 165),
+            _ => Color.White
+        };
+        // Positioned below the four movement-state lamps; no SpriteFont needed.
+        batch.Draw(pixel, new Rectangle(18, 46, 282, 66), new Color(17, 25, 37));
+        batch.Draw(pixel, new Rectangle(18, 46, 4, 66), modeColor);
+        GymDebugText.Draw(batch, pixel, 28, 54,
+            MovementGymFaultModeLabel.For(gym.FaultSensitivity), modeColor);
+        GymDebugText.Draw(batch, pixel, 28, 76,
+            "F5 STRICT  F6 DIAG  F7 SAFE", new Color(174, 188, 208), 1);
+        GymDebugText.Draw(batch, pixel, 28, 91,
+            "LAST RECOVERIES: " + gym.LastStepRecoveryCount,
+            new Color(174, 188, 208), 1);
     }
 
     private static Rectangle WorldToScreen(

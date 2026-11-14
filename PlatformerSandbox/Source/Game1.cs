@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using PlatformerSandbox.Gameplay.Movement.Gyms;
 using PlatformerSandbox.Simulation.Motion.Profiles;
+using PlatformerSandbox.Simulation.Diagnostics;
 using PlatformerSandbox.Gyms;
 
 namespace PlatformerSandbox;
@@ -71,6 +72,12 @@ public sealed class Game1 : Game
             ApplyPreset(MovementGymTuning.Responsive, "Responsive");
         if (JustPressed(keys, Keys.F3))
             ApplyPreset(MovementGymTuning.Snappy, "Snappy");
+        if (JustPressed(keys, Keys.F5))
+            _gym.SetFaultSensitivity(SimulationFaultSensitivity.Strict);
+        if (JustPressed(keys, Keys.F6))
+            _gym.SetFaultSensitivity(SimulationFaultSensitivity.Diagnostic);
+        if (JustPressed(keys, Keys.F7))
+            _gym.SetFaultSensitivity(SimulationFaultSensitivity.Resilient);
         if (JustPressed(keys, Keys.Tab))
             _selectedParameter = (MovementGymParameter)(
                 ((int)_selectedParameter + 1) % Enum.GetValues<MovementGymParameter>().Length);
@@ -166,7 +173,8 @@ public sealed class Game1 : Game
             $"| free-stop={diagnostics.FreeStoppingDistanceUnits:F2}u " +
             $"({diagnostics.FreeStoppingTimeSeconds:F2}s) " +
             $"| {_selectedParameter}={selectedValue:F3} " +
-            "| F1/F2/F3: Presets  Tab: Setting  -/+: Adjust  " +
+            $"| Fault={_gym.FaultSensitivity} Recoveries={_gym.LastStepRecoveryCount} " +
+            "| F1/F2/F3: Presets  F5/F6/F7: Fault Mode  Tab: Setting  -/+: Adjust  " +
             "A/D: Move  Space: Jump  R: Reset  P: Pause  Gold: Moving Platform";
     }
 }
