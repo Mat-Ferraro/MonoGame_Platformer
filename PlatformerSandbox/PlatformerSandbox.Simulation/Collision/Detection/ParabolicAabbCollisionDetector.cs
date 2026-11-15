@@ -76,7 +76,21 @@ public static class ParabolicAabbCollisionDetector
                 continue;
             double midpoint = begin + (end - begin) * 0.5;
             Aabb middle = BoundsAt(moving, velocity, acceleration, midpoint);
-            if (!AabbCollisionDetector.Overlaps(middle, target))
+            bool hasInteriorOverlap = AabbCollisionDetector.Overlaps(middle, target);
+            if (!hasInteriorOverlap && end == durationSeconds)
+            {
+                // Near the update endpoint, the open contact interval can be
+                // narrower than the world-coordinate ULP. Its midpoint may
+                // round right back onto the entering face, despite the END
+                // position being genuinely inside the obstacle. The analytic
+                // face root still marks the entry: test the representable
+                // endpoint before discarding that interval. Require positive
+                // overlap on BOTH axes so endpoint touches and corner grazes
+                // remain non-collisions.
+                hasInteriorOverlap = AabbCollisionDetector.Overlaps(
+                    BoundsAt(moving, velocity, acceleration, end), target);
+            }
+            if (!hasInteriorOverlap)
                 continue;
 
             Vector2D? normal = SelectEnteringFace(events, begin, velocity, acceleration);

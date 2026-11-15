@@ -162,18 +162,87 @@ public sealed class UnifiedCollisionEventSchedulerTests
     }
 
     [Fact]
-    public void AnalyticalQueryRejectsUnsplitRelativeTurningPoint()
+    public void RelativeHorizontalTurnIsSplitWithoutRequiringCallerToPrecomputeIt()
     {
-        // Body x=t^2 always moves right, but a platform moving right at
-        // one unit per second makes the relative x velocity go -1 -> +1.
-        // The relative path must be split at t=0.5 before collision search.
+        // World x=t^2 is monotone. The platform moves right at 1 unit/s,
+        // so relative vx=2t-1 changes sign at t=0.5.
         MotionSample2D Curve(double t) =>
             new(new Vector2D(t * t, 0), new Vector2D(2 * t, 0));
-        Assert.Throws<ArgumentException>(() =>
-            UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
-                Box(0, 0), Curve, 0, 1,
-                Array.Empty<StaticAabbCollider>(),
-                [Moving(7, 5, 0, new Vector2D(1, 0))]));
+        var hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+            Box(0, 0), Curve, 0, 1,
+            Array.Empty<StaticAabbCollider>(),
+            [Moving(7, 5, 0, new Vector2D(1, 0))]);
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public void RelativeHorizontalTurnDetectsMovingPlatformCatchingBodyBeforeTurn()
+    {
+        MotionSample2D Curve(double t) =>
+            new(new Vector2D(t * t, 0), new Vector2D(2 * t, 0));
+        // Platform's right face starts 0.2 units left of the body.
+        // It catches the accelerating body before relative vx reverses.
+        var hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+            Box(0, 0), Curve, 0, 1,
+            Array.Empty<StaticAabbCollider>(),
+            [Moving(7, -1.2, 0, new Vector2D(1, 0))]);
+        Assert.True(hit.HasValue);
+        Assert.Equal(7, hit.Value.ColliderId);
+        Assert.Equal(new Vector2D(1, 0), hit.Value.Normal);
+        Near((1.0 - Math.Sqrt(0.2)) * 0.5, hit.Value.TimeSeconds);
+    }
+
+    [Fact]
+    public void RisingElevatorCollisionIsDetectedBeforeRelativeVerticalTurn()
+    {
+        // vy=2-4t, elevator vy=1; relative vy reverses at t=0.25.
+        // The body touches the elevator underside at relative dy=0.06,
+        // before the turn, even though the body's world apex comes later.
+        MotionSample2D Curve(double t) =>
+            new(new Vector2D(0, 2 * t - 2 * t * t),
+                new Vector2D(0, 2 - 4 * t));
+        var hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+            Box(0, 0), Curve, 0, 0.7,
+            Array.Empty<StaticAabbCollider>(),
+            [Moving(7, 0, 1.06, new Vector2D(0, 1))]);
+        Assert.True(hit.HasValue);
+        Assert.True(hit.Value.IsMovingPlatform);
+        Assert.Equal(new Vector2D(0, -1), hit.Value.Normal);
+        Near((1.0 - Math.Sqrt(0.52)) / 4.0, hit.Value.TimeSeconds);
+    }
+
+    [Fact]
+    public void RisingElevatorCanCatchDescendingCharacterAfterRelativeVerticalTurn()
+    {
+        // Initially the body rises faster than the elevator. Relative
+        // velocity becomes negative, and the lift catches it from below.
+        MotionSample2D Curve(double t) =>
+            new(new Vector2D(0, 1.5 * t - 2 * t * t),
+                new Vector2D(0, 1.5 - 4 * t));
+        var hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+            Box(0, 2.02), Curve, 0, 0.5,
+            Array.Empty<StaticAabbCollider>(),
+            [Moving(7, 0, 1, new Vector2D(0, 1))]);
+        Assert.True(hit.HasValue);
+        Assert.True(hit.Value.IsMovingPlatform);
+        Assert.Equal(new Vector2D(0, 1), hit.Value.Normal);
+        Near((0.5 + Math.Sqrt(0.41)) / 4.0, hit.Value.TimeSeconds);
+    }
+
+    [Fact]
+    public void MultipleRelativeTurnsPreserveEarliestStableContactOrder()
+    {
+        MotionSample2D Curve(double t) =>
+            new(new Vector2D(t * t, 0), new Vector2D(2 * t, 0));
+        // Two identical moving faces at different IDs. Relative velocity
+        // turns within the segment, but stable ID still wins exact ties.
+        var a = Moving(8, -1.2, 0, new Vector2D(1, 0));
+        var b = Moving(3, -1.2, 0, new Vector2D(1, 0));
+        var hit = UnifiedCollisionEventScheduler.SweepAnalyticalFirst(
+            Box(0, 0), Curve, 0, 1,
+            Array.Empty<StaticAabbCollider>(), [a, b]);
+        Assert.True(hit.HasValue);
+        Assert.Equal(3, hit.Value.ColliderId);
     }
 
     [Fact]

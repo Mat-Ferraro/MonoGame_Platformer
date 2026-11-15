@@ -8,7 +8,8 @@ public sealed class CharacterControlStepResult
     internal CharacterControlStepResult(
         Aabb bounds, Vector2D velocity, bool isGrounded, bool isJumping,
         bool jumpStarted, int jumpsStarted, double elapsedSeconds,
-        double durationSeconds, CharacterControlContact[] contacts)
+        double durationSeconds, CharacterControlContact[] contacts,
+        CollisionAssistEvent[]? assists = null)
     {
         Bounds = bounds;
         Velocity = velocity;
@@ -19,6 +20,8 @@ public sealed class CharacterControlStepResult
         ElapsedSeconds = elapsedSeconds;
         DurationSeconds = durationSeconds;
         Contacts = Array.AsReadOnly((CharacterControlContact[])contacts.Clone());
+        Assists = Array.AsReadOnly((CollisionAssistEvent[])
+            (assists ?? Array.Empty<CollisionAssistEvent>()).Clone());
     }
 
     public Aabb Bounds { get; }
@@ -30,4 +33,5 @@ public sealed class CharacterControlStepResult
     public double ElapsedSeconds { get; }
     public double DurationSeconds { get; }
     public IReadOnlyList<CharacterControlContact> Contacts { get; }
+    public IReadOnlyList<CollisionAssistEvent> Assists { get; }
 }

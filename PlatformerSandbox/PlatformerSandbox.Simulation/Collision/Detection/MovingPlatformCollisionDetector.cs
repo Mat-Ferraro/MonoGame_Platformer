@@ -77,6 +77,28 @@ public static class MovingPlatformCollisionDetector
         return best;
     }
 
+    // This is not a general-purpose epsilon for collision or time queries.
+    // Only a final interval that cannot advance the binary64 absolute clock
+    // may be consumed, and only if bounded relative travel is insignificant.
+    private static bool IsBoundedTerminalTimeTail(
+        Vector2D initialVelocity, Vector2D acceleration, double advanced,
+        double tail, Vector2D platformVelocity)
+    {
+        const double maximumDiscardedRelativeTravel = 1e-9;
+        // Bound displacement on BOTH axes, including movement of the platform
+        // and acceleration during the tail. Overflow/NaN fails the bound.
+        double vx = Math.Abs(initialVelocity.X + acceleration.X * advanced);
+        double vy = Math.Abs(initialVelocity.Y + acceleration.Y * advanced);
+        double quadratic = 0.5 * tail * tail;
+        double dx = (vx + Math.Abs(platformVelocity.X)) * tail +
+            Math.Abs(acceleration.X) * quadratic;
+        double dy = (vy + Math.Abs(platformVelocity.Y)) * tail +
+            Math.Abs(acceleration.Y) * quadratic;
+        return double.IsFinite(dx) && double.IsFinite(dy) &&
+            dx <= maximumDiscardedRelativeTravel &&
+            dy <= maximumDiscardedRelativeTravel;
+    }
+
     private static MovingPlatformSweepHit? SweepOne(
         Aabb initialBody, Vector2D initialVelocity, Vector2D acceleration,
         double startTime, double duration, MovingPlatformTrajectory platform,
@@ -87,11 +109,29 @@ public static class MovingPlatformCollisionDetector
         while (advanced < duration)
         {
             double now = startTime + advanced;
-            double segment = Math.Min(duration - advanced,
+            double remaining = duration - advanced;
+            double segment = Math.Min(remaining,
                 platform.TimeUntilNextTurn(now));
-            if (!(segment > 0.0) || now + segment <= now ||
-                !double.IsFinite(segment))
+            if (!(segment > 0.0) || !double.IsFinite(segment))
                 throw new InvalidOperationException("Moving-platform event cannot advance time.");
+
+            if (now + segment <= now)
+            {
+                // An analytical turnaround may leave a positive *terminal*
+                // remainder smaller than the next representable absolute
+                // world-time increment. A 60 Hz step reaching t=60.0 can
+                // leave ~2e-15 s after splitting at the exact turnaround.
+                // Consume ONLY such a terminal tail, after proving that its
+                // total relative displacement is below a precision-only
+                // 1e-9-unit limit on each axis. A pending interior event or
+                // any physically significant remainder still faults.
+                if (segment == remaining &&
+                    IsBoundedTerminalTimeTail(initialVelocity, acceleration,
+                        advanced, segment, platform.Evaluate(now).Velocity))
+                    return null;
+                throw new InvalidOperationException(
+                    "Moving-platform event cannot advance time.");
+            }
 
             MotionSample2D bodyAtStart = ConstantAcceleration2D.Evaluate(
                 Vector2D.Zero, initialVelocity, acceleration, advanced);
@@ -112,11 +152,38 @@ public static class MovingPlatformCollisionDetector
                 double hitTime = advanced + hit.TimeSeconds;
                 double absoluteTime = startTime + hitTime;
                 MovingPlatformSample atImpact = platform.Evaluate(absoluteTime);
-                Vector2D platformDisplacement = atImpact.Bounds.Min -
-                                                platformAtStart.Bounds.Min;
-                Aabb bodyAtImpact = hit.MovingBoundsAtImpact.Translated(platformDisplacement);
                 MotionSample2D bodySample = ConstantAcceleration2D.Evaluate(
                     Vector2D.Zero, initialVelocity, acceleration, hitTime);
+                // The relative-frame hit provides the contact TIME and NORMAL,
+                // not an authoritative world-space translation. Subtracting
+                // platform Y motion in the relative query and adding it back
+                // after the hit can round a grounded character a few ULPs
+                // BELOW its exact static floor, causing a subsequent strict
+                // start-penetration fault. Evaluate the tangential coordinate
+                // directly from the original world trajectory and constrain
+                // the hit axis to the platform's exact contact plane.
+                Aabb worldBody = initialBody.Translated(bodySample.Position);
+                Aabb bodyAtImpact;
+                if (hit.Normal.X < 0.0)
+                    bodyAtImpact = new Aabb(
+                        new Vector2D(atImpact.Bounds.Left - initialBody.Width,
+                            worldBody.Bottom),
+                        new Vector2D(atImpact.Bounds.Left, worldBody.Top));
+                else if (hit.Normal.X > 0.0)
+                    bodyAtImpact = new Aabb(
+                        new Vector2D(atImpact.Bounds.Right, worldBody.Bottom),
+                        new Vector2D(atImpact.Bounds.Right + initialBody.Width,
+                            worldBody.Top));
+                else if (hit.Normal.Y > 0.0)
+                    bodyAtImpact = new Aabb(
+                        new Vector2D(worldBody.Left, atImpact.Bounds.Top),
+                        new Vector2D(worldBody.Right,
+                            atImpact.Bounds.Top + initialBody.Height));
+                else
+                    bodyAtImpact = new Aabb(
+                        new Vector2D(worldBody.Left,
+                            atImpact.Bounds.Bottom - initialBody.Height),
+                        new Vector2D(worldBody.Right, atImpact.Bounds.Bottom));
                 return new MovingPlatformSweepHit(platform.Id, hitTime,
                     hit.Normal, bodyAtImpact, atImpact.Bounds,
                     bodySample.Velocity, atImpact.Velocity);

@@ -41,6 +41,30 @@ public sealed class MovingPlatformCollisionDetectorTests
         Near(-2, hit.Value.RelativeVelocityAtImpact.X);
     }
 
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.1)]
+    [InlineData(0.21)]
+    public void DescendingSideContactPreservesExactWorldSpaceFloorPlane(double worldTime)
+    {
+        // In the platform frame Y is moving upward even though the character
+        // stands at world Y=0. Converting the relative contact position back
+        // must not introduce a tiny static-floor penetration.
+        var elevator = new MovingPlatformTrajectory(7,
+            new Aabb(new Vector2D(1.3, 0.5), new Vector2D(2.3, 0.85)),
+            new Vector2D(0.0, -1.5), 1.0);
+        var contact = Query(
+            new Aabb(new Vector2D(0.0, 0.0), new Vector2D(0.8, 1.6)),
+            new Vector2D(10.0, 0.0), Vector2D.Zero,
+            worldTime, 0.1, elevator);
+        Assert.True(contact.HasValue);
+        Assert.Equal(new Vector2D(-1.0, 0.0), contact.Value.Normal);
+        Assert.Equal(0.0, contact.Value.BodyBoundsAtImpact.Bottom);
+        Assert.Equal(1.6, contact.Value.BodyBoundsAtImpact.Top);
+        Assert.Equal(contact.Value.PlatformBoundsAtImpact.Left,
+            contact.Value.BodyBoundsAtImpact.Right);
+    }
+
     [Fact]
     public void MovingBodyCatchesMovingPlatformAtRelativeSpeed()
     {

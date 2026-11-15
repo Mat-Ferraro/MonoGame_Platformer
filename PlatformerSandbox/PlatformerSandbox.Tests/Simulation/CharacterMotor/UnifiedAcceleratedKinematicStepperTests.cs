@@ -102,10 +102,35 @@ public sealed class UnifiedAcceleratedKinematicStepperTests
         var wall = new StaticAabbCollider(1, Box(3, -1, 1, 12));
         var ceiling = new MovingPlatformTrajectory(7,
             Box(1.5, 5, 9, 1), new Vector2D(2, 0), 4);
-        Assert.Throws<InvalidOperationException>(() =>
+        SimulationEventLimitException fault = Assert.Throws<SimulationEventLimitException>(() =>
             UnifiedAcceleratedKinematicStepper.Step(
                 Box(0, 0), new Vector2D(10, 10), Vector2D.Zero,
                 0, 0.6, [wall], [ceiling], maxContactEvents: 1));
+        // The event budget is a hard stop, and the first contact remains diagnosable.
+        SimulationContactTrace first = Assert.Single(fault.Contacts);
+        Assert.Equal(1, first.ColliderId);
+        Near(0.2, first.TimeWithinStepSeconds);
+        Assert.Equal(new Vector2D(-1, 0), first.Normal);
+    }
+
+    [Fact]
+    public void StrictModeClosesAnAlreadyResolvedNearEndContactWithoutRecovery()
+    {
+        // Impact is slightly before the last local instant, while the
+        // authoritative world clock has no distinct instant in the tail.
+        double wallLeft = Math.BitDecrement(6.0);
+        var wall = new StaticAabbCollider(1,
+            new Aabb(new Vector2D(wallLeft, -1.0),
+                new Vector2D(wallLeft + 1.0, 3.0)));
+        SimulationFaultSession strict = SimulationFaultPolicy.Development.StartStep();
+        UnifiedAcceleratedStepResult result = UnifiedAcceleratedKinematicStepper.Step(
+            Box(0.0, 0.0), new Vector2D(10.0, 0.0), Vector2D.Zero,
+            1.0, 0.5, [wall], Array.Empty<MovingPlatformTrajectory>(),
+            diagnostics: strict);
+        Assert.Equal(0.5, result.AdvancedSeconds);
+        Assert.Equal(0, strict.RecoveryCount);
+        Assert.Equal(1, Assert.Single(result.Contacts).ColliderId);
+        Assert.True(result.Bounds.Right <= wallLeft);
     }
 
     [Fact]

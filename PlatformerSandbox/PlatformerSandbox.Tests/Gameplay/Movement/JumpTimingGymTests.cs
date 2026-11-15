@@ -89,7 +89,10 @@ public sealed class JumpTimingGymTests
 
     private static MovementGymSession NewGymThatHasWalkedOffTheRightLedge()
     {
-        var gym = new MovementGymSession();
+        // The combined gym now has a left-side crush wall at x=4.30..4.70.
+        // Use the unchanged horizontal-only fixture to reach the original
+        // x=6..8 pit without jumping over unrelated crush-test obstacles.
+        var gym = new MovementGymSession(platformMode: MovingPlatformGymMode.Horizontal);
         for (int i = 0; i < 180 && gym.IsGrounded; i++)
             gym.Step(MovementGymSession.FixedStepSeconds, HorizontalDirection.Right, false);
         Assert.False(gym.IsGrounded);

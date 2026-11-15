@@ -78,6 +78,34 @@ public sealed class ParabolicAabbCollisionDetectorTests
     }
 
     [Fact]
+    public void OneUlpOfEndpointPenetrationStillProducesAContact()
+    {
+        // At the root, the right edge is exactly aligned with the wall.
+        // Between the root and 0.5 s there is no representable midpoint
+        // with positive X overlap: midpoint overlap testing alone misses it.
+        double wallLeft = Math.BitDecrement(6.0);
+        var hit = ParabolicAabbCollisionDetector.Sweep(
+            Box(0, 0, 1, 1), new Vector2D(10, 0), Vector2D.Zero, 0.5,
+            Collider(Box(wallLeft, -1, 7, 3)));
+
+        Assert.True(hit.HasValue);
+        Assert.Equal(new Vector2D(-1, 0), hit.Value.Normal);
+        Assert.True(hit.Value.TimeSeconds < 0.5);
+        Assert.Equal(wallLeft, hit.Value.MovingBoundsAtImpact.Right);
+    }
+
+    [Fact]
+    public void OneUlpEndpointCornerGrazeDoesNotInventAContact()
+    {
+        double wallLeft = Math.BitDecrement(6.0);
+        // The X edge crosses by one ULP, but Y only touches the obstacle.
+        // There is no positive-area intersection in either time interval.
+        Assert.Null(ParabolicAabbCollisionDetector.Sweep(
+            Box(0, 0, 1, 1), new Vector2D(10, 0), Vector2D.Zero, 0.5,
+            Collider(Box(wallLeft, 1, 7, 3))));
+    }
+
+    [Fact]
     public void ApexAtEndpointDoesNotCountIfAcceleratingAway()
     {
         Assert.Null(ParabolicAabbCollisionDetector.Sweep(

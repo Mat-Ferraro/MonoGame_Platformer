@@ -126,11 +126,17 @@ public sealed class MovingPlatformCharacterControllerTests
     }
 
     [Fact]
-    public void VerticalMovingPlatformIsRejectedByFirstRuntimeIntegration()
+    public void VerticalMovingPlatformNowCarriesSupportedRider()
     {
         var rising = new MovingPlatformTrajectory(7,
             Box(-1, 0, 4, 0.25), new Vector2D(0, 2), 1);
-        Assert.Throws<ArgumentException>(() => Motor(Box(0, 0.25), rising));
+        var motor = Motor(Box(0, 0.25), rising);
+        Assert.Equal(7, motor.MovingSupportId);
+        Near(2.0, motor.Velocity.Y);
+        motor.Step(0.2, HorizontalDirection.Neutral, false);
+        Near(0.65, motor.Bounds.Bottom);
+        Near(2.0, motor.Velocity.Y);
+        Assert.True(motor.IsGrounded);
     }
 
     [Fact]

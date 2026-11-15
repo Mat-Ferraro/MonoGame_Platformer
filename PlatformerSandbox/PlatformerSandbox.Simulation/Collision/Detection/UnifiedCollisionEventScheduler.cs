@@ -48,12 +48,59 @@ public static class UnifiedCollisionEventScheduler
     }
 
     /// <summary>
+    /// Returns ALL genuinely coincident first impacts in ascending collider-ID
+    /// order. Uses exact time equality; it does not merge merely close impact
+    /// times or introduce a floating-point time tolerance. The ordinary
+    /// first-hit query remains unchanged for callers that need only one hit.
+    /// </summary>
+    public static IReadOnlyList<UnifiedCollisionHit> SweepParabolicCoincident(
+        Aabb body, Vector2D velocity, Vector2D acceleration,
+        double worldStartSeconds, double durationSeconds,
+        IReadOnlyList<StaticAabbCollider> staticColliders,
+        IReadOnlyList<MovingPlatformTrajectory> movingPlatforms,
+        double contactAlignmentTolerance = 1e-8)
+    {
+        UnifiedCollisionHit? first = SweepParabolicFirst(body, velocity,
+            acceleration, worldStartSeconds, durationSeconds, staticColliders,
+            movingPlatforms, contactAlignmentTolerance);
+        if (first is null) return Array.Empty<UnifiedCollisionHit>();
+
+        var hits = new List<UnifiedCollisionHit> { first.Value };
+        foreach (StaticAabbCollider obstacle in staticColliders)
+        {
+            if (obstacle.Id == first.Value.ColliderId) continue;
+            ParabolicSweepHit? candidate = ParabolicAabbCollisionDetector.Sweep(
+                body, velocity, acceleration, durationSeconds, obstacle,
+                contactAlignmentTolerance);
+            if (candidate is { } hit && hit.TimeSeconds == first.Value.TimeSeconds)
+                hits.Add(new UnifiedCollisionHit(hit.ColliderId, false,
+                    hit.TimeSeconds, hit.Normal, hit.MovingBoundsAtImpact,
+                    hit.VelocityAtImpact, Vector2D.Zero));
+        }
+        foreach (MovingPlatformTrajectory platform in movingPlatforms)
+        {
+            if (platform.Id == first.Value.ColliderId) continue;
+            MovingPlatformSweepHit? candidate = MovingPlatformCollisionDetector.SweepFirst(
+                body, velocity, acceleration, worldStartSeconds,
+                durationSeconds, [platform], contactAlignmentTolerance);
+            if (candidate is { } hit && hit.TimeSeconds == first.Value.TimeSeconds)
+                hits.Add(new UnifiedCollisionHit(hit.PlatformId, true,
+                    hit.TimeSeconds, hit.Normal, hit.BodyBoundsAtImpact,
+                    hit.BodyVelocityAtImpact, hit.PlatformVelocityAtImpact));
+        }
+        hits.Sort((a, b) => a.ColliderId.CompareTo(b.ColliderId));
+        return Array.AsReadOnly(hits.ToArray());
+    }
+
+    /// <summary>
     /// Exact arbitrary analytical motion, including nonparabolic jump curves.
-    /// The supplied interval MUST be monotone in X and Y, including in the
-    /// relative frame of each moving platform. The calling coordinator splits
-    /// at jump apices, release events, horizontal and relative reversals;
-    /// platform turnarounds are split internally. Relative endpoint velocity
-    /// sign changes are rejected rather than risking a missed collision.
+    /// The supplied interval must be monotone in WORLD X and Y; the calling
+    /// coordinator splits at its own motion-law discontinuities and reversals.
+    /// Each moving-platform leg is split internally at RELATIVE X/Y velocity
+    /// zero events as well as platform turnarounds, so a world-monotone jump
+    /// may turn relative to a rising elevator without invalidating the query.
+    /// The velocity on each supplied world-motion phase must be continuous
+    /// and have at most one zero crossing per component on a platform leg.
     /// evaluate(0).Position must be zero.
     /// </summary>
     public static UnifiedCollisionHit? SweepAnalyticalFirst(
@@ -100,57 +147,69 @@ public static class UnifiedCollisionEventScheduler
                         "An analytical platform event cannot advance representable time. " +
                         "The authoritative motion coordinator must normalize the event boundary.");
 
-                MotionSample2D bodyStart = evaluate(advanced);
-                MotionSample2D bodyEnd = evaluate(advanced + segment);
-                Aabb intervalBody = body.Translated(bodyStart.Position);
-                MovingPlatformSample platformStart = platform.Evaluate(now);
-                Vector2D platformVelocity = platformStart.Velocity;
-                if (ChangesRelativeDirection(bodyStart.Velocity, bodyEnd.Velocity,
-                        platformVelocity))
-                {
-                    throw new ArgumentException(
-                        "Relative analytical motion turns within a moving-platform " +
-                        "interval. Split the input at the relative velocity-zero event.",
-                        nameof(evaluate));
-                }
+                // A world-monotone jump need not be monotone RELATIVE to a
+                // moving elevator. For example, vy may pass through the
+                // elevator speed before the character reaches its world apex.
+                // Locate relative velocity-zero events deterministically,
+                // and sweep each monotone interval with the existing exact
+                // analytical face-crossing detector. Never skip the whole
+                // interval or treat a valid reversal as a simulation fault.
+                Vector2D platformVelocity = platform.Evaluate(now).Velocity;
+                var boundaries = new List<double> { 0.0, segment };
+                AddRelativeTurn(boundaries, evaluate, advanced, segment,
+                    platformVelocity.X, horizontal: true);
+                AddRelativeTurn(boundaries, evaluate, advanced, segment,
+                    platformVelocity.Y, horizontal: false);
+                boundaries.Sort();
 
-                // The platform is fixed in the relative frame during this
-                // uninterrupted velocity leg. The body remains analytical.
-                MotionSample2D EvaluateRelative(double localTime)
+                bool foundOnThisLeg = false;
+                for (int part = 0; part + 1 < boundaries.Count; ++part)
                 {
-                    MotionSample2D bodySample = evaluate(advanced + localTime);
-                    return new MotionSample2D(
-                        bodySample.Position - bodyStart.Position -
-                            platformVelocity * localTime,
-                        bodySample.Velocity - platformVelocity);
-                }
+                    double start = boundaries[part];
+                    double end = boundaries[part + 1];
+                    if (!(end > start)) continue;
+                    double absoluteStart = advanced + start;
+                    double intervalDuration = end - start;
+                    MotionSample2D bodyStart = evaluate(absoluteStart);
+                    Aabb intervalBody = body.Translated(bodyStart.Position);
+                    MovingPlatformSample platformStart = platform.Evaluate(now + start);
 
-                var relativeObstacle = new StaticAabbCollider(
-                    platform.Id, platformStart.Bounds);
-                AnalyticalSweepHit? relativeHit =
-                    AnalyticalAabbCollisionDetector.SweepFirst(
-                        intervalBody, EvaluateRelative, segment,
-                        [relativeObstacle], contactAlignmentTolerance);
-                if (relativeHit is { } hit)
-                {
-                    double time = advanced + hit.TimeSeconds;
+                    // Platform velocity is constant throughout this leg;
+                    // the frame origin changes for each monotone subinterval.
+                    MotionSample2D EvaluateRelative(double localTime)
+                    {
+                        MotionSample2D bodySample = evaluate(absoluteStart + localTime);
+                        return new MotionSample2D(
+                            bodySample.Position - bodyStart.Position -
+                                platformVelocity * localTime,
+                            bodySample.Velocity - platformVelocity);
+                    }
+
+                    var relativeObstacle = new StaticAabbCollider(
+                        platform.Id, platformStart.Bounds);
+                    AnalyticalSweepHit? relativeHit =
+                        AnalyticalAabbCollisionDetector.SweepFirst(
+                            intervalBody, EvaluateRelative, intervalDuration,
+                            [relativeObstacle], contactAlignmentTolerance);
+                    if (relativeHit is not { } hit) continue;
+
+                    double time = absoluteStart + hit.TimeSeconds;
                     MotionSample2D bodyAtImpact = evaluate(time);
                     MovingPlatformSample platformAtImpact =
                         platform.Evaluate(worldStartSeconds + time);
-                    // Recompute WORLD impact bounds from authoritative body
-                    // displacement. A face-aligned relative hit is corrected
-                    // by the platform's exact displacement on this leg.
-                    Vector2D authoritativePlatformDisplacement =
+                    Vector2D platformDisplacement =
                         platformAtImpact.Bounds.Min - platformStart.Bounds.Min;
                     Aabb contactBounds = hit.MovingBoundsAtImpact.Translated(
-                        authoritativePlatformDisplacement);
+                        platformDisplacement);
                     UnifiedCollisionHit candidate = new(
                         platform.Id, true, time, hit.Normal,
                         contactBounds, bodyAtImpact.Velocity,
                         platformAtImpact.Velocity);
                     best = Earlier(best, candidate);
+                    foundOnThisLeg = true;
                     break;
                 }
+                if (foundOnThisLeg) break;
 
                 advanced += segment;
                 if (advanced < durationSeconds && ++turnCount > maxPlatformTurnEvents)
@@ -161,21 +220,108 @@ public static class UnifiedCollisionEventScheduler
         return best;
     }
 
-    private static bool ChangesRelativeDirection(
-        Vector2D initialBodyVelocity, Vector2D finalBodyVelocity,
-        Vector2D platformVelocity)
+    /// <summary>
+    /// All contacts at the exact first impact instant of a piecewise analytical
+    /// trajectory, ordered by stable collider ID. The single-hit query performs
+    /// the authoritative global-world validation and selects the impact time;
+    /// each candidate is then queried with the SAME trajectory and platform
+    /// turnaround/relative-turn logic. Near-but-unequal timestamps are not
+    /// coalesced. This service reports geometry only, never gameplay response.
+    /// </summary>
+    public static IReadOnlyList<UnifiedCollisionHit> SweepAnalyticalCoincident(
+        Aabb body,
+        Func<double, MotionSample2D> evaluate,
+        double worldStartSeconds,
+        double durationSeconds,
+        IReadOnlyList<StaticAabbCollider> staticColliders,
+        IReadOnlyList<MovingPlatformTrajectory> movingPlatforms,
+        double contactAlignmentTolerance = 1e-8,
+        int maxPlatformTurnEvents = 64)
     {
-        // This is a conservative check of the caller's relative-monotonicity
-        // contract. A single segment with multiple hidden turns is likewise
-        // outside the API contract; callers must split at all motion events.
-        return (initialBodyVelocity.X < platformVelocity.X &&
-                finalBodyVelocity.X > platformVelocity.X) ||
-               (initialBodyVelocity.X > platformVelocity.X &&
-                finalBodyVelocity.X < platformVelocity.X) ||
-               (initialBodyVelocity.Y < platformVelocity.Y &&
-                finalBodyVelocity.Y > platformVelocity.Y) ||
-               (initialBodyVelocity.Y > platformVelocity.Y &&
-                finalBodyVelocity.Y < platformVelocity.Y);
+        UnifiedCollisionHit? first = SweepAnalyticalFirst(
+            body, evaluate, worldStartSeconds, durationSeconds,
+            staticColliders, movingPlatforms, contactAlignmentTolerance,
+            maxPlatformTurnEvents);
+        if (first is null) return Array.Empty<UnifiedCollisionHit>();
+
+        var hits = new List<UnifiedCollisionHit> { first.Value };
+        foreach (StaticAabbCollider collider in staticColliders)
+        {
+            if (collider.Id == first.Value.ColliderId) continue;
+            UnifiedCollisionHit? candidate = SweepAnalyticalFirst(
+                body, evaluate, worldStartSeconds, durationSeconds,
+                [collider], Array.Empty<MovingPlatformTrajectory>(),
+                contactAlignmentTolerance, maxPlatformTurnEvents);
+            if (candidate is { } hit && hit.TimeSeconds == first.Value.TimeSeconds)
+                hits.Add(hit);
+        }
+        foreach (MovingPlatformTrajectory platform in movingPlatforms)
+        {
+            if (platform.Id == first.Value.ColliderId) continue;
+            UnifiedCollisionHit? candidate = SweepAnalyticalFirst(
+                body, evaluate, worldStartSeconds, durationSeconds,
+                Array.Empty<StaticAabbCollider>(), [platform],
+                contactAlignmentTolerance, maxPlatformTurnEvents);
+            if (candidate is { } hit && hit.TimeSeconds == first.Value.TimeSeconds)
+                hits.Add(hit);
+        }
+        hits.Sort((a, b) => a.ColliderId.CompareTo(b.ColliderId));
+        return Array.AsReadOnly(hits.ToArray());
+    }
+
+    /// <summary>
+    /// Find an interior relative-velocity zero using a bracketed binary64
+    /// search. This is event isolation, not sampled collision detection:
+    /// contact times are still solved by AnalyticalAabbCollisionDetector.
+    /// On a single continuous world-motion phase a velocity component has
+    /// at most one crossing; any more complex curve must be split by its
+    /// motion coordinator at its physical law-change events.
+    /// </summary>
+    private static void AddRelativeTurn(
+        List<double> boundaries,
+        Func<double, MotionSample2D> evaluate,
+        double advanced,
+        double duration,
+        double platformVelocity,
+        bool horizontal)
+    {
+        double InitialRelativeVelocity(double localTime)
+        {
+            Vector2D v = evaluate(advanced + localTime).Velocity;
+            return (horizontal ? v.X : v.Y) - platformVelocity;
+        }
+
+        double first = InitialRelativeVelocity(0.0);
+        double last = InitialRelativeVelocity(duration);
+        if (!((first < 0.0 && last > 0.0) ||
+              (first > 0.0 && last < 0.0)))
+            return;
+
+        double low = 0.0;
+        double high = duration;
+        bool negativeAtStart = first < 0.0;
+        for (int i = 0; i < 128; ++i)
+        {
+            double mid = low + (high - low) * 0.5;
+            if (mid == low || mid == high) break;
+            double velocity = InitialRelativeVelocity(mid);
+            if (velocity == 0.0)
+            {
+                low = mid;
+                high = mid;
+                break;
+            }
+            if ((velocity < 0.0) == negativeAtStart) low = mid;
+            else high = mid;
+        }
+
+        // Pick the representable time nearest the root. A root that rounds
+        // onto the segment boundary requires no additional subinterval;
+        // the physical reversal cannot be temporally resolved in this leg.
+        double root = Math.Abs(InitialRelativeVelocity(low)) <=
+                      Math.Abs(InitialRelativeVelocity(high)) ? low : high;
+        if (root > 0.0 && root < duration)
+            boundaries.Add(root);
     }
 
     private static UnifiedCollisionHit? Earlier(

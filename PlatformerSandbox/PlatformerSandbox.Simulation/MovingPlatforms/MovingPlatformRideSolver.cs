@@ -57,9 +57,15 @@ public static class MovingPlatformRideSolver
                 "The body must start supported by this platform. " +
                 "Landing onto a moving platform requires a separate relative collision query.");
 
-        // All horizontal support queries operate in a platform-local frame.
-        // The sole authoritative world displacement is added on output.
+        // Support-departure queries remain in a platform-local frame.
+        // Returned world motion is integrated separately to avoid drift.
         double localLeft = initialBody.Left - start.Bounds.Left;
+        // Local X is authoritative for the analytical support-departure query.
+        // Keep a separate WORLD-space body for the emitted position. If an
+        // immovable wall has stopped the rider, platform travel and opposite
+        // relative travel cancel physically; reassembling floor.Left+localLeft
+        // each frame can instead drift through that wall by one or two ULPs.
+        Aabb worldBody = initialBody;
         double relativeVelocity = relativeHorizontalVelocity;
         double advanced = 0.0;
         int turns = 0;
@@ -100,14 +106,39 @@ public static class MovingPlatformRideSolver
             double travel = relativeVelocity * dt +
                             0.5 * relativeHorizontalAcceleration * dt * dt;
             localLeft = exit?.BodyLeftAtDeparture ?? localLeft + travel;
+
+            // Each segment stays within one constant-velocity platform leg.
+            // Compose the horizontal velocities BEFORE integrating. In
+            // particular, vx(world) = vx(platform) + vx(relative) = 0 must
+            // yield EXACTLY zero displacement when acceleration is also zero.
+            // This prevents repeated local->world conversion from creating
+            // spurious sub-ULP penetration while pressed against a static wall.
+            MovingPlatformSample legStart = platform.Evaluate(now);
+            double worldDx = (legStart.Velocity.X + relativeVelocity) * dt +
+                0.5 * relativeHorizontalAcceleration * dt * dt;
             relativeVelocity += relativeHorizontalAcceleration * dt;
             // Assign the exact requested duration on a terminal segment.
             // Repeated += can otherwise leave a sub-ULP remainder forever.
             advanced = dt == remaining ? durationSeconds : advanced + dt;
 
             MovingPlatformSample atEvent = platform.Evaluate(startTimeSeconds + advanced);
-            Aabb worldBody = BuildWorldBody(
-                atEvent.Bounds, localLeft, initialBody.Width, initialBody.Height);
+            if (exit.HasValue)
+            {
+                // A departure root identifies an exact support edge in the
+                // platform frame. Preserve that exact geometric boundary.
+                worldBody = BuildWorldBody(
+                    atEvent.Bounds, localLeft, initialBody.Width, initialBody.Height);
+            }
+            else
+            {
+                // Y support is always pinned to the authoritative platform
+                // plane; only X uses the independent world displacement.
+                // Adding zero preserves BOTH original X faces exactly.
+                worldBody = new Aabb(
+                    new Vector2D(worldBody.Left + worldDx, atEvent.Bounds.Top),
+                    new Vector2D(worldBody.Right + worldDx,
+                        atEvent.Bounds.Top + initialBody.Height));
+            }
             Vector2D worldVelocity = atEvent.Velocity +
                                      new Vector2D(relativeVelocity, 0.0);
             if (exit.HasValue)

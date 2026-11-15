@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PlatformerSandbox.Foundation.Geometry;
@@ -55,16 +56,31 @@ internal static class MovementGymRenderer
                 rect.Bottom < 0 || rect.Top > viewport.Height)
                 continue;
 
-            Color color = collider.Id <= 2 ? FloorColor : ElevatedColor;
+            Color color = collider.Id == MovementGymSession.GroundStepBumpColliderId
+                ? new Color(250, 216, 83) // visual fixture, NOT collision behavior
+                : collider.Id <= 2 ? FloorColor : ElevatedColor;
             batch.Draw(pixel, rect, color);
             DrawOutline(batch, pixel, rect, Color.White * 0.22f);
         }
 
-        Rectangle moving = WorldToScreen(gym.MovingPlatform.Bounds, centerX,
-            originX, groundY);
-        if (moving.Right >= 0 && moving.Left <= viewport.Width &&
-            moving.Bottom >= 0 && moving.Top <= viewport.Height)
+        // World-anchored step marker stays with the bump as the camera pans.
+        // The small 0.10-unit rise is intentionally highlighted, not enlarged.
+        if (gym.Colliders.Any(c => c.Id == MovementGymSession.GroundStepBumpColliderId))
         {
+            int markerX = (int)Math.Round(originX +
+                (-3.70 - centerX) * PixelsPerWorldUnit);
+            int markerY = (int)Math.Round(groundY - 2.30 * PixelsPerWorldUnit);
+            GymDebugText.Draw(batch, pixel, markerX, markerY,
+                "STEP TEST - WALK LEFT - F9", new Color(250, 216, 83), 1);
+        }
+
+        // Both real moving colliders render from the same simulation clock.
+        foreach (var platform in gym.MovingPlatforms)
+        {
+            Rectangle moving = WorldToScreen(platform.Bounds, centerX,
+                originX, groundY);
+            if (moving.Right < 0 || moving.Left > viewport.Width ||
+                moving.Bottom < 0 || moving.Top > viewport.Height) continue;
             batch.Draw(pixel, moving, MovingFloor);
             DrawOutline(batch, pixel, moving, Color.White * 0.60f);
         }
@@ -78,6 +94,20 @@ internal static class MovementGymRenderer
         // Fault mode is a SEPARATELY LABELED, persistent in-game HUD below them.
         // Read the authoritative mode every Draw; no cached/lagging selection.
         DrawFaultModeHud(batch, pixel, gym);
+        GymDebugText.Draw(batch, pixel, 18, 123,
+            gym.PlatformMode == MovingPlatformGymMode.Both
+                ? "PLATFORMS: HORIZONTAL + ELEVATOR"
+                : gym.PlatformMode == MovingPlatformGymMode.Elevator
+                    ? "PLATFORM: ELEVATOR" : "PLATFORM: HORIZONTAL",
+            MovingFloor, 1);
+        GymDebugText.Draw(batch, pixel, 18, 140,
+            "CRUSH RESPAWNS: " + gym.CrushRespawns,
+            new Color(255, 144, 144), 1);
+        GymDebugText.Draw(batch, pixel, 18, 157,
+            "F9 COLLISION ASSIST: " +
+            (gym.AssistancePolicy.AnyEnabled ? "ON" : "OFF") +
+            "  ASSISTS: " + gym.TotalAssists,
+            new Color(174, 218, 192), 1);
 
         // Compact state indicators: ground, jumping, paused, moving-floor.
         batch.Draw(pixel, new Rectangle(18, 18, 15, 15),

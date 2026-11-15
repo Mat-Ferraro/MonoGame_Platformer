@@ -43,6 +43,11 @@ public sealed class MovingPlatformRestingContactRegressionTests
     {
         MovingPlatformTrajectory platform = CreatePlatform();
         CharacterMovementController motor = CreateController(platform);
+        // Recreate a transient *unsupported* contact state consistently.
+        // The authoritative support was added when multiple platforms were
+        // introduced. Leaving it latched while clearing the legacy flags
+        // describes an impossible runtime state and bypasses the sweep.
+        SetPrivateField(motor, "_supportPlatform", null!);
         SetPrivateField(motor, "_onMovingPlatform", false);
         SetPrivateField(motor, "_grounded", false);
         SetPrivateField(motor, "_velocity", new Vector2D(9, 0));
@@ -67,6 +72,11 @@ public sealed class MovingPlatformRestingContactRegressionTests
     {
         MovingPlatformTrajectory platform = CreatePlatform();
         CharacterMovementController motor = CreateController(platform);
+        // Recreate a transient *unsupported* contact state consistently.
+        // The authoritative support was added when multiple platforms were
+        // introduced. Leaving it latched while clearing the legacy flags
+        // describes an impossible runtime state and bypasses the sweep.
+        SetPrivateField(motor, "_supportPlatform", null!);
         SetPrivateField(motor, "_onMovingPlatform", false);
         SetPrivateField(motor, "_grounded", false);
         SetPrivateField(motor, "_velocity", new Vector2D(2, 3));

@@ -22,8 +22,8 @@ public sealed class MovementGymSessionTests
     public void StageHasUniqueStableColliderIds()
     {
         var gym = new MovementGymSession();
-        Assert.Equal(6, gym.Colliders.Count);
-        Assert.Equal(6, gym.Colliders.Select(c => c.Id).Distinct().Count());
+        Assert.Equal(14, gym.Colliders.Count);
+        Assert.Equal(14, gym.Colliders.Select(c => c.Id).Distinct().Count());
         Assert.All(gym.Colliders, c =>
             Assert.False(AabbCollisionDetector.Overlaps(gym.PlayerBounds, c.Bounds)));
     }
