@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "scenes": [
+    { "level": "TITLE", "music": "music_title", "emitters": [] },
+    { "level": "CAVERN_A", "music": "music_cavern_a", "emitters": [
+      { "id": "airflow_a", "cue": "ambience.air", "x": 13.0, "y": 25.0, "innerRadius": 1.0, "outerRadius": 17.0 },
+      { "id": "airflow_far", "cue": "ambience.air", "x": 39.0, "y": 24.0, "innerRadius": 1.0, "outerRadius": 16.0 }
+    ] },
+    { "level": "CAVERN_B", "music": "music_cavern_b", "emitters": [
+      { "id": "airflow_b", "cue": "ambience.air", "x": 14.5, "y": 25.0, "innerRadius": 1.0, "outerRadius": 17.0 }
+    ] },
+    { "level": "CAVERN_C", "music": "music_cavern_c", "emitters": [
+      { "id": "airflow_c", "cue": "ambience.air", "x": 13.0, "y": 25.0, "innerRadius": 1.0, "outerRadius": 16.0 },
+      { "id": "airflow_c_far", "cue": "ambience.air", "x": 44.0, "y": 22.0, "innerRadius": 1.5, "outerRadius": 14.0 }
+    ] }
+  ]
+}

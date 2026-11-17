@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 
 namespace PlatformerSandbox.Gameplay.GameFlow;
@@ -51,6 +52,25 @@ public static class GameLevelMenuCatalog
         });
 
     public static IReadOnlyList<GameUiMenuItem> Items => _items;
+
+    /// <summary>Retain familiar demo shortcuts, discover all other LDtk levels,
+    /// and keep non-LDtk gyms at the end of the menu.</summary>
+    public static IReadOnlyList<GameUiMenuItem> WithDiscoveredLevels(IEnumerable<string> levelIds)
+    {
+        ArgumentNullException.ThrowIfNull(levelIds);
+        var ids = levelIds.ToHashSet(StringComparer.Ordinal);
+        var list = new List<GameUiMenuItem>();
+        // The first six are the historical LDtk menu entries. Their scene IDs
+        // remain compatibility aliases for previously authored single-level files.
+        foreach (GameUiMenuItem item in _items.Take(6))
+            if (item.Destination is SceneDestination destination && ids.Remove(destination.LevelId))
+                list.Add(item);
+        foreach (string id in ids.OrderBy(x => x, StringComparer.Ordinal))
+            list.Add(new GameUiMenuItem("LDTK  /  " + id.Replace('_', ' '),
+                GameUiCommand.PlaySelectedLevel, new SceneDestination(id)));
+        list.AddRange(_items.Skip(6));
+        return list.AsReadOnly();
+    }
 }
 
 
@@ -129,14 +149,21 @@ public sealed class GameUiNavigation
 public sealed class GameFlowController : IDisposable
 {
     private readonly GameSceneCoordinator _scenes;
+    private readonly IReadOnlyList<GameUiMenuItem> _levelMenuItems;
     private readonly GameUiNavigation _ui = new();
     private readonly SceneTransitionCurtain _curtain = new();
     private bool _disposed;
     private double _failureNoticeSeconds;
     public SceneFlowValidationMetrics Validation { get; } = new();
 
-    public GameFlowController(IGameFlowSceneFactory factory) =>
+    public GameFlowController(IGameFlowSceneFactory factory,
+        IReadOnlyList<GameUiMenuItem>? levelMenuItems = null)
+    {
         _scenes = new GameSceneCoordinator(factory);
+        _levelMenuItems = levelMenuItems ?? GameLevelMenuCatalog.Items;
+        if (_levelMenuItems.Count == 0)
+            throw new ArgumentException("Level menu cannot be empty.", nameof(levelMenuItems));
+    }
 
     public GameSceneCoordinator Scenes => _scenes;
     public GameUiNavigation Ui => _ui;
@@ -161,7 +188,7 @@ public sealed class GameFlowController : IDisposable
             new("SETTINGS", GameUiCommand.Settings),
             new("QUIT", GameUiCommand.Quit)
         ],
-        GameUiScreen.LevelSelect => GameLevelMenuCatalog.Items,
+        GameUiScreen.LevelSelect => _levelMenuItems,
         GameUiScreen.Pause =>
         [
             new("RESUME", GameUiCommand.Resume),

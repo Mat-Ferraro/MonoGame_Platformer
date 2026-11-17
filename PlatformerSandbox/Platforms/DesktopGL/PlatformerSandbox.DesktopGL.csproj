@@ -37,6 +37,30 @@
     <ProjectReference Include="..\..\PlatformerSandbox.Simulation\PlatformerSandbox.Simulation.csproj" />
     <ProjectReference Include="..\..\PlatformerSandbox.Diagnostics\PlatformerSandbox.Diagnostics.csproj" />
   </ItemGroup>
+  <!-- Deploy animation art and its JSON manifest as readable assets. The
+       PNG is decoded at runtime to avoid depending on an optional XNB build
+       step for the test character. Keep these paths paired. -->
+  <ItemGroup>
+    <Content Include="..\..\Content\Assets\Characters\C02_TestCharacter.png"
+             Link="Content\Characters\C02_TestCharacter.png"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Ship animation manifests as readable authoring data beside the PNG. -->
+  <ItemGroup>
+    <Content Include="..\..\Content\Characters\*.anim.json"
+             Link="Content\Characters\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- A01 authored audio cues and original test samples. Kept as files rather
+       than XNB until the sound content-builder workflow has been validated. -->
+  <ItemGroup>
+    <Content Include="..\..\Content\Audio\*.*"
+             Link="Content\Audio\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <Import Project="..\..\Content\BuildContent.targets" />
   <!-- Generates Info.plist for a hand-packaged macOS .app bundle, when building for macOS. -->
   <Import Project="..\..\Resources\macOS\MacBundle.targets" Condition="$(RuntimeIdentifier.StartsWith('osx'))" />

@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "cues": [
+    {
+      "id": "ui.navigate",
+      "category": "Ui",
+      "samples": [
+        "ui_move"
+      ],
+      "gain": 0.48,
+      "priority": 60,
+      "maxVoices": 2,
+      "cooldownSeconds": 0.045
+    },
+    {
+      "id": "ui.confirm",
+      "category": "Ui",
+      "samples": [
+        "ui_confirm"
+      ],
+      "gain": 0.58,
+      "priority": 80,
+      "maxVoices": 2
+    },
+    {
+      "id": "ui.back",
+      "category": "Ui",
+      "samples": [
+        "ui_back"
+      ],
+      "gain": 0.55,
+      "priority": 70,
+      "maxVoices": 2
+    },
+    {
+      "id": "player.jump",
+      "category": "Gameplay",
+      "samples": [
+        "jump_01",
+        "jump_02"
+      ],
+      "gain": 0.78,
+      "pitchMin": -0.04,
+      "pitchMax": 0.04,
+      "priority": 80,
+      "maxVoices": 3,
+      "cooldownSeconds": 0.06
+    },
+    {
+      "id": "player.land",
+      "category": "Gameplay",
+      "samples": [
+        "land_01",
+        "land_02"
+      ],
+      "gain": 0.58,
+      "pitchMin": -0.06,
+      "pitchMax": 0.03,
+      "priority": 45,
+      "maxVoices": 3,
+      "cooldownSeconds": 0.09
+    },
+    {
+      "id": "player.wall",
+      "category": "Gameplay",
+      "samples": [
+        "wall"
+      ],
+      "gain": 0.36,
+      "priority": 30,
+      "maxVoices": 2,
+      "cooldownSeconds": 0.16
+    },
+    {
+      "id": "player.ability",
+      "category": "Gameplay",
+      "samples": [
+        "ability"
+      ],
+      "gain": 0.65,
+      "priority": 80,
+      "maxVoices": 3,
+      "cooldownSeconds": 0.09
+    },
+    {
+      "id": "player.respawn",
+      "category": "Gameplay",
+      "samples": [
+        "respawn"
+      ],
+      "gain": 0.66,
+      "priority": 85,
+      "maxVoices": 2
+    },
+    {
+      "id": "ambience.cavern",
+      "category": "Ambience",
+      "samples": [
+        "cavern_bed"
+      ],
+      "gain": 0.45,
+      "priority": 2,
+      "maxVoices": 1,
+      "loop": true
+    },
+    {
+      "id": "ambience.air",
+      "category": "Ambience",
+      "samples": [
+        "airflow"
+      ],
+      "gain": 0.65,
+      "priority": 3,
+      "maxVoices": 4,
+      "loop": true
+    }
+  ]
+}

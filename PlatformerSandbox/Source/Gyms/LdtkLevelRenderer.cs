@@ -2,6 +2,8 @@ using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PlatformerSandbox.Foundation.Geometry;
+using PlatformerSandbox.Foundation.Presentation;
+using PlatformerSandbox.Presentation;
 using PlatformerSandbox.Gameplay.Content;
 using PlatformerSandbox.Gameplay.World;
 
@@ -18,26 +20,25 @@ internal static class LdtkLevelRenderer
         WorldSession world, LdtkImportedLevel level, bool paused,
         LdtkVisualSceneAssets? visuals = null, bool showCollisionDebug = false,
         bool showDebugHud = true, bool? collisionBackdrop = null,
-        LdtkConnectedLevel? connected = null)
+        LdtkConnectedLevel? connected = null,
+        Camera2DView? camera = null,
+        LdtkGrayboxAnimator? playerAnimations = null,
+        LdtkCharacterSpriteAssets? characterSprites = null)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
-        double width = level.WidthPx / scale;
-        double height = level.HeightPx / scale;
         WorldPlayerSnapshot player = world.GetPlayer(1);
-        double visibleWidth = viewport.Width / scale;
-        double visibleHeight = viewport.Height / scale;
-        double left = ViewOrigin(player.Bounds.Center.X, width, visibleWidth);
-        double bottom = ViewOrigin(player.Bounds.Center.Y, height, visibleHeight);
-        double cameraLeftPx = left * scale;
-        double cameraTopPx = level.HeightPx - (bottom + visibleHeight) * scale;
+        // The optional projection lets the renderer remain usable by existing
+        // fixtures while the game host owns the persistent follow controller.
+        Camera2DView view = camera ?? Camera2DView.FromFocus(
+            player.Bounds.Center, level.WidthPx / scale, level.HeightPx / scale,
+            viewport.Width, viewport.Height, scale);
+        double cameraLeftPx = view.CameraLeftPx;
+        double cameraTopPx = view.CameraTopPx;
 
         Rectangle WorldRect(Aabb box)
         {
-            int x = (int)Math.Round((box.Left - left) * scale);
-            int y = (int)Math.Round(viewport.Height - (box.Top - bottom) * scale);
-            int w = Math.Max(1, (int)Math.Round(box.Width * scale));
-            int h = Math.Max(1, (int)Math.Round(box.Height * scale));
-            return new Rectangle(x, y, w, h);
+            CameraScreenRect rect = view.WorldRect(box);
+            return new Rectangle(rect.X, rect.Y, rect.Width, rect.Height);
         }
 
         bool hasVisuals = visuals is not null && (visuals.Definition.TileCount > 0 ||
@@ -79,9 +80,60 @@ internal static class LdtkLevelRenderer
         foreach (WorldPlayerSnapshot entity in world.Snapshot().Players)
         {
             Rectangle rect = WorldRect(entity.Bounds);
-            batch.Draw(pixel, rect, new Color(68, 214, 177));
-            batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
-                Math.Max(1, rect.Width), 2), Color.White);
+            // Existing graybox stays collider-aligned. Animation is cosmetic:
+            // a small face/foot cue shows frame and facing without changing
+            // player bounds or introducing authored art requirements.
+            LdtkGrayboxPose pose = playerAnimations?.GetPose(entity.PlayerId)
+                ?? new LdtkGrayboxPose("Idle", 0, 1);
+            Color body = pose.Clip switch
+            {
+                "Dash" => new Color(243, 204, 104),
+                "Rising" => new Color(117, 198, 246),
+                "Falling" => new Color(127, 176, 230),
+                _ => new Color(68, 214, 177)
+            };
+            if (characterSprites is not null && playerAnimations is not null)
+            {
+                // Draw the actual atlas frame, flipped by facing direction.
+                // The authoritative collider remains unchanged; a F9 outline
+                // provides a useful sprite-vs-collision visual check.
+                characterSprites.Draw(batch, rect, pose,
+                    entity.PlayerId == 1 ? Color.White : new Color(228, 204, 255));
+                if (showCollisionDebug)
+                {
+                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
+                        Math.Max(1, rect.Width), 1), Color.Orange);
+                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Bottom - 1,
+                        Math.Max(1, rect.Width), 1), Color.Orange);
+                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
+                        1, Math.Max(1, rect.Height)), Color.Orange);
+                    batch.Draw(pixel, new Rectangle(rect.Right - 1, rect.Top,
+                        1, Math.Max(1, rect.Height)), Color.Orange);
+                }
+            }
+            else
+            {
+                // Original C01 graybox fallback; remains available even when
+                // optional PNG/manifest files are missing or malformed.
+                batch.Draw(pixel, rect, body);
+                batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
+                    Math.Max(1, rect.Width), 2), Color.White);
+                if (playerAnimations is not null)
+                {
+                    int eyeSize = Math.Max(2, (int)Math.Round(3 * scale / 32.0));
+                    int eyeX = pose.Facing >= 0 ? rect.Right - eyeSize - 4 : rect.Left + 4;
+                    int eyeY = rect.Top + Math.Max(4, rect.Height / 4);
+                    if (pose.Clip != "Idle" || pose.Frame != 1)
+                        batch.Draw(pixel, new Rectangle(eyeX, eyeY, eyeSize, eyeSize),
+                            new Color(20, 43, 56));
+                    if (pose.Clip is "Run" or "Dash")
+                    {
+                        int footX = rect.Left + ((pose.Frame % 2 == 0) ? 4 : rect.Width - 7);
+                        batch.Draw(pixel, new Rectangle(footX, rect.Bottom - 4, 3, 3),
+                            new Color(16, 61, 69));
+                    }
+                }
+            }
             GymDebugText.Draw(batch, pixel, rect.Left + 4, rect.Top + 5,
                 entity.PlayerId.ToString(), new Color(18, 23, 35));
         }
@@ -159,12 +211,4 @@ internal static class LdtkLevelRenderer
         }
     }
 
-    private static double ViewOrigin(double focus, double levelLength,
-        double viewportLength)
-    {
-        if (levelLength <= viewportLength)
-            return (levelLength - viewportLength) * 0.5;
-        return Math.Clamp(focus - viewportLength * 0.5,
-            0, levelLength - viewportLength);
-    }
 }

@@ -12744,6 +12744,56 @@
               ],
               "__worldX": 3860,
               "__worldY": 600
+            },
+            {
+              "__identifier": "LevelExit",
+              "__grid": [
+                111,
+                32
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#EDBA51",
+              "iid": "086f0e27-0e4f-441c-96f8-45d1fac914c1",
+              "width": 110,
+              "height": 140,
+              "defUid": 302,
+              "px": [
+                1790,
+                520
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "TriggerId",
+                  "__type": "Int",
+                  "__value": 7105,
+                  "__tile": null,
+                  "defUid": 4020,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetLevel",
+                  "__type": "String",
+                  "__value": "CAVERN_C",
+                  "__tile": null,
+                  "defUid": 4021,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetEntrance",
+                  "__type": "String",
+                  "__value": "WEST",
+                  "__tile": null,
+                  "defUid": 4022,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 4350,
+              "__worldY": 520
             }
           ]
         },
@@ -16655,6 +16705,7463 @@
           "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
           "iid": "314ae1d1-78e1-44cd-ba37-426ae6d8a873",
           "levelId": 902,
+          "layerDefUid": 26,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [
+            {
+              "px": [
+                0,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                0
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                128,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                1
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                256,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                2
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                384,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                3
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                512,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                4
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                640,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                5
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                768,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                6
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                896,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                7
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1024,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                8
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1152,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                9
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1280,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                10
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1408,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                11
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1536,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                12
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1664,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                13
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1792,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                14
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1920,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                15
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2048,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                16
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2176,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                17
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                320
+              ],
+              "src": [
+                0,
+                0
+              ],
+              "f": 0,
+              "t": 0,
+              "d": [
+                18
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2432,
+                320
+              ],
+              "src": [
+                256,
+                0
+              ],
+              "f": 0,
+              "t": 2,
+              "d": [
+                19
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                128,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                20
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                384,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                21
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                640,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                22
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                896,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                23
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1152,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                24
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1408,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                25
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1664,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                26
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1920,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                27
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2176,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                28
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2432,
+                448
+              ],
+              "src": [
+                128,
+                0
+              ],
+              "f": 0,
+              "t": 1,
+              "d": [
+                29
+              ],
+              "a": 1.0
+            }
+          ],
+          "entityInstances": []
+        }
+      ],
+      "__neighbours": []
+    },
+    {
+      "identifier": "CAVERN_C",
+      "iid": "29c72ced-13f6-4685-984a-3fa16b1fa733",
+      "uid": 903,
+      "worldX": 5120,
+      "worldY": 0,
+      "worldDepth": 0,
+      "pxWid": 2560,
+      "pxHei": 1280,
+      "__bgColor": "#696A79",
+      "bgColor": null,
+      "useAutoIdentifier": false,
+      "bgRelPath": null,
+      "bgPos": null,
+      "bgPivotX": 0.5,
+      "bgPivotY": 0.5,
+      "__smartColor": "#ADADB5",
+      "__bgPos": null,
+      "externalRelPath": null,
+      "fieldInstances": [
+        {
+          "__identifier": "DrawCollisionBackdrop",
+          "__type": "Bool",
+          "__value": false,
+          "__tile": null,
+          "defUid": 80,
+          "realEditorValues": []
+        }
+      ],
+      "layerInstances": [
+        {
+          "__identifier": "FG_Close",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "fc544dfd-5034-49d3-a4d7-c1726b8104c2",
+          "levelId": 903,
+          "layerDefUid": 21,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [
+            {
+              "px": [
+                0,
+                320
+              ],
+              "src": [
+                0,
+                384
+              ],
+              "f": 0,
+              "t": 12,
+              "d": [
+                0
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                512,
+                320
+              ],
+              "src": [
+                128,
+                384
+              ],
+              "f": 0,
+              "t": 13,
+              "d": [
+                1
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1024,
+                320
+              ],
+              "src": [
+                0,
+                384
+              ],
+              "f": 0,
+              "t": 12,
+              "d": [
+                2
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1664,
+                320
+              ],
+              "src": [
+                128,
+                384
+              ],
+              "f": 0,
+              "t": 13,
+              "d": [
+                3
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                320
+              ],
+              "src": [
+                0,
+                384
+              ],
+              "f": 0,
+              "t": 12,
+              "d": [
+                4
+              ],
+              "a": 1.0
+            }
+          ],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "FG_Near",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "02f7eb91-7006-4052-8466-ab5502cca8e9",
+          "levelId": 903,
+          "layerDefUid": 22,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [
+            {
+              "px": [
+                256,
+                320
+              ],
+              "src": [
+                256,
+                256
+              ],
+              "f": 0,
+              "t": 10,
+              "d": [
+                0
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                640,
+                320
+              ],
+              "src": [
+                256,
+                256
+              ],
+              "f": 0,
+              "t": 10,
+              "d": [
+                1
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1152,
+                320
+              ],
+              "src": [
+                256,
+                256
+              ],
+              "f": 0,
+              "t": 10,
+              "d": [
+                2
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1664,
+                320
+              ],
+              "src": [
+                256,
+                256
+              ],
+              "f": 0,
+              "t": 10,
+              "d": [
+                3
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2176,
+                320
+              ],
+              "src": [
+                256,
+                256
+              ],
+              "f": 0,
+              "t": 10,
+              "d": [
+                4
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                64,
+                496
+              ],
+              "src": [
+                384,
+                256
+              ],
+              "f": 0,
+              "t": 11,
+              "d": [
+                5
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                768,
+                496
+              ],
+              "src": [
+                384,
+                256
+              ],
+              "f": 0,
+              "t": 11,
+              "d": [
+                6
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1408,
+                496
+              ],
+              "src": [
+                384,
+                256
+              ],
+              "f": 0,
+              "t": 11,
+              "d": [
+                7
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                496
+              ],
+              "src": [
+                384,
+                256
+              ],
+              "f": 0,
+              "t": 11,
+              "d": [
+                8
+              ],
+              "a": 1.0
+            }
+          ],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "Entities",
+          "__type": "Entities",
+          "__cWid": 160,
+          "__cHei": 80,
+          "__gridSize": 16,
+          "__opacity": 1,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": null,
+          "__tilesetRelPath": null,
+          "iid": "c0a4d39c-a4ad-42a7-8616-00116aa28e9c",
+          "levelId": 903,
+          "layerDefUid": 5,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [],
+          "entityInstances": [
+            {
+              "__identifier": "PlayerSpawn",
+              "__grid": [
+                20,
+                30
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#BE4A2F",
+              "iid": "2765c793-7b8d-42f9-966b-1e23fa4ebd46",
+              "width": 32,
+              "height": 32,
+              "defUid": 3,
+              "px": [
+                320,
+                480
+              ],
+              "fieldInstances": [],
+              "__worldX": 5440,
+              "__worldY": 480
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                12,
+                16
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  128,
+                  0,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "55041648-8bf5-4721-b835-fbbf9922cf1c",
+              "width": 420,
+              "height": 355,
+              "defUid": 30,
+              "px": [
+                200,
+                260
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      128,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      128,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Background",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -30,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -7,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": -85.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": -55,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5320,
+              "__worldY": 260
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                58,
+                22
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  256,
+                  0,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "3dbbfc2f-a873-4fd8-b208-abc94184a8d9",
+              "width": 530,
+              "height": 480,
+              "defUid": 30,
+              "px": [
+                930,
+                360
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      256,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      256,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Background",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -20,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 5,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.68,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": -65.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": -35,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6050,
+              "__worldY": 360
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                106,
+                19
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  384,
+                  0,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "fd721c9f-ba61-464c-80e7-a4d505a38f51",
+              "width": 500,
+              "height": 400,
+              "defUid": 30,
+              "px": [
+                1710,
+                315
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      384,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      384,
+                      0,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Background",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -10,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -6,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.78,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": -55.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": -25,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6830,
+              "__worldY": 315
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                37,
+                43
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  0,
+                  128,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "c4b85a5a-5297-482f-96d0-87c52f0e3fe4",
+              "width": 350,
+              "height": 275,
+              "defUid": 30,
+              "px": [
+                600,
+                700
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      0,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      0,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -20,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 8,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.92,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5720,
+              "__worldY": 700
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                96,
+                47
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  128,
+                  128,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "8243ff40-9ac9-4677-9877-756b9f9c0015",
+              "width": 440,
+              "height": 270,
+              "defUid": 30,
+              "px": [
+                1540,
+                760
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      128,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      128,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -9,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.85,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6660,
+              "__worldY": 760
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                21,
+                58
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  256,
+                  128,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "54bd8c40-483b-4bb5-94a3-ea6a86fe6a81",
+              "width": 300,
+              "height": 425,
+              "defUid": 30,
+              "px": [
+                350,
+                930
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      256,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      256,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -13,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.85,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 20.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 15,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5470,
+              "__worldY": 930
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                74,
+                44
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  384,
+                  128,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "20aa0ceb-5b27-471b-b9c6-ce31b88ccb26",
+              "width": 280,
+              "height": 430,
+              "defUid": 30,
+              "px": [
+                1190,
+                710
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      384,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      384,
+                      128,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 10,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 9,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.82,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 35.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 25,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6310,
+              "__worldY": 710
+            },
+            {
+              "__identifier": "ScenerySprite",
+              "__grid": [
+                126,
+                55
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 20,
+                "srcRect": [
+                  0,
+                  256,
+                  128,
+                  128
+                ]
+              },
+              "__smartColor": "#6BC9BE",
+              "iid": "d38b5443-3ecb-4043-a0e6-8b3aae6845ce",
+              "width": 440,
+              "height": 425,
+              "defUid": 30,
+              "px": [
+                2020,
+                890
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      0,
+                      256,
+                      128,
+                      128
+                    ]
+                  },
+                  "__tile": {
+                    "tilesetUid": 20,
+                    "srcRect": [
+                      0,
+                      256,
+                      128,
+                      128
+                    ]
+                  },
+                  "defUid": 31,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 32,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 20,
+                  "__tile": null,
+                  "defUid": 33,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -5,
+                  "__tile": null,
+                  "defUid": 34,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.7,
+                  "__tile": null,
+                  "defUid": 35,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 45.0,
+                  "__tile": null,
+                  "defUid": 36,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 35,
+                  "__tile": null,
+                  "defUid": 37,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 38,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 39,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 7140,
+              "__worldY": 890
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                3,
+                19
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "38226593-4e38-45a3-8f7b-47ca29c4094a",
+              "width": 1080,
+              "height": 300,
+              "defUid": 81,
+              "px": [
+                120,
+                620
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfA.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -10,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5240,
+              "__worldY": 620
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                34,
+                19
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "0f9dd7d1-ddad-40ca-9d34-34ed582d2705",
+              "width": 900,
+              "height": 270,
+              "defUid": 81,
+              "px": [
+                1090,
+                630
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfB.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -7,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -2.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6210,
+              "__worldY": 630
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                56,
+                20
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "feb13937-3c32-4fbc-af8b-18dceae87f74",
+              "width": 790,
+              "height": 335,
+              "defUid": 81,
+              "px": [
+                1810,
+                648
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfC.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -6,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 3.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6930,
+              "__worldY": 648
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                19,
+                23
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "8b9f3ae4-467a-44a1-b80c-7d77d02bebd5",
+              "width": 850,
+              "height": 255,
+              "defUid": 81,
+              "px": [
+                610,
+                750
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfB.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -8,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 6.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5730,
+              "__worldY": 750
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                2,
+                13
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "6f85dc0b-ac1f-487f-bcd3-8c284c44d28b",
+              "width": 660,
+              "height": 390,
+              "defUid": 81,
+              "px": [
+                90,
+                440
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfC.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -12,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -4.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5210,
+              "__worldY": 440
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                25,
+                15
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "d863ce85-5765-4be6-b172-d335edb81e39",
+              "width": 940,
+              "height": 270,
+              "defUid": 81,
+              "px": [
+                810,
+                500
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/RockShelfA.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -11,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 2.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5930,
+              "__worldY": 500
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                11,
+                1
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "ecbf187e-9388-44fa-a11b-d8212f4097c4",
+              "width": 320,
+              "height": 530,
+              "defUid": 81,
+              "px": [
+                355,
+                60
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/HangingRoots.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Background",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 10,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -5.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.55,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": -42.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": -22.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5475,
+              "__worldY": 60
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                1,
+                2
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "4f9e121f-0305-48a1-bdc9-ee1ed702812b",
+              "width": 310,
+              "height": 430,
+              "defUid": 81,
+              "px": [
+                35,
+                65
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/HangingRoots.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 55,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 4.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.63,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 22.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 15.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5155,
+              "__worldY": 65
+            },
+            {
+              "__identifier": "TerrainArtwork",
+              "__grid": [
+                69,
+                2
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#C9A370",
+              "iid": "7680a617-755d-4a4e-b334-9db65990940d",
+              "width": 380,
+              "height": 640,
+              "defUid": 81,
+              "px": [
+                2210,
+                90
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Image",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/HangingRoots.png",
+                  "__tile": null,
+                  "defUid": 90,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 91,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 56,
+                  "__tile": null,
+                  "defUid": 92,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -2.0,
+                  "__tile": null,
+                  "defUid": 93,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 0.76,
+                  "__tile": null,
+                  "defUid": 94,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 28.0,
+                  "__tile": null,
+                  "defUid": 95,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 18.0,
+                  "__tile": null,
+                  "defUid": 96,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 97,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 98,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Tint",
+                  "__type": "Color",
+                  "__value": "#B9D5E8",
+                  "__tile": null,
+                  "defUid": 99,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 7330,
+              "__worldY": 90
+            },
+            {
+              "__identifier": "PaintedSprite",
+              "__grid": [
+                12,
+                19
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 201,
+                "srcRect": [
+                  0,
+                  0,
+                  256,
+                  256
+                ]
+              },
+              "__smartColor": "#7EBAA4",
+              "iid": "f03a551b-1f7b-4e2a-8317-b3692bc84783",
+              "width": 420,
+              "height": 310,
+              "defUid": 202,
+              "px": [
+                200,
+                310
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 201,
+                    "srcRect": [
+                      0,
+                      0,
+                      256,
+                      256
+                    ]
+                  },
+                  "__tile": null,
+                  "defUid": 210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Background",
+                  "__tile": null,
+                  "defUid": 211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": -20,
+                  "__tile": null,
+                  "defUid": 212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -4.0,
+                  "__tile": null,
+                  "defUid": 213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": -60.0,
+                  "__tile": null,
+                  "defUid": 215,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": -20.0,
+                  "__tile": null,
+                  "defUid": 216,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 217,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 218,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5320,
+              "__worldY": 310
+            },
+            {
+              "__identifier": "PaintedSprite",
+              "__grid": [
+                43,
+                21
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 201,
+                "srcRect": [
+                  256,
+                  0,
+                  256,
+                  256
+                ]
+              },
+              "__smartColor": "#7EBAA4",
+              "iid": "029e9618-5ef2-494e-8d8e-85188964c7aa",
+              "width": 500,
+              "height": 320,
+              "defUid": 202,
+              "px": [
+                700,
+                350
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 201,
+                    "srcRect": [
+                      256,
+                      0,
+                      256,
+                      256
+                    ]
+                  },
+                  "__tile": null,
+                  "defUid": 210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 5,
+                  "__tile": null,
+                  "defUid": 212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": -4.0,
+                  "__tile": null,
+                  "defUid": 213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 215,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 216,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 217,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 218,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5820,
+              "__worldY": 350
+            },
+            {
+              "__identifier": "PaintedSprite",
+              "__grid": [
+                83,
+                22
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 201,
+                "srcRect": [
+                  512,
+                  0,
+                  256,
+                  256
+                ]
+              },
+              "__smartColor": "#7EBAA4",
+              "iid": "6069baa3-c27e-4794-a3e7-f9f8908f1b7b",
+              "width": 430,
+              "height": 310,
+              "defUid": 202,
+              "px": [
+                1335,
+                360
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 201,
+                    "srcRect": [
+                      512,
+                      0,
+                      256,
+                      256
+                    ]
+                  },
+                  "__tile": null,
+                  "defUid": 210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Terrain",
+                  "__tile": null,
+                  "defUid": 211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 6,
+                  "__tile": null,
+                  "defUid": 212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 5.0,
+                  "__tile": null,
+                  "defUid": 213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 215,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 216,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 217,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 218,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6455,
+              "__worldY": 360
+            },
+            {
+              "__identifier": "PaintedSprite",
+              "__grid": [
+                119,
+                11
+              ],
+              "__pivot": [
+                0.5,
+                0.5
+              ],
+              "__tags": [],
+              "__tile": {
+                "tilesetUid": 201,
+                "srcRect": [
+                  768,
+                  0,
+                  256,
+                  256
+                ]
+              },
+              "__smartColor": "#7EBAA4",
+              "iid": "c61d35ca-d390-4a81-baf0-e567c50e5e5a",
+              "width": 300,
+              "height": 510,
+              "defUid": 202,
+              "px": [
+                1905,
+                190
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Art",
+                  "__type": "Tile",
+                  "__value": {
+                    "tilesetUid": 201,
+                    "srcRect": [
+                      768,
+                      0,
+                      256,
+                      256
+                    ]
+                  },
+                  "__tile": null,
+                  "defUid": 210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Plane",
+                  "__type": "String",
+                  "__value": "Foreground",
+                  "__tile": null,
+                  "defUid": 211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Depth",
+                  "__type": "Int",
+                  "__value": 10,
+                  "__tile": null,
+                  "defUid": 212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RotationDeg",
+                  "__type": "Float",
+                  "__value": 5.0,
+                  "__tile": null,
+                  "defUid": 213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Opacity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxX",
+                  "__type": "Float",
+                  "__value": 27.0,
+                  "__tile": null,
+                  "defUid": 215,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ParallaxY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 216,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipX",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 217,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "FlipY",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 218,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 7025,
+              "__worldY": 190
+            },
+            {
+              "__identifier": "LevelEntrance",
+              "__grid": [
+                35,
+                22
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#69D1FF",
+              "iid": "7495a58a-0b90-48d0-958f-31817d0dfd7d",
+              "width": 64,
+              "height": 64,
+              "defUid": 301,
+              "px": [
+                560,
+                360
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EntranceId",
+                  "__type": "String",
+                  "__value": "WEST",
+                  "__tile": null,
+                  "defUid": 4010,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5680,
+              "__worldY": 360
+            },
+            {
+              "__identifier": "LevelEntrance",
+              "__grid": [
+                136,
+                33
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#69D1FF",
+              "iid": "dda97ea4-8832-4ad8-822d-fbcb91bd7b23",
+              "width": 64,
+              "height": 64,
+              "defUid": 301,
+              "px": [
+                2180,
+                540
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EntranceId",
+                  "__type": "String",
+                  "__value": "EAST",
+                  "__tile": null,
+                  "defUid": 4010,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 7300,
+              "__worldY": 540
+            },
+            {
+              "__identifier": "LevelExit",
+              "__grid": [
+                26,
+                26
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#EDBA51",
+              "iid": "89f25479-c73a-4862-8985-caae39498086",
+              "width": 100,
+              "height": 280,
+              "defUid": 302,
+              "px": [
+                420,
+                420
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "TriggerId",
+                  "__type": "Int",
+                  "__value": 7201,
+                  "__tile": null,
+                  "defUid": 4020,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetLevel",
+                  "__type": "String",
+                  "__value": "CAVERN_A",
+                  "__tile": null,
+                  "defUid": 4021,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetEntrance",
+                  "__type": "String",
+                  "__value": "EAST",
+                  "__tile": null,
+                  "defUid": 4022,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5540,
+              "__worldY": 420
+            },
+            {
+              "__identifier": "LevelExit",
+              "__grid": [
+                149,
+                35
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#EDBA51",
+              "iid": "22c13f11-dd9c-40bb-9a3d-86c0deb23b2c",
+              "width": 100,
+              "height": 130,
+              "defUid": 302,
+              "px": [
+                2390,
+                570
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "TriggerId",
+                  "__type": "Int",
+                  "__value": 7202,
+                  "__tile": null,
+                  "defUid": 4020,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetLevel",
+                  "__type": "String",
+                  "__value": "CAVERN_B",
+                  "__tile": null,
+                  "defUid": 4021,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TargetEntrance",
+                  "__type": "String",
+                  "__value": "WEST",
+                  "__tile": null,
+                  "defUid": 4022,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 7510,
+              "__worldY": 570
+            },
+            {
+              "__identifier": "Checkpoint",
+              "__grid": [
+                99,
+                37
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#72E5AE",
+              "iid": "512376e8-f5cb-416b-af6f-1671c0c36783",
+              "width": 64,
+              "height": 96,
+              "defUid": 303,
+              "px": [
+                1590,
+                600
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "TriggerId",
+                  "__type": "Int",
+                  "__value": 7203,
+                  "__tile": null,
+                  "defUid": 4030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "SpawnId",
+                  "__type": "String",
+                  "__value": "MID_CHECKPOINT",
+                  "__tile": null,
+                  "defUid": 4031,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6710,
+              "__worldY": 600
+            },
+            {
+              "__identifier": "WindZone",
+              "__grid": [
+                55,
+                21
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#9BB8FF",
+              "iid": "c16b5e72-2599-4ca4-afcf-5ce0dde16d32",
+              "width": 660,
+              "height": 315,
+              "defUid": 304,
+              "px": [
+                880,
+                340
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "TriggerId",
+                  "__type": "Int",
+                  "__value": 7204,
+                  "__tile": null,
+                  "defUid": 4040,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "SpeedPercent",
+                  "__type": "Float",
+                  "__value": -50.0,
+                  "__tile": null,
+                  "defUid": 4041,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6000,
+              "__worldY": 340
+            },
+            {
+              "__identifier": "MovingPlatform",
+              "__grid": [
+                81,
+                37
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#B8A4F1",
+              "iid": "d8d35e53-5e13-4c64-8934-3598b466e874",
+              "width": 128,
+              "height": 18,
+              "defUid": 305,
+              "px": [
+                1300,
+                600
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "ColliderId",
+                  "__type": "Int",
+                  "__value": 8003,
+                  "__tile": null,
+                  "defUid": 4050,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "VelocityX",
+                  "__type": "Float",
+                  "__value": -0.7,
+                  "__tile": null,
+                  "defUid": 4051,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "VelocityY",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 4052,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "TravelSeconds",
+                  "__type": "Float",
+                  "__value": 1.5,
+                  "__tile": null,
+                  "defUid": 4053,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6420,
+              "__worldY": 600
+            }
+          ]
+        },
+        {
+          "__identifier": "Terrain_Art",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "560a2f0b-719e-4c57-a933-fe2f03da8ddd",
+          "levelId": 903,
+          "layerDefUid": 23,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "Collisions",
+          "__type": "IntGrid",
+          "__cWid": 80,
+          "__cHei": 40,
+          "__gridSize": 32,
+          "__opacity": 1,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": null,
+          "__tilesetRelPath": null,
+          "iid": "4ad21804-5a7a-4135-9849-5b33be12842d",
+          "levelId": 903,
+          "layerDefUid": 2,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "autoLayerTiles": [],
+          "seed": 9566475,
+          "overrideTilesetUid": null,
+          "gridTiles": [],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "BG_Near",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "4587f9a5-3a53-49df-bdf3-9126d02c2ad4",
+          "levelId": 903,
+          "layerDefUid": 24,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [
+            {
+              "px": [
+                0,
+                576
+              ],
+              "src": [
+                0,
+                256
+              ],
+              "f": 0,
+              "t": 8,
+              "d": [
+                0
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                256,
+                576
+              ],
+              "src": [
+                128,
+                256
+              ],
+              "f": 0,
+              "t": 9,
+              "d": [
+                1
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                512,
+                576
+              ],
+              "src": [
+                0,
+                256
+              ],
+              "f": 0,
+              "t": 8,
+              "d": [
+                2
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                768,
+                576
+              ],
+              "src": [
+                128,
+                256
+              ],
+              "f": 0,
+              "t": 9,
+              "d": [
+                3
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1024,
+                576
+              ],
+              "src": [
+                0,
+                256
+              ],
+              "f": 0,
+              "t": 8,
+              "d": [
+                4
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1280,
+                576
+              ],
+              "src": [
+                128,
+                256
+              ],
+              "f": 0,
+              "t": 9,
+              "d": [
+                5
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1536,
+                576
+              ],
+              "src": [
+                0,
+                256
+              ],
+              "f": 0,
+              "t": 8,
+              "d": [
+                6
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1792,
+                576
+              ],
+              "src": [
+                128,
+                256
+              ],
+              "f": 0,
+              "t": 9,
+              "d": [
+                7
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2048,
+                576
+              ],
+              "src": [
+                0,
+                256
+              ],
+              "f": 0,
+              "t": 8,
+              "d": [
+                8
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                576
+              ],
+              "src": [
+                128,
+                256
+              ],
+              "f": 0,
+              "t": 9,
+              "d": [
+                9
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                0,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                10
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                384,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                11
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                768,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                12
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1152,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                13
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1536,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                14
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1920,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                15
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                352
+              ],
+              "src": [
+                384,
+                128
+              ],
+              "f": 0,
+              "t": 7,
+              "d": [
+                16
+              ],
+              "a": 1.0
+            }
+          ],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "BG_Mid",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "20b0e13d-3862-481d-b961-a869d4dd22f0",
+          "levelId": 903,
+          "layerDefUid": 25,
+          "pxOffsetX": 0,
+          "pxOffsetY": 0,
+          "visible": true,
+          "optionalRules": [],
+          "intGridCsv": [],
+          "autoLayerTiles": [],
+          "seed": 3667265,
+          "overrideTilesetUid": null,
+          "gridTiles": [
+            {
+              "px": [
+                0,
+                448
+              ],
+              "src": [
+                0,
+                128
+              ],
+              "f": 0,
+              "t": 4,
+              "d": [
+                0
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                256,
+                448
+              ],
+              "src": [
+                128,
+                128
+              ],
+              "f": 0,
+              "t": 5,
+              "d": [
+                1
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                512,
+                448
+              ],
+              "src": [
+                0,
+                128
+              ],
+              "f": 0,
+              "t": 4,
+              "d": [
+                2
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                768,
+                448
+              ],
+              "src": [
+                128,
+                128
+              ],
+              "f": 0,
+              "t": 5,
+              "d": [
+                3
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1024,
+                448
+              ],
+              "src": [
+                0,
+                128
+              ],
+              "f": 0,
+              "t": 4,
+              "d": [
+                4
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1280,
+                448
+              ],
+              "src": [
+                128,
+                128
+              ],
+              "f": 0,
+              "t": 5,
+              "d": [
+                5
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1536,
+                448
+              ],
+              "src": [
+                0,
+                128
+              ],
+              "f": 0,
+              "t": 4,
+              "d": [
+                6
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1792,
+                448
+              ],
+              "src": [
+                128,
+                128
+              ],
+              "f": 0,
+              "t": 5,
+              "d": [
+                7
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2048,
+                448
+              ],
+              "src": [
+                0,
+                128
+              ],
+              "f": 0,
+              "t": 4,
+              "d": [
+                8
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2304,
+                448
+              ],
+              "src": [
+                128,
+                128
+              ],
+              "f": 0,
+              "t": 5,
+              "d": [
+                9
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                128,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                10
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                384,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                11
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                640,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                12
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                896,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                13
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1152,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                14
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1408,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                15
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1664,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                16
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                1920,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                17
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2176,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                18
+              ],
+              "a": 1.0
+            },
+            {
+              "px": [
+                2432,
+                576
+              ],
+              "src": [
+                256,
+                128
+              ],
+              "f": 0,
+              "t": 6,
+              "d": [
+                19
+              ],
+              "a": 1.0
+            }
+          ],
+          "entityInstances": []
+        },
+        {
+          "__identifier": "BG_Far",
+          "__type": "Tiles",
+          "__cWid": 20,
+          "__cHei": 10,
+          "__gridSize": 128,
+          "__opacity": 1.0,
+          "__pxTotalOffsetX": 0,
+          "__pxTotalOffsetY": 0,
+          "__tilesetDefUid": 20,
+          "__tilesetRelPath": "ParallaxPlaceholderAtlas.png",
+          "iid": "f34ecf15-8fde-4a97-af5f-5b06b4a7e71f",
+          "levelId": 903,
           "layerDefUid": 26,
           "pxOffsetX": 0,
           "pxOffsetY": 0,

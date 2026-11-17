@@ -18,6 +18,10 @@ using PlatformerSandbox.Simulation.Motion.Profiles;
 using PlatformerSandbox.Simulation.Diagnostics;
 using PlatformerSandbox.Simulation.CharacterMotor;
 using PlatformerSandbox.Gyms;
+using PlatformerSandbox.Foundation.Presentation;
+using PlatformerSandbox.Foundation.Audio;
+using PlatformerSandbox.Audio;
+using PlatformerSandbox.Presentation;
 
 namespace PlatformerSandbox;
 
@@ -43,6 +47,7 @@ public sealed class Game1 : Game
         string.Equals(argument, "--dev-context-fail-inside-world-step", StringComparison.OrdinalIgnoreCase));
 #endif
     private readonly GameFlowController _flow;
+    private readonly LdtkContentCatalog _ldtkCatalog;
     private GamePadState _previousGamepad;
     // Gameplay assistance starts enabled in the *playable* gym. Unit-test
     // fixtures may still explicitly select the unassisted baseline.
@@ -62,6 +67,21 @@ public sealed class Game1 : Game
     private bool _ldtkWindDirty;
     private string _lastLdtkInteraction = "NONE";
     private LdtkVisualSceneAssets? _ldtkVisuals;
+    // Presentation-owned, never part of the authoritative world tick.
+    private Camera2D? _ldtkCamera;
+    private LdtkGrayboxAnimator? _ldtkCharacterAnimations;
+    private LdtkCharacterSpriteAssets? _ldtkCharacterSprites;
+    private AudioService? _audio;
+    private PlatformerAudioPresenter? _audioEvents;
+    private MusicDirector? _music;
+    private PlatformerSoundscapePresenter? _soundscapes;
+    private readonly string _audioSettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "PlatformerSandbox", "Settings", "audio.json");
+    private string _audioControlMessage = "";
+    private double _audioControlNoticeSeconds;
+    private string? _audioWarning;
+    private string? _ldtkCharacterArtWarning;
     private bool _ldtkShowCollisionDebug;
     private bool _ldtkDrawCollisionBackdrop = true;
     private GameDebugHudMode _debugHudMode = GameDebugHudMode.Full;
@@ -112,7 +132,9 @@ public sealed class Game1 : Game
         IsFixedTimeStep = true;
         TargetElapsedTime = TimeSpan.FromSeconds(MovementGymSession.FixedStepSeconds);
         Window.AllowUserResizing = true;
-        _flow = new GameFlowController(new HostSceneFactory(this));
+        _ldtkCatalog = LdtkContentCatalog.Discover(FindLdtkDirectory());
+        _flow = new GameFlowController(new HostSceneFactory(this),
+            GameLevelMenuCatalog.WithDiscoveredLevels(_ldtkCatalog.Levels.Keys));
     }
 
     protected override void Initialize()
@@ -144,12 +166,124 @@ public sealed class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        // C02 test artwork. Missing/malformed optional art must not prevent
+        // opening LDtk scenes: retain the C01 procedural character fallback.
+        try
+        {
+            _ldtkCharacterSprites = LdtkCharacterSpriteAssets.Load(Content, GraphicsDevice);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+            Microsoft.Xna.Framework.Content.ContentLoadException or
+            System.Text.Json.JsonException or ArgumentException)
+        {
+            System.Diagnostics.Debug.WriteLine("C02 sprite fallback: " + ex);
+            _ldtkCharacterArtWarning = ex.GetType().Name + ": " + ex.Message;
+            _ldtkCharacterSprites = null;
+        }
+        // A01: authored cue manifest, preloaded test SFX, and native playback
+        // adapter. Keep failures in presentation so missing audio hardware
+        // cannot corrupt or prevent the deterministic simulation.
+        try
+        {
+            string audioFolder = Path.Combine(AppContext.BaseDirectory, "Content", "Audio");
+            AudioCueCatalog cues = AudioCueCatalog.FromJson(
+                File.ReadAllText(Path.Combine(audioFolder, "cues.json")));
+            _audio = new AudioService(cues,
+                new MonoGameAudioBackend(audioFolder, cues), maxVoices: 16);
+            AudioSettingsStore.Load(_audioSettingsPath).Apply(_audio);
+            _audioEvents = new PlatformerAudioPresenter(_audio);
+            // Optional music must not disable otherwise working UI/gameplay SFX.
+            try
+            {
+                _music = new MusicDirector(new MonoGameWavMusicBackend(audioFolder));
+                AudioSoundscapeCatalog authoredSound = AudioSoundscapeCatalog.FromJson(
+                    File.ReadAllText(Path.Combine(audioFolder, "soundscapes.json")));
+                _soundscapes = new PlatformerSoundscapePresenter(_audio, _music, authoredSound);
+                RefreshMusicVolume();
+                // Direct --dev-level launches commit their scene before LoadContent.
+                // Initialize the matching soundscape rather than always playing TITLE.
+                string initialAudioScene = _flow.ActiveScene == MajorSceneKind.Gameplay
+                    ? (_flow.Scenes.ActiveDestination?.LevelId ?? "")
+                    : "TITLE";
+                _soundscapes.ChangeScene(initialAudioScene);
+                ShowMusicStatus();
+            }
+            catch (Exception musicFailure) when (musicFailure is not OutOfMemoryException)
+            {
+                System.Diagnostics.Debug.WriteLine("A02 optional soundscape music unavailable: " + musicFailure);
+                _music?.Dispose();
+                _music = null;
+                _soundscapes = null;
+                ShowAudioMessage("A02 MUSIC/SOUNDSCAPE UNAVAILABLE");
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            System.Diagnostics.Debug.WriteLine("A01 optional audio fallback: " + ex);
+            _audioWarning = ex.GetType().Name + ": " + ex.Message;
+            _audioEvents = null;
+            _soundscapes = null;
+            _audio?.Dispose();
+            _audio = null;
+            _music?.Dispose();
+            _music = null;
+        }
     }
 
     protected override void Update(GameTime gameTime)
     {
         using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
+        // Listener uses only committed player state from the previous tick.
+        // It is intentionally never part of a solver or gameplay command.
+        if (_audio is not null)
+        {
+            UpdateAudioListener();
+            _audio.Update(gameTime.ElapsedGameTime.TotalSeconds);
+        }
+        _music?.Update(gameTime.ElapsedGameTime.TotalSeconds);
+        if (_audioControlNoticeSeconds > 0)
+            _audioControlNoticeSeconds = Math.Max(0,
+                _audioControlNoticeSeconds - gameTime.ElapsedGameTime.TotalSeconds);
         KeyboardState keys = Keyboard.GetState();
+        // Presentation-only quick mute, leaving existing F12/F6 gym and menu
+        // shortcuts untouched. Ctrl+Shift+M toggles all SFX and ambience.
+        bool audioMuteChord = JustPressed(keys, Keys.M) &&
+            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
+            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
+        if (audioMuteChord && _audio is not null)
+        {
+            _audio.SetMute(!_audio.IsMuted);
+            RefreshMusicVolume();
+            ShowAudioMessage(_audio.IsMuted ? "A02 AUDIO MUTED" : "A02 AUDIO UNMUTED");
+        }
+        // Ctrl+Shift+Plus/Minus adjusts only Master. All category gains are
+        // persisted in editable JSON, independent of input, menus and physics.
+        bool audioVolumeModifiers =
+            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
+            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
+        if (audioVolumeModifiers && _audio is not null)
+        {
+            int delta = (JustPressed(keys, Keys.OemPlus) || JustPressed(keys, Keys.Add) ? 1 : 0) -
+                (JustPressed(keys, Keys.OemMinus) || JustPressed(keys, Keys.Subtract) ? 1 : 0);
+            if (delta != 0)
+            {
+                float master = Math.Clamp(
+                    _audio.Mixer.MasterVolume + delta * .1f, 0f, 1f);
+                _audio.SetMasterVolume(master);
+                RefreshMusicVolume();
+                try
+                {
+                    AudioSettingsStore.Save(_audioSettingsPath,
+                        AudioUserSettings.FromMixer(_audio.Mixer));
+                    ShowAudioMessage("A02 MASTER VOLUME " + (int)Math.Round(master * 100) + "%");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    System.Diagnostics.Debug.WriteLine("A02 volume save failed: " + ex);
+                    ShowAudioMessage("A02 VOLUME UPDATED - SAVE FAILED");
+                }
+            }
+        }
         // Ctrl+Shift+F12 is reserved for manual report export. Plain F12 remains
         // available to the request-order gym below.
         bool reportChord = JustPressed(keys, Keys.F12) &&
@@ -211,6 +345,7 @@ public sealed class Game1 : Game
         // The fade-in may end this frame. Before the first resumed physics
         // tick, re-seed held inputs so a menu/transition key does not jump.
         _paused = _flow.IsGameplaySuspended;
+        _audio?.SetWorldPaused(_paused);
         _diagnostics?.CaptureScene(_flow, _worldClockTest, _gym);
         if (wasSuspended && !_paused)
         {
@@ -220,6 +355,32 @@ public sealed class Game1 : Game
         }
         if (changedScene)
         {
+            // Scene-owned sounds never survive the scene that created them.
+            // Application/UI audio remains available during transitions.
+            _audio?.StopOwner("level");
+            // The newly activated scene must supply its own listener before
+            // we admit spatial loops, avoiding a brief old-scene pan spike.
+            UpdateAudioListener();
+            if (_soundscapes is not null)
+            {
+                string soundScene = _flow.ActiveScene == MajorSceneKind.Gameplay
+                    ? (_flow.Scenes.ActiveDestination?.LevelId ?? "")
+                    : "TITLE";
+                try
+                {
+                    _soundscapes.ChangeScene(soundScene);
+                    ShowMusicStatus();
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // Audio is cosmetic: asset faults never roll back a scene.
+                    System.Diagnostics.Debug.WriteLine("A02 scene audio unavailable: " + ex);
+                    _music?.Dispose();
+                    _music = null;
+                    _soundscapes = null;
+                    ShowAudioMessage("A02 SCENE MUSIC UNAVAILABLE");
+                }
+            }
             // Seed current held states at the scene/input-context boundary.
             // An Enter/A button that started gameplay must not become a jump.
             _inputRouter.SelectSource(_inputRouter.Source,
@@ -310,7 +471,8 @@ public sealed class Game1 : Game
             _flow.Scenes.ActiveDestination is SceneDestination authoredDestination)
         {
             int index = JustPressed(keys, Keys.D1) ? 0 :
-                JustPressed(keys, Keys.D2) ? 1 : -1;
+                JustPressed(keys, Keys.D2) ? 1 :
+                JustPressed(keys, Keys.D3) ? 2 : -1;
             if (index >= 0)
             {
                 var links = new List<LdtkExitLink>(authoredLevel.Exits.Values);
@@ -448,7 +610,8 @@ public sealed class Game1 : Game
         {
             if (JustPressed(keys, Keys.N) && !authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
                 AuthoredWorldGym.JoinGuest(authoredWorld);
-            if (JustPressed(keys, Keys.M) && authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
+            if (JustPressed(keys, Keys.M) && !audioMuteChord &&
+                authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
                 authoredWorld.RemovePlayer(AuthoredWorldGym.ThirdPlayerId);
             if (JustPressed(keys, Keys.V))
             {
@@ -608,6 +771,9 @@ public sealed class Game1 : Game
                 if (_ldtkConnectedLevel is not null) _ldtkWindDirty = false;
                 foreach (WorldGameplayEvent gameplayEvent in committed.Events)
                 {
+                    // A01: only post-commit world events create game audio.
+                    // This never calls from WorldSession.Step() or a solver.
+                    _audioEvents?.Present(gameplayEvent);
                     if (gameplayEvent.Kind == WorldGameplayEventKind.CharacterStateRequestDenied)
                         _latestStateFeedback = "DENIED P" + gameplayEvent.PlayerId + " " +
                             gameplayEvent.StateRequestKind + " " + gameplayEvent.Rejection;
@@ -710,10 +876,20 @@ public sealed class Game1 : Game
                 if (_worldClockTest is WorldSession clockWorld)
                 {
                     if (_ldtkLevelMode && _ldtkLevel is LdtkImportedLevel imported)
+                    {
+                        Camera2DView camera = GetLdtkCameraView(imported, clockWorld,
+                            _paused ? 0 : gameTime.ElapsedGameTime.TotalSeconds);
+                        _ldtkCharacterAnimations ??= new LdtkGrayboxAnimator(
+                            _ldtkCharacterSprites?.Definition);
+                        _ldtkCharacterAnimations.Advance(
+                            _paused ? 0 : gameTime.ElapsedGameTime.TotalSeconds,
+                            clockWorld.Snapshot().Players);
                         LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
-                            _ldtkDrawCollisionBackdrop, _ldtkConnectedLevel);
+                            _ldtkDrawCollisionBackdrop, _ldtkConnectedLevel,
+                            camera, _ldtkCharacterAnimations, _ldtkCharacterSprites);
+                    }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
                         MovementGymRenderer.DrawAuthoredWorld(
                             _spriteBatch, _pixel, GraphicsDevice.Viewport,
@@ -751,6 +927,26 @@ public sealed class Game1 : Game
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
             DrawTransitionCurtain(_spriteBatch, _pixel);
+            if (_ldtkLevelMode && _ldtkCharacterSprites is null)
+            {
+                // Do not let optional artwork failures silently masquerade as
+                // an animation bug during visual acceptance.
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 38),
+                    "C02 ART FALLBACK - " + (_ldtkCharacterArtWarning?.Length > 58
+                        ? _ldtkCharacterArtWarning[..58] : _ldtkCharacterArtWarning),
+                    new Color(255, 189, 112), 1);
+            }
+            if (_audioControlNoticeSeconds > 0)
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 74),
+                    _audioControlMessage, new Color(153, 220, 194), 1);
+            if (_audioWarning is not null)
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 55),
+                    "A01 AUDIO UNAVAILABLE - " + (_audioWarning.Length > 70
+                        ? _audioWarning[..70] : _audioWarning),
+                    new Color(255, 189, 112), 1);
             if (_diagnostics is not null)
             {
                 // Minimal always-available report UI, including when Title or
@@ -768,10 +964,75 @@ public sealed class Game1 : Game
 
     protected override void UnloadContent()
     {
+        _music?.Dispose();
+        _music = null;
+        _soundscapes = null;
+        _audio?.Dispose();
+        _audio = null;
+        _audioEvents = null;
+        _ldtkCharacterSprites?.Dispose();
+        _ldtkCharacterSprites = null;
         _flow.Dispose();
         _pixel?.Dispose();
         _spriteBatch?.Dispose();
         base.UnloadContent();
+    }
+
+    private void UpdateAudioListener()
+    {
+        if (_audio is null) return;
+        if (_worldClockTest is WorldSession world && world.HasPlayer(1))
+        {
+            var center = world.GetPlayer(1).Bounds.Center;
+            _audio.SetListener(new AudioListener(center.X, center.Y));
+        }
+        else
+            _audio.SetListener(null);
+    }
+
+    private void RefreshMusicVolume()
+    {
+        if (_audio is null || _music is null) return;
+        float volume = _audio.IsMuted ? 0f : _audio.Mixer.MasterVolume *
+            _audio.Mixer.GetCategoryVolume(AudioCategory.Music);
+        _music.SetBusGain(volume);
+    }
+
+    private void ShowMusicStatus()
+    {
+        if (_music is null || _audio is null) return;
+        float gain = _audio.IsMuted ? 0 : _audio.Mixer.MasterVolume *
+            _audio.Mixer.GetCategoryVolume(AudioCategory.Music);
+        // This reports the requested track, not a guarantee of sound output.
+        // It helps distinguish a silent/zero-gain mixer from a missing track.
+        ShowAudioMessage("A02 MUSIC REQUESTED: " +
+            (_music.RequestedTrack ?? "NONE") +
+            "  GAIN " + (int)Math.Round(gain * 100) + "%");
+    }
+
+    private void ShowAudioMessage(string message)
+    {
+        _audioControlMessage = message;
+        _audioControlNoticeSeconds = 3;
+    }
+
+    private Camera2DView GetLdtkCameraView(LdtkImportedLevel level,
+        WorldSession world, double presentationSeconds)
+    {
+        WorldPlayerSnapshot player = world.GetPlayer(1);
+        if (_ldtkCamera is null)
+        {
+            _ldtkCamera = new Camera2D();
+            _ldtkCamera.Snap(player.Bounds.Center);
+        }
+        else
+            _ldtkCamera.Follow(player.Bounds.Center, player.Velocity,
+                presentationSeconds);
+        double pixelsPerUnit = LdtkLevelImporter.PixelsPerWorldUnit;
+        return _ldtkCamera.GetView(level.WidthPx / pixelsPerUnit,
+            level.HeightPx / pixelsPerUnit,
+            GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+            pixelsPerUnit);
     }
 
     private void ActivatePreparedScene(MovementGymSession gym, WorldSession? world,
@@ -784,7 +1045,7 @@ public sealed class Game1 : Game
         _authoredWorldMode = levelId == GameLevelIds.AuthoredWorld;
         _motionLabMode = levelId == GameLevelIds.MotionLab;
         _routeLabMode = levelId is (GameLevelIds.RouteA or GameLevelIds.RouteB);
-        _ldtkLevelMode = levelId is (GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB);
+        _ldtkLevelMode = importedLdtk is not null;
         // Default to a small overlay in illustrated LDtk scenes; existing
         // diagnostics-rich gym fixtures retain Full unless user chooses a
         // mode, which persists across reloads and scene changes.
@@ -796,6 +1057,8 @@ public sealed class Game1 : Game
         _ldtkWindDirty = false;
         _lastLdtkInteraction = "NONE";
         _ldtkVisuals = visuals;
+        _ldtkCamera = null; // fresh camera on every successful scene activation
+        _ldtkCharacterAnimations = null; // animation timelines are scene-owned
         _ldtkShowCollisionDebug = false;
         _ldtkDrawCollisionBackdrop = visuals?.Terrain?.DrawCollisionBackdrop ?? true;
         _windSelection = 0;
@@ -811,20 +1074,18 @@ public sealed class Game1 : Game
         _titleRefreshCounter = 6;
     }
 
-    private static string FindLdtkFile(string fileName)
+    private static string FindLdtkDirectory()
     {
-        // In Visual Studio, the content file lives at solution-root/Content/Levels.
-        // Walk ancestor directories to make Debug/Release and local CLI launch
-        // paths work without touching Content.csproj or hardcoding a user path.
+        // Search from the application directory, not the process working
+        // directory. Works with Visual Studio, CLI and local test launches.
         string? directory = AppContext.BaseDirectory;
         for (int depth = 0; depth < 12 && directory is not null; depth++)
         {
-            string candidate = Path.Combine(directory, "Content", "Levels", fileName);
-            if (File.Exists(candidate)) return candidate;
+            string candidate = Path.Combine(directory, "Content", "Levels");
+            if (Directory.Exists(candidate)) return candidate;
             directory = Directory.GetParent(directory)?.FullName;
         }
-        throw new FileNotFoundException(
-            "Missing Content/Levels/" + fileName + ". Extract the ZIP at the solution root.");
+        throw new DirectoryNotFoundException("Missing Content/Levels directory beside the project.");
     }
 
     // The scene factory prepares every new gameplay world BEFORE the old
@@ -836,10 +1097,10 @@ public sealed class Game1 : Game
             if (kind == MajorSceneKind.Title) return destination is null;
             if (kind != MajorSceneKind.Gameplay || destination is null) return false;
             if (RouteLevelGym.Catalog.Supports(destination)) return true;
-            if (destination.LevelId is (GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB))
-                return destination.EntranceId is ("START" or "WEST" or "EAST");
+            if (host._ldtkCatalog.Supports(destination)) return true;
             return destination.EntranceId == GameLevelIds.DefaultEntrance &&
-                GameLevelIds.IsStandalonePlayableLevel(destination.LevelId);
+                destination.LevelId is (GameLevelIds.MovementGym or
+                    GameLevelIds.SharedWorld or GameLevelIds.AuthoredWorld or GameLevelIds.MotionLab);
         }
 
         public bool TryPrepare(MajorSceneKind kind, SceneDestination? destination,
@@ -874,6 +1135,8 @@ public sealed class Game1 : Game
                         host._ldtkConnectedLevel = null;
                         host._ldtkActiveWindIds.Clear();
                         host._ldtkVisuals = null;
+                        host._ldtkCamera = null;
+                        host._ldtkCharacterAnimations = null;
                         // Returning to Title ends the session; switching levels
                         // or restarting never does.
                         host._gameplaySession = null;
@@ -898,40 +1161,21 @@ public sealed class Game1 : Game
             LdtkConnectedLevel? preparedConnectedLdtk = null;
             LdtkVisualSceneAssets? preparedVisuals = null;
             WorldSession? preparedLdtkWorld = null;
-            if (destination!.LevelId is (GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB))
+            if (host._ldtkCatalog.Supports(destination!))
             {
                 try
                 {
-                    bool connected = destination.LevelId is (GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB);
-                    string filename = FindLdtkFile(connected ? "ConnectedWorldDemo.ldtk" :
-                        destination.LevelId == GameLevelIds.LdtkTest
-                        ? "FirstAttempt.ldtk" : destination.LevelId == GameLevelIds.LdtkSceneryDemo
-                        ? "SceneryDemo.ldtk" : destination.LevelId == GameLevelIds.LdtkTerrainDemo
-                        ? "TerrainDemo.ldtk" : "ParallaxDemo.ldtk");
-                    // Read once so collision, artwork and textures are prepared
-                    // from the same on-disk snapshot. Never read live files
-                    // during an authoritative tick or in Draw().
-                    string json = File.ReadAllText(filename);
-                    string? selectedIdentifier = connected ? destination.LevelId : null;
-                    if (connected)
-                    {
-                        var linkedCatalog = LdtkConnectedWorldCatalog.FromJson(json);
-                        preparedConnectedLdtk = linkedCatalog.Require(destination);
-                        string spawn = preparedConnectedLdtk.Entrances[destination.EntranceId];
-                        importedLdtk = preparedConnectedLdtk.Imported with { StartSpawnId = spawn };
-                    }
-                    else importedLdtk = LdtkLevelImporter.FromJson(json);
-                    LdtkVisualDefinition visualData = LdtkVisualImporter.FromJson(json, selectedIdentifier);
-                    LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, selectedIdentifier);
-                    LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, selectedIdentifier);
-                    if (visualData.LevelId != importedLdtk.World.LevelId ||
-                        scenery.LevelId != importedLdtk.World.LevelId ||
-                        terrain.LevelId != importedLdtk.World.LevelId)
-                        throw new InvalidOperationException("LDtk visual/scenery/world IDs differ.");
-                    if (visualData.TileCount > 0 || scenery.SpriteCount > 0 ||
-                        terrain.ArtworkCount > 0)
+                    // The registry chooses the file and authored identifier.
+                    // Every importer uses the SAME fresh JSON snapshot in
+                    // Prepare; GPU textures load only before scene activation.
+                    LdtkPreparedContent content = host._ldtkCatalog.Prepare(destination!);
+                    importedLdtk = content.Imported;
+                    preparedConnectedLdtk = content.Connected;
+                    if (content.Visuals.TileCount > 0 || content.Scenery.SpriteCount > 0 ||
+                        content.Terrain.ArtworkCount > 0)
                         preparedVisuals = new LdtkVisualSceneAssets(
-                            host.GraphicsDevice, filename, visualData, scenery, terrain);
+                            host.GraphicsDevice, content.FilePath,
+                            content.Visuals, content.Scenery, content.Terrain);
                     preparedLdtkWorld = LdtkLevelGym.Create(importedLdtk,
                         preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
                         host._inputRouter.SourceId,
@@ -947,7 +1191,7 @@ public sealed class Game1 : Game
                     return false; // Existing scene remains untouched.
                 }
             }
-            WorldSession? preparedWorld = destination!.LevelId switch
+            WorldSession? preparedWorld = preparedLdtkWorld ?? (destination!.LevelId switch
             {
                 GameLevelIds.SharedWorld => SharedWorldClockGym.Create(
                     preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
@@ -964,9 +1208,8 @@ public sealed class Game1 : Game
                     destination, roster, preparedGym.AssistancePolicy,
                     preparedGym.FaultSensitivity,
                     worldInstanceId: ++host._nextWorldInstanceId),
-                GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB => preparedLdtkWorld,
                 _ => null
-            };
+            });
             scene = new HostScene(MajorSceneKind.Gameplay, destination,
                 () =>
                 {
@@ -1033,18 +1276,29 @@ public sealed class Game1 : Game
         if (newStart || JustPressed(keys, Keys.P))
         {
             if (_flow.ActiveScene == MajorSceneKind.Gameplay)
+            {
                 _flow.PauseOrResume();
+                _audio?.Play(new AudioCueRequest("ui.confirm", "ui"));
+            }
             return;
         }
         if (newBack)
         {
             _flow.Back();
+            _audio?.Play(new AudioCueRequest("ui.back", "ui"));
             return;
         }
         if (!_flow.IsMenuOpen) return;
-        if (newUp) _flow.Navigate(-1);
-        else if (newDown) _flow.Navigate(1);
-        else if (newConfirm) _flow.ConfirmSelection();
+        if (newUp || newDown)
+        {
+            _flow.Navigate(newUp ? -1 : 1);
+            _audio?.Play(new AudioCueRequest("ui.navigate", "ui"));
+        }
+        else if (newConfirm)
+        {
+            _flow.ConfirmSelection();
+            _audio?.Play(new AudioCueRequest("ui.confirm", "ui"));
+        }
     }
 
     private bool JustPressed(GamePadState current, Buttons button) =>
@@ -1062,6 +1316,11 @@ public sealed class Game1 : Game
             "PLATFORMER SANDBOX", new Color(99, 217, 183), 3);
         GymDebugText.Draw(batch, pixel, left, Math.Max(66, height / 2 - 199),
             "SCENE FLOW LAB - TITLE / PLAY / PAUSE", new Color(190, 206, 223), 1);
+        if (_ldtkCatalog.RejectedProjects.Count > 0)
+            GymDebugText.Draw(batch, pixel, left, Math.Max(85, height / 2 - 175),
+                "LDTK VALIDATION: " + _ldtkCatalog.RejectedProjects.Count +
+                " PROJECT(S) REJECTED - CHECK CONTENT/LEVELS",
+                new Color(255, 168, 122), 1);
     }
 
     private void DrawFlowMenu(SpriteBatch batch, Texture2D pixel)
