@@ -26,6 +26,16 @@ public sealed class BufferedJumpInput
         _constraints = constraints;
     }
 
+    /// <summary>Independent copy for a proposed fixed-tick update.</summary>
+    public BufferedJumpInput Fork()
+    {
+        var copy = new BufferedJumpInput(_constraints);
+        copy._pendingPressTimeSeconds = _pendingPressTimeSeconds;
+        copy._lastWalkOffTimeSeconds = _lastWalkOffTimeSeconds;
+        copy._buttonHeld = _buttonHeld;
+        return copy;
+    }
+
     public bool HasPendingPress => _pendingPressTimeSeconds is not null;
     public bool IsButtonHeld => _buttonHeld;
 

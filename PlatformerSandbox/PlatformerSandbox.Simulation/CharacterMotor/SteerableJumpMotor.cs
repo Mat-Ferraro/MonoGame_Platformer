@@ -48,6 +48,9 @@ public sealed class SteerableJumpMotor
     private bool _referenceVertical = true;
     private bool _grounded;
     private int _blockedDirection;
+    // Horizontal world transport is a separate, additive velocity channel.
+    // It is applied to every collision-swept analytical X segment.
+    private double _externalHorizontalSpeed;
 
     public SteerableJumpMotor(
         Aabb takeoffBounds,
@@ -62,8 +65,12 @@ public sealed class SteerableJumpMotor
         MovingPlatformTrajectory? movingPlatform = null, double startTimeSeconds = 0.0,
         double inheritedVerticalVelocity = 0.0,
         IReadOnlyList<MovingPlatformTrajectory>? additionalMovingPlatforms = null,
-        CollisionAssistancePolicy? assistancePolicy = null)
+        CollisionAssistancePolicy? assistancePolicy = null,
+        double externalHorizontalSpeed = 0.0)
     {
+        if (!double.IsFinite(externalHorizontalSpeed) ||
+            Math.Abs(externalHorizontalSpeed) > 10000.0)
+            throw new ArgumentOutOfRangeException(nameof(externalHorizontalSpeed));
         if (!takeoffBounds.IsValid)
             throw new ArgumentException("Invalid initial bounds.", nameof(takeoffBounds));
         if (!double.IsFinite(inheritedHorizontalVelocity))
@@ -141,6 +148,7 @@ public sealed class SteerableJumpMotor
         _maxContactEvents = maxContactEvents;
         _assistancePolicy = assistancePolicy ?? CollisionAssistancePolicy.Disabled;
         _bounds = takeoffBounds;
+        _externalHorizontalSpeed = externalHorizontalSpeed;
         _velocity = new Vector2D(inheritedHorizontalVelocity,
             flight.Evaluate(0.0).VerticalVelocity + _inheritedVerticalVelocity);
     }
@@ -159,12 +167,25 @@ public sealed class SteerableJumpMotor
     internal SteerableJumpMotor Fork() => (SteerableJumpMotor)MemberwiseClone();
 
     /// <summary>
+    /// A blocking wall consumed an external transport component. The world
+    /// velocity is already the authoritative collision response; changing
+    /// only this accounting field avoids a spurious counter-impulse later.
+    /// Called solely on a staged jump motor before the world commits.
+    /// </summary>
+    internal void NormalizeBlockedExternalTransport() =>
+        _externalHorizontalSpeed = 0.0;
+
+    /// <summary>
     /// The direction is a current input command, not a future fixed schedule.
     /// Local calculations are committed atomically after the full step succeeds.
     /// </summary>
     public SteerableJumpStepResult Step(
-        double durationSeconds, HorizontalDirection direction, bool jumpReleasedThisStep = false)
+        double durationSeconds, HorizontalDirection direction,
+        bool jumpReleasedThisStep = false, double externalHorizontalSpeed = 0.0)
     {
+        if (!double.IsFinite(externalHorizontalSpeed) ||
+            Math.Abs(externalHorizontalSpeed) > 10000.0)
+            throw new ArgumentOutOfRangeException(nameof(externalHorizontalSpeed));
         if (!double.IsFinite(durationSeconds) || durationSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(durationSeconds));
         if (direction is not (HorizontalDirection.Left or
@@ -174,7 +195,11 @@ public sealed class SteerableJumpMotor
             return new SteerableJumpStepResult(_bounds, _velocity, _grounded, []);
 
         Aabb bounds = _bounds;
-        Vector2D velocity = _velocity;
+        Vector2D velocity = new(
+            _velocity.X + externalHorizontalSpeed - _externalHorizontalSpeed,
+            _velocity.Y);
+        if (!double.IsFinite(velocity.X))
+            throw new OverflowException("Combined airborne motion is not finite.");
         double flightTime = _flightElapsedSeconds;
         JumpFlightTrajectory flight = _flight;
 
@@ -199,9 +224,56 @@ public sealed class SteerableJumpMotor
         var assists = new List<CollisionAssistEvent>();
         int ceilingCorrectionsUsed = _ceilingCorrectionsUsed;
 
+        // Never allow an analytical event to spin indefinitely on the main
+        // thread. Some legitimate sub-ULP phase boundaries require one retry
+        // without advancing time; a repeated retry is a simulation fault.
+        // This does not alter collision response or consume event budgets.
+        const int maxSameTimeIterations = 128;
+        const int maxTotalIterations = 16384;
+        int totalIterations = 0;
+        int sameTimeIterations = 0;
+        double previousIterationElapsed = double.NaN;
+        string lastIterationPath = "initial";
+
         while (elapsed < durationSeconds && !grounded)
         {
+            totalIterations++;
+            if (elapsed == previousIterationElapsed)
+                sameTimeIterations++;
+            else
+            {
+                previousIterationElapsed = elapsed;
+                sameTimeIterations = 0;
+            }
+            if (sameTimeIterations >= maxSameTimeIterations ||
+                totalIterations >= maxTotalIterations)
+            {
+                throw new SimulationNoProgressException(
+                    "Analytical jump exceeded its bounded iteration budget; " +
+                    "no partial state was committed. " +
+                    $"totalIterations={totalIterations}, " +
+                    $"sameTimeIterations={sameTimeIterations}, " +
+                    $"lastPath={lastIterationPath}, " +
+                    $"worldStart={_worldTimeSeconds:R}, " +
+                    $"elapsed={elapsed:R}, duration={durationSeconds:R}, " +
+                    $"flightTime={flightTime:R}, " +
+                    $"verticalReference={verticalReference}, " +
+                    $"grounded={grounded}, blockedDirection={blockedDirection}, " +
+                    $"bounds=[{bounds.Left:R},{bounds.Bottom:R}," +
+                    $"{bounds.Right:R},{bounds.Top:R}], " +
+                    $"velocity=({velocity.X:R},{velocity.Y:R}), " +
+                    $"contacts={contacts.Count}, " +
+                    $"staticColliders={_obstacles.Length}, " +
+                    $"movingPlatforms={_movingPlatformColliders.Length}.");
+            }
+
             double remaining = durationSeconds - elapsed;
+            // A previously resolved static top contact can reconstruct a few
+            // binary64 ULPs below its exact Y face. The ordinary ground motor
+            // already canonicalizes this case; the analytical jump motor owns
+            // its own state and must do the same BEFORE each strict re-query.
+            // This cannot repair a meaningful penetration or a side overlap.
+            bounds = StaticFloorPrecisionAlignment.Align(bounds, _obstacles);
             // The sweep query must never silently accept initial penetration.
             // A *small* residual overlap may be repaired explicitly, within a
             // bounded distance, before querying the next analytical segment.
@@ -233,6 +305,7 @@ public sealed class SteerableJumpMotor
                         if (correction.Normal.Y > 0.0)
                             grounded = true;
                     }
+                    lastIterationPath = "moving-overlap-repair";
                     continue;
                 }
             }
@@ -265,15 +338,16 @@ public sealed class SteerableJumpMotor
             HorizontalMotionTrajectory horizontal = blocked
                 ? new HorizontalMotionTrajectory(0.0, carrierX, 0.0,
                     0.0, carrierX, 0.0, 0.0, carrierX, carrierX)
-                : _airMotion.CreateTrajectory(0.0, velocity.X, direction);
+                : _airMotion.CreateTrajectory(0.0,
+                    velocity.X - externalHorizontalSpeed, direction);
             double segmentDuration = remaining;
 
             if (horizontal.TimeToCruiseSeconds > 0.0)
                 segmentDuration = Math.Min(segmentDuration, horizontal.TimeToCruiseSeconds);
             if (!blocked && direction != HorizontalDirection.Neutral &&
-                (int)direction * velocity.X < 0.0)
+                (int)direction * (velocity.X - externalHorizontalSpeed) < 0.0)
             {
-                double reversalStopTime = Math.Abs(velocity.X) /
+                double reversalStopTime = Math.Abs(velocity.X - externalHorizontalSpeed) /
                                           _airMotion.ReversalDecelerationRate;
                 segmentDuration = Math.Min(segmentDuration, reversalStopTime);
             }
@@ -311,8 +385,12 @@ public sealed class SteerableJumpMotor
                 foreach (MovingPlatformTrajectory other in _movingPlatformColliders)
                     segmentDuration = Math.Min(segmentDuration,
                         other.TimeUntilNextTurn(worldNow));
-                double relativeVx = horizontal.Evaluate(0.0).Velocity -
-                                    floorAtStart.Value.Velocity.X;
+                // Compare the authoritative combined world velocity directly.
+                // Reconstructing X as (local + wind) can differ by one ULP
+                // from velocity.X. At exactly the moving platform's speed,
+                // that round-off fabricates a positive sub-ULP relative-turn
+                // event; normalization repeats it forever without moving time.
+                double relativeVx = velocity.X - floorAtStart.Value.Velocity.X;
                 double relativeAx = horizontal.Evaluate(0.0).Acceleration;
                 relativeTurnSeconds = relativeAx == 0.0 ? double.PositiveInfinity :
                     -relativeVx / relativeAx;
@@ -369,16 +447,18 @@ public sealed class SteerableJumpMotor
                 if (!blocked && horizontal.TimeToCruiseSeconds > 0.0 &&
                     horizontal.TimeToCruiseSeconds <= segmentDuration)
                 {
-                    velocity = new Vector2D(horizontal.CruiseVelocity, velocity.Y);
+                    velocity = new Vector2D(
+                        horizontal.CruiseVelocity + externalHorizontalSpeed, velocity.Y);
                     normalizedEvent = true;
                 }
                 else if (!blocked && direction != HorizontalDirection.Neutral &&
-                    (int)direction * velocity.X < 0.0 &&
-                    Math.Abs(velocity.X) / _airMotion.ReversalDecelerationRate
+                    (int)direction * (velocity.X - externalHorizontalSpeed) < 0.0 &&
+                    Math.Abs(velocity.X - externalHorizontalSpeed) /
+                        _airMotion.ReversalDecelerationRate
                         <= segmentDuration)
                 {
                     // The first phase of a reversal ends exactly at vX=0.
-                    velocity = new Vector2D(0.0, velocity.Y);
+                    velocity = new Vector2D(externalHorizontalSpeed, velocity.Y);
                     normalizedEvent = true;
                 }
                 else if (!blocked && floorAtStart is { } nearbyPlatform &&
@@ -425,13 +505,17 @@ public sealed class SteerableJumpMotor
                 }
 
                 if (normalizedEvent)
+                {
+                    lastIterationPath = "normalized-sub-ulp-event";
                     continue;
+                }
 
                 // A final remainder smaller than one representable clock
                 // increment contains no schedulable movement interval.
                 if (remaining == segmentDuration)
                 {
                     elapsed = durationSeconds;
+                    lastIterationPath = "sub-ulp-final-remainder";
                     continue;
                 }
 
@@ -451,22 +535,25 @@ public sealed class SteerableJumpMotor
             MotionSample2D Evaluate(double t)
             {
                 HorizontalMotionSample x = horizontal.Evaluate(t);
+                double transportX = blocked ? 0.0 : externalHorizontalSpeed;
+                double displacementX = x.Position + transportX * t;
+                double combinedX = x.Velocity + transportX;
                 if (isVerticalReference)
                 {
                     JumpSample y = flight.Evaluate(Math.Min(
                         startFlightTime + t, flight.TotalDurationSeconds));
                     return new MotionSample2D(
-                        new Vector2D(x.Position,
+                        new Vector2D(displacementX,
                             y.VerticalDisplacement - startVerticalPosition +
                             _inheritedVerticalVelocity * t),
-                        new Vector2D(x.Velocity,
+                        new Vector2D(combinedX,
                             y.VerticalVelocity + _inheritedVerticalVelocity));
                 }
                 MotionSample yFree = ConstantAcceleration.Evaluate(
                     0.0, startVerticalVelocity, _gravity, t);
                 return new MotionSample2D(
-                    new Vector2D(x.Position, yFree.Position),
-                    new Vector2D(x.Velocity, yFree.Velocity));
+                    new Vector2D(displacementX, yFree.Position),
+                    new Vector2D(combinedX, yFree.Velocity));
             }
 
             // An airborne player can still be trapped between horizontally
@@ -511,6 +598,7 @@ public sealed class SteerableJumpMotor
                         verticalReference = false;
                     }
                 }
+                lastIterationPath = "collision-free-segment";
                 continue;
             }
 
@@ -541,6 +629,7 @@ public sealed class SteerableJumpMotor
                     assists.Add(new CollisionAssistEvent(ceilingHit.ColliderId,
                         assistWorldTime, deltaX));
                     ceilingCorrectionsUsed++;
+                    lastIterationPath = "ceiling-corner-assist";
                     continue;
                 }
             }
@@ -602,7 +691,8 @@ public sealed class SteerableJumpMotor
                     if (contact.Normal.X != 0.0)
                     {
                         int towardWall = contact.Normal.X < 0.0 ? 1 : -1;
-                        if (contact.IsMovingPlatform || (int)direction == towardWall)
+                        if (contact.IsMovingPlatform || (int)direction == towardWall ||
+                            Math.Sign(externalHorizontalSpeed) == towardWall)
                         {
                             // Direction of currently requested input wins
                             // when both horizontal sides are constrained.
@@ -624,6 +714,7 @@ public sealed class SteerableJumpMotor
                     throw new SimulationNoProgressException(
                         "Simultaneous analytical contacts at t=0 do not " +
                         "advance time or change the jump constraints.");
+                lastIterationPath = "simultaneous-contact";
                 continue;
             }
 
@@ -658,7 +749,8 @@ public sealed class SteerableJumpMotor
                 // Keep the designer's vertical law. Never fall back to a
                 // weaker gravity merely because horizontal motion was blocked.
                 int towardWall = hit.Value.Normal.X < 0.0 ? 1 : -1;
-                if (onMoving || (int)direction == towardWall)
+                if (onMoving || (int)direction == towardWall ||
+                    Math.Sign(externalHorizontalSpeed) == towardWall)
                     blockedDirection = towardWall;
             }
             else
@@ -669,6 +761,7 @@ public sealed class SteerableJumpMotor
                 if (hit.Value.Normal.Y > 0.0)
                     grounded = true;
             }
+            lastIterationPath = "single-contact";
         }
 
         // The jump motor is the authoritative owner while airborne. Normalize
@@ -679,10 +772,14 @@ public sealed class SteerableJumpMotor
         bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
             bounds, _worldTimeSeconds + durationSeconds,
             _movingPlatformColliders, _obstacles);
+        // Publish exactly face-aligned static support at the jump boundary;
+        // otherwise the next fixed step could fail strict start validation.
+        bounds = StaticFloorPrecisionAlignment.Align(bounds, _obstacles);
 
         // Commit only after all calculations and contacts have succeeded.
         _bounds = bounds;
         _velocity = velocity;
+        _externalHorizontalSpeed = externalHorizontalSpeed;
         _flightElapsedSeconds = flightTime;
         _referenceVertical = verticalReference;
         _flight = flight;

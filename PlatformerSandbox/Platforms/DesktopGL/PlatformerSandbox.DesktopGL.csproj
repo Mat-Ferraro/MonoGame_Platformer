@@ -28,12 +28,14 @@
     <UpToDateCheckInput Include="..\..\Content\Assets\**\*" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="LDtkMonogame" Version="1.8.3" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\PlatformerSandbox.Foundation\PlatformerSandbox.Foundation.csproj" />
     <ProjectReference Include="..\..\PlatformerSandbox.Gameplay\PlatformerSandbox.Gameplay.csproj" />
     <ProjectReference Include="..\..\PlatformerSandbox.Simulation\PlatformerSandbox.Simulation.csproj" />
+    <ProjectReference Include="..\..\PlatformerSandbox.Diagnostics\PlatformerSandbox.Diagnostics.csproj" />
   </ItemGroup>
   <Import Project="..\..\Content\BuildContent.targets" />
   <!-- Generates Info.plist for a hand-packaged macOS .app bundle, when building for macOS. -->

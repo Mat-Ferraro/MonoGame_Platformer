@@ -81,6 +81,10 @@ public static class UnifiedAcceleratedKinematicStepper
                 Aabb atEnd = bounds.Translated(tail.Position);
                 atEnd = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     atEnd, worldEnd, movingPlatforms, staticColliders);
+                // Bounded static-floor canonicalization is legal only AFTER
+                // a previously validated contact. The initial world check
+                // remains strict, including at zero duration.
+                atEnd = StaticFloorPrecisionAlignment.Align(atEnd, staticColliders);
                 // A zero-duration query validates both static and moving
                 // penetration at the authoritative END time without inventing
                 // a physically unrepresentable sweep interval.
@@ -108,8 +112,13 @@ public static class UnifiedAcceleratedKinematicStepper
             // The first query's starting-penetration validation above is never
             // bypassed by this correction.
             if (contacts.Count > 0)
+            {
                 bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     bounds, absoluteTime, movingPlatforms, staticColliders);
+                // Only representationally tiny top-face overlap is aligned.
+                // Never reinterpret genuine penetration as a floor contact.
+                bounds = StaticFloorPrecisionAlignment.Align(bounds, staticColliders);
+            }
 
             UnifiedCollisionHit? next = UnifiedCollisionEventScheduler.SweepParabolicFirst(
                 bounds, velocity, activeAcceleration, absoluteTime, remaining,
@@ -122,6 +131,8 @@ public static class UnifiedAcceleratedKinematicStepper
                 bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     bounds, worldStartSeconds + durationSeconds,
                     movingPlatforms, staticColliders);
+                if (contacts.Count > 0)
+                    bounds = StaticFloorPrecisionAlignment.Align(bounds, staticColliders);
                 velocity = sample.Velocity;
                 elapsed = durationSeconds;
                 break;
@@ -199,6 +210,11 @@ public static class UnifiedAcceleratedKinematicStepper
                 bounds = hit.BodyBoundsAtImpact;
                 bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     bounds, eventTime, movingPlatforms, staticColliders);
+                // Do not bypass simultaneous-contact/crush classification.
+                // If its resolved contact set also includes a static floor,
+                // canonicalize only a tiny floor-face rounding residual.
+                if (coincident.Any(c => !c.IsMovingPlatform && c.Normal.Y > 0.0))
+                    bounds = StaticFloorPrecisionAlignment.Align(bounds, staticColliders);
                 Vector2D beforeAcceleration = activeAcceleration;
                 velocity = resolved.Velocity;
                 activeAcceleration = resolved.Acceleration;
@@ -239,6 +255,8 @@ public static class UnifiedAcceleratedKinematicStepper
             bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                 bounds, worldStartSeconds + elapsed,
                 movingPlatforms, staticColliders);
+            if (!hit.IsMovingPlatform && hit.Normal.Y > 0.0)
+                bounds = StaticFloorPrecisionAlignment.Align(bounds, staticColliders);
             Vector2D incoming = hit.BodyVelocityAtImpact;
             Vector2D accelerationBeforeImpact = activeAcceleration;
             Vector2D outgoing;

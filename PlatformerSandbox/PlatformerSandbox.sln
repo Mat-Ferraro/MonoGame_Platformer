@@ -1,6 +1,7 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.11.12324.101 stable
+VisualStudioVersion = 18.11.12324.101
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Platforms", "Platforms", "{FC58C8E9-BE5B-44AA-A71A-4FCD139CC62D}"
 EndProject
@@ -15,6 +16,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlatformerSandbox.Gameplay", "PlatformerSandbox.Gameplay\PlatformerSandbox.Gameplay.csproj", "{9DC61393-B11C-4AC4-8AFB-0D42CF2CC0A2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlatformerSandbox.Tests", "PlatformerSandbox.Tests\PlatformerSandbox.Tests.csproj", "{AD9B39E6-A5B5-46DD-8DF0-E81ABC93AB57}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlatformerSandbox.Diagnostics", "PlatformerSandbox.Diagnostics\PlatformerSandbox.Diagnostics.csproj", "{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -98,6 +101,18 @@ Global
 		{AD9B39E6-A5B5-46DD-8DF0-E81ABC93AB57}.Release|x64.Build.0 = Release|Any CPU
 		{AD9B39E6-A5B5-46DD-8DF0-E81ABC93AB57}.Release|x86.ActiveCfg = Release|Any CPU
 		{AD9B39E6-A5B5-46DD-8DF0-E81ABC93AB57}.Release|x86.Build.0 = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|x64.Build.0 = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Debug|x86.Build.0 = Debug|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|x64.ActiveCfg = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|x64.Build.0 = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|x86.ActiveCfg = Release|Any CPU
+		{56B7FAEA-CA62-4B0C-A1EC-56F7043914BE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -6,6 +7,12 @@ using Microsoft.Xna.Framework.Input;
 using PlatformerSandbox.Gameplay.Movement.Gyms;
 using PlatformerSandbox.Gameplay.Input.Requests;
 using PlatformerSandbox.Gameplay.Input.Local;
+using PlatformerSandbox.Gameplay.World;
+using PlatformerSandbox.Gameplay.States;
+using PlatformerSandbox.Gameplay.Abilities;
+using PlatformerSandbox.Gameplay.GameFlow;
+using PlatformerSandbox.Gameplay.Content;
+using PlatformerSandbox.Gameplay.Presentation;
 using PlatformerSandbox.Input;
 using PlatformerSandbox.Simulation.Motion.Profiles;
 using PlatformerSandbox.Simulation.Diagnostics;
@@ -15,18 +22,65 @@ using PlatformerSandbox.Gyms;
 namespace PlatformerSandbox;
 
 /// <summary>
-/// Thin MonoGame host for the first playable movement test gym.
-/// Device polling and presentation live here; the Gameplay and Simulation
-/// projects do not reference MonoGame or own any graphics state.
+/// MonoGame application host: device polling, scene-flow input adaptation,
+/// and presentation. Gameplay and Simulation remain headless and do not own
+/// MonoGame graphics or native input state.
 /// </summary>
 public sealed class Game1 : Game
 {
     private readonly GraphicsDeviceManager _graphics;
+    private readonly GameDiagnosticBridge? _diagnostics;
+#if DEBUG
+    private readonly bool _devCrashAfterWorldStep = Array.Exists(
+        Environment.GetCommandLineArgs(), argument =>
+        string.Equals(argument, "--dev-context-crash-after-world-step", StringComparison.OrdinalIgnoreCase));
+    private readonly bool _devStallAfterWorldStep = Array.Exists(
+        Environment.GetCommandLineArgs(), argument =>
+        string.Equals(argument, "--dev-stall-after-world-step", StringComparison.OrdinalIgnoreCase));
+    private bool _devStallInjected;
+    private readonly bool _devFailInsideWorldStep = Array.Exists(
+        Environment.GetCommandLineArgs(), argument =>
+        string.Equals(argument, "--dev-context-fail-inside-world-step", StringComparison.OrdinalIgnoreCase));
+#endif
+    private readonly GameFlowController _flow;
+    private GamePadState _previousGamepad;
     // Gameplay assistance starts enabled in the *playable* gym. Unit-test
     // fixtures may still explicitly select the unassisted baseline.
-    private readonly MovementGymSession _gym = new(
+    private MovementGymSession _gym = new(
         assistancePolicy: MovementGymSession.PlayableAssistancePreset);
     private readonly List<MovementRequest> _inputRequests = new(5);
+    private readonly List<WorldPlayerCommand> _worldCommands = new(2);
+    private readonly List<CharacterStateRequest> _characterStateRequests = new(4);
+    private readonly List<CharacterAbilityRequest> _characterAbilityRequests = new(5);
+    private readonly List<WorldMotionRequest> _motionRequests = new(3);
+    private bool _motionLabMode;
+    private bool _routeLabMode;
+    private bool _ldtkLevelMode;
+    private LdtkImportedLevel? _ldtkLevel;
+    private LdtkConnectedLevel? _ldtkConnectedLevel;
+    private readonly HashSet<int> _ldtkActiveWindIds = new();
+    private bool _ldtkWindDirty;
+    private string _lastLdtkInteraction = "NONE";
+    private LdtkVisualSceneAssets? _ldtkVisuals;
+    private bool _ldtkShowCollisionDebug;
+    private bool _ldtkDrawCollisionBackdrop = true;
+    private GameDebugHudMode _debugHudMode = GameDebugHudMode.Full;
+    private bool _debugHudUserSelected;
+    private GameplaySession? _gameplaySession;
+    private long _nextGameplaySessionId;
+    private string _lastRouteStatus = "NONE";
+    private bool _failNextRoutePreparation;
+    private int _windSelection; // 0 off, 1 left 75%, 2 right 75%
+
+    private string _latestStateFeedback = "NONE";
+    private string _latestAbilityFeedback = "NONE";
+    private readonly List<WorldGameplayEvent> _recentWorldEvents = new(8);
+    private readonly SceneFlowSmokeRunner _sceneFlowSmoke = new();
+    private long _nextWorldInstanceId;
+    private WorldSession? _worldClockTest;
+    private bool _authoredWorldMode;
+    private int _worldP1Respawns;
+    private int _worldP2Respawns;
     private readonly LocalPlayerInputRouter _inputRouter = new();
     private readonly MonoGameLocalInputBindings _inputBindings = new();
     private LocalPlayerInput? _lastPlayerInput;
@@ -44,8 +98,9 @@ public sealed class Game1 : Game
     private MovementGymParameter _selectedParameter = MovementGymParameter.GroundStoppingTime;
     private string _tuningLabel = "Baseline";
 
-    public Game1()
+    public Game1(GameDiagnosticBridge? diagnostics = null)
     {
+        _diagnostics = diagnostics;
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = 1280,
@@ -57,13 +112,29 @@ public sealed class Game1 : Game
         IsFixedTimeStep = true;
         TargetElapsedTime = TimeSpan.FromSeconds(MovementGymSession.FixedStepSeconds);
         Window.AllowUserResizing = true;
+        _flow = new GameFlowController(new HostSceneFactory(this));
     }
 
     protected override void Initialize()
     {
         _previousKeyboard = Keyboard.GetState();
+        _previousGamepad = GamePad.GetState(PlayerIndex.One);
         _inputRouter.SelectSource(LocalInputSource.Keyboard,
             _inputBindings.CaptureKeyboard(_previousKeyboard));
+        // Optional direct developer boot, e.g. --dev-level=MOTION_LAB.
+        // Bypasses the title without adding a separate hidden scene manager.
+        string? directLevelId = null;
+        string directEntranceId = GameLevelIds.DefaultEntrance;
+        foreach (string argument in Environment.GetCommandLineArgs())
+        {
+            if (argument.StartsWith("--dev-level=", StringComparison.OrdinalIgnoreCase))
+                directLevelId = argument["--dev-level=".Length..].ToUpperInvariant();
+            else if (argument.StartsWith("--dev-entrance=", StringComparison.OrdinalIgnoreCase))
+                directEntranceId = argument["--dev-entrance=".Length..].ToUpperInvariant();
+        }
+        if (directLevelId is not null &&
+            _flow.RequestPlay(directLevelId, directEntranceId) == SceneQueueResult.Queued)
+            _flow.CommitPending();
         UpdateWindowTitle();
         base.Initialize();
     }
@@ -77,14 +148,188 @@ public sealed class Game1 : Game
 
     protected override void Update(GameTime gameTime)
     {
+        using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
         KeyboardState keys = Keyboard.GetState();
+        // Ctrl+Shift+F12 is reserved for manual report export. Plain F12 remains
+        // available to the request-order gym below.
+        bool reportChord = JustPressed(keys, Keys.F12) &&
+            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
+            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
+        if (reportChord) _diagnostics?.ExportReport();
         GamePadState gamepadState = GamePad.GetState(PlayerIndex.One);
         LocalDeviceInput keyboard = _inputBindings.CaptureKeyboard(keys);
         LocalDeviceInput gamepad = _inputBindings.CaptureGamepad(gamepadState);
         _gamepadOneConnected = gamepad.IsConnected;
-        if (keys.IsKeyDown(Keys.Escape))
+        // Presentation-only debug overlay cycle. Available in every gameplay
+        // scene without consuming movement, ability or menu input.
+        // F11 is an extra convenience shortcut only in LDtk scenes; the
+        // request-resolver gym retains its original F11 scenario control.
+        if (_flow.ActiveScene == MajorSceneKind.Gameplay && !_flow.IsMenuOpen &&
+            (JustPressed(keys, Keys.OemTilde) ||
+             (_ldtkLevelMode && JustPressed(keys, Keys.F11))))
+        {
+            _debugHudMode = GameDebugHudModes.Next(_debugHudMode);
+            _debugHudUserSelected = true;
+        }
+        // A semantic UI command has priority over gameplay and gym shortcuts.
+        // Scene preparation/commit occurs here, strictly outside world.Step().
+        bool wasSuspended = _paused;
+        bool cancelledSmoke = _sceneFlowSmoke.IsRunning &&
+            JustPressed(keys, Keys.Escape);
+        if (cancelledSmoke)
+            _sceneFlowSmoke.Abort("USER CANCELLED");
+        if (!cancelledSmoke && !_sceneFlowSmoke.IsRunning)
+            HandleSceneNavigation(keys, gamepadState);
+        // Curtain timing uses presentation time, never world time. Scene
+        // preparation runs only after the covered phase on a safe Update.
+        bool changedScene = _flow.AdvanceTransition(
+            gameTime.ElapsedGameTime.TotalSeconds);
+        // SM Phase 6: a real coordinator/curtain smoke sequence, not a fake
+        // scene counter. Execute only at this safe Update boundary, and
+        // never step the authoritative world while the smoke test is running.
+        if (_sceneFlowSmoke.IsRunning)
+        {
+            if (CurrentRouteProbe() is SceneFlowProbeSnapshot observation)
+            {
+                SceneFlowSmokeCommand? next = _sceneFlowSmoke.Advance(observation,
+                    _flow.IsTransitionActive, _flow.Curtain.LastSucceeded);
+                if (next is SceneFlowSmokeCommand command)
+                {
+                    SceneQueueResult outcome = command.Operation == SceneFlowSmokeOperation.Restart
+                        ? _flow.RequestRestart()
+                        : _flow.RequestChangeLevel(command.LevelId, command.EntranceId);
+                    if (outcome != SceneQueueResult.Queued)
+                        _sceneFlowSmoke.Abort("Coordinator rejected " + outcome);
+                    else if (command.Operation == SceneFlowSmokeOperation.ExpectedFailure)
+                        _failNextRoutePreparation = true;
+                }
+            }
+            else
+                _sceneFlowSmoke.Abort("Lost active route world");
+        }
+        // IMPORTANT: sample suspension *after* advancing the curtain.
+        // The fade-in may end this frame. Before the first resumed physics
+        // tick, re-seed held inputs so a menu/transition key does not jump.
+        _paused = _flow.IsGameplaySuspended;
+        _diagnostics?.CaptureScene(_flow, _worldClockTest, _gym);
+        if (wasSuspended && !_paused)
+        {
+            _inputRouter.SelectSource(_inputRouter.Source,
+                _inputRouter.Source == LocalInputSource.Keyboard ? keyboard : gamepad);
+            _lastPlayerInput = null;
+        }
+        if (changedScene)
+        {
+            // Seed current held states at the scene/input-context boundary.
+            // An Enter/A button that started gameplay must not become a jump.
+            _inputRouter.SelectSource(_inputRouter.Source,
+                _inputRouter.Source == LocalInputSource.Keyboard ? keyboard : gamepad);
+            _lastPlayerInput = null;
+            _lastResolution = null;
+            _paused = _flow.IsGameplaySuspended;
+            _titleRefreshCounter = 6;
+        }
+        if (_flow.ExitRequested)
         {
             Exit();
+            return;
+        }
+        if (changedScene || _flow.IsGameplaySuspended || _sceneFlowSmoke.IsRunning)
+        {
+            // No simulation ticks when Title or any gameplay overlay is active.
+            // UI input continues through HandleSceneNavigation() every frame.
+            _previousKeyboard = keys;
+            _previousGamepad = gamepadState;
+            if (++_titleRefreshCounter >= 6)
+            {
+                _titleRefreshCounter = 0;
+                UpdateWindowTitle();
+            }
+            base.Update(gameTime);
+            return;
+        }
+
+        // Developer fixture changes are typed scene requests, not immediate
+        // mid-world mutations. They are committed below before the next tick.
+        if (JustPressed(keys, Keys.F4))
+            _flow.RequestPlay(_worldClockTest is null
+                ? GameLevelIds.SharedWorld : GameLevelIds.MovementGym);
+        if (_worldClockTest is not null && JustPressed(keys, Keys.F2))
+            _flow.RequestPlay(_authoredWorldMode
+                ? GameLevelIds.SharedWorld : GameLevelIds.AuthoredWorld);
+        if (_worldClockTest is not null && JustPressed(keys, Keys.F1))
+            _flow.RequestPlay(_motionLabMode
+                ? GameLevelIds.SharedWorld : GameLevelIds.MotionLab);
+        if (_worldClockTest is not null && JustPressed(keys, Keys.T))
+            _flow.RequestRestart();
+        // Direct route-debug shortcuts still use the real, validated exit
+        // mapping. One changes level only at this safe game-loop boundary.
+        if (_routeLabMode && _flow.Scenes.ActiveDestination is SceneDestination currentRoute)
+        {
+            // F9 runs an eight-operation scene lifecycle regression using the
+            // same fade/prepare/commit path as ordinary gameplay exits.
+            if (JustPressed(keys, Keys.F9) &&
+                CurrentRouteProbe() is SceneFlowProbeSnapshot startingRoute)
+                _sceneFlowSmoke.Start(startingRoute);
+            if (_sceneFlowSmoke.IsRunning)
+            {
+                _previousKeyboard = keys;
+                _previousGamepad = gamepadState;
+                base.Update(gameTime);
+                return;
+            }
+            // A one-shot, explicitly simulated content-loading failure.
+            // The prior world must remain fully playable after recovery.
+            // F10 is unused by the ordinary request gym in this route mode.
+            if (JustPressed(keys, Keys.F10))
+            {
+                string alternate = currentRoute.LevelId == GameLevelIds.RouteA
+                    ? GameLevelIds.RouteB : GameLevelIds.RouteA;
+                if (_flow.RequestChangeLevel(alternate, RouteLevelGym.WestEntrance)
+                    == SceneQueueResult.Queued)
+                {
+                    _failNextRoutePreparation = true;
+                    _lastRouteStatus = "TEST: NEXT ROUTE PREPARATION WILL FAIL";
+                }
+            }
+            int? selectedGate = JustPressed(keys, Keys.D1) ? RouteLevelGym.LeftGateId :
+                JustPressed(keys, Keys.D2) ? RouteLevelGym.RightGateId : null;
+            if (selectedGate is int gate &&
+                RouteLevelGym.Catalog.TryResolveExit(currentRoute, gate,
+                    out SceneDestination? target) && target is not null)
+            {
+                _flow.RequestChangeLevel(target.LevelId, target.EntranceId);
+                _lastRouteStatus = "MANUAL EXIT " + gate + " TO " +
+                    target.LevelId + "/" + target.EntranceId;
+            }
+        }
+        // Developer inspection of an LDtk exit without needing to traverse an
+        // unfinished art-level layout. Gameplay trigger crossings use the
+        // exact same validated exit destinations through committed events.
+        if (_ldtkConnectedLevel is LdtkConnectedLevel authoredLevel &&
+            _flow.Scenes.ActiveDestination is SceneDestination authoredDestination)
+        {
+            int index = JustPressed(keys, Keys.D1) ? 0 :
+                JustPressed(keys, Keys.D2) ? 1 : -1;
+            if (index >= 0)
+            {
+                var links = new List<LdtkExitLink>(authoredLevel.Exits.Values);
+                links.Sort((a,b) => a.TriggerId.CompareTo(b.TriggerId));
+                if (index < links.Count)
+                    _flow.RequestChangeLevel(links[index].Destination.LevelId,
+                        links[index].Destination.EntranceId);
+            }
+        }
+        // Any developer shortcut that queued a transition must immediately
+        // gate gameplay; preparation itself waits for the curtain and the
+        // next safe Update. Never simulate a tick after requesting a switch.
+        if (_flow.IsTransitionActive)
+        {
+            _paused = true;
+            _previousKeyboard = keys;
+            _previousGamepad = gamepadState;
+            UpdateWindowTitle();
+            base.Update(gameTime);
             return;
         }
 
@@ -97,32 +342,54 @@ public sealed class Game1 : Game
                 ? LocalInputSource.GamepadOne : LocalInputSource.Keyboard;
             _inputRouter.SelectSource(next,
                 next == LocalInputSource.Keyboard ? keyboard : gamepad);
-            ResetRequestTestBaseline();
+            if ((_authoredWorldMode || _motionLabMode || _routeLabMode || _ldtkLevelMode) &&
+                _worldClockTest is WorldSession sourceWorld)
+                sourceWorld.AssignInputSource(AuthoredWorldGym.FirstPlayerId,
+                    _inputRouter.SourceId);
+            if (_worldClockTest is null)
+                ResetRequestTestBaseline();
             _lastPlayerInput = null;
         }
 
         // These controls edit gameplay configuration; they never mutate the
         // motor's velocity directly. Any change resets to the same spawn.
-        if (JustPressed(keys, Keys.F1))
+        if (_worldClockTest is null && JustPressed(keys, Keys.F1))
             ApplyPreset(MovementGymTuning.Baseline, "Baseline");
-        if (JustPressed(keys, Keys.F2))
+        if (_worldClockTest is null && JustPressed(keys, Keys.F2))
             ApplyPreset(MovementGymTuning.Responsive, "Responsive");
-        if (JustPressed(keys, Keys.F3))
+        if (_worldClockTest is null && JustPressed(keys, Keys.F3))
             ApplyPreset(MovementGymTuning.Snappy, "Snappy");
         if (JustPressed(keys, Keys.F5))
+        {
             _gym.SetFaultSensitivity(SimulationFaultSensitivity.Strict);
+            _worldClockTest?.SetFaultSensitivity(SimulationFaultSensitivity.Strict);
+        }
         if (JustPressed(keys, Keys.F6))
+        {
             _gym.SetFaultSensitivity(SimulationFaultSensitivity.Diagnostic);
+            _worldClockTest?.SetFaultSensitivity(SimulationFaultSensitivity.Diagnostic);
+        }
         if (JustPressed(keys, Keys.F7))
+        {
             _gym.SetFaultSensitivity(SimulationFaultSensitivity.Resilient);
-        if (JustPressed(keys, Keys.F9))
+            _worldClockTest?.SetFaultSensitivity(SimulationFaultSensitivity.Resilient);
+        }
+        // The world-clock demo uses a fixed assistance policy for its entire
+        // lifetime; F9 remains the ordinary movement-gym test switch.
+        if (_ldtkLevelMode && JustPressed(keys, Keys.F9))
+            _ldtkShowCollisionDebug = !_ldtkShowCollisionDebug;
+        // Authoring A/B: gray collision rectangles are purely visual backing,
+        // not the authoritative colliders. F9 outlines remain independent.
+        if (_ldtkLevelMode && JustPressed(keys, Keys.F10))
+            _ldtkDrawCollisionBackdrop = !_ldtkDrawCollisionBackdrop;
+        if (_worldClockTest is null && JustPressed(keys, Keys.F9))
             _gym.SetAssistancePolicy(_gym.AssistancePolicy.AnyEnabled
                 ? CollisionAssistancePolicy.Disabled
                 : MovementGymSession.PlayableAssistancePreset);
 
         // Request resolver gym is presentation/test input only. Each change
         // resets the level so A/B comparisons start from identical geometry.
-        if (JustPressed(keys, Keys.F10))
+        if (_worldClockTest is null && JustPressed(keys, Keys.F10))
         {
             _requestTestEnabled = !_requestTestEnabled;
             ResetRequestTestBaseline();
@@ -132,34 +399,65 @@ public sealed class Game1 : Game
             _requestScenario = MovementRequestGymHarness.Next(_requestScenario);
             ResetRequestTestBaseline();
         }
-        if (_requestTestEnabled && JustPressed(keys, Keys.F12))
+        if (_requestTestEnabled && JustPressed(keys, Keys.F12) && !reportChord)
         {
             _reverseRequestOrder = !_reverseRequestOrder;
             ResetRequestTestBaseline();
         }
-        if (JustPressed(keys, Keys.Tab))
+        if (_worldClockTest is null && JustPressed(keys, Keys.Tab))
             _selectedParameter = (MovementGymParameter)(
                 ((int)_selectedParameter + 1) % Enum.GetValues<MovementGymParameter>().Length);
-        if (JustPressed(keys, Keys.OemMinus) || JustPressed(keys, Keys.Subtract))
+        if (_worldClockTest is null &&
+            (JustPressed(keys, Keys.OemMinus) || JustPressed(keys, Keys.Subtract)))
             AdjustParameter(-1);
-        if (JustPressed(keys, Keys.OemPlus) || JustPressed(keys, Keys.Add))
+        if (_worldClockTest is null &&
+            (JustPressed(keys, Keys.OemPlus) || JustPressed(keys, Keys.Add)))
             AdjustParameter(1);
 
         if (JustPressed(keys, Keys.R))
-            _gym.Reset();
-        if (JustPressed(keys, Keys.P))
         {
-            _paused = !_paused;
-            if (!_paused)
+            if (_worldClockTest is WorldSession world)
             {
-                // Resume is a new input-context boundary. A button held
-                // during pause must not become an unsolicited fresh press.
-                _inputRouter.SelectSource(_inputRouter.Source,
-                    _inputRouter.Source == LocalInputSource.Keyboard
-                        ? keyboard : gamepad);
+                if (_authoredWorldMode || _motionLabMode || _routeLabMode || _ldtkLevelMode)
+                    world.RespawnPlayer(1);
+                else
+                    world.RespawnPlayer(SharedWorldClockGym.FirstPlayerId,
+                        SharedWorldClockGym.SpawnBounds(world, SharedWorldClockGym.FirstPlayerId));
+                _worldP1Respawns++;
+            }
+            else
+                _gym.Reset();
+        }
+        if (_worldClockTest is WorldSession testWorld &&
+            testWorld.HasPlayer(2) && JustPressed(keys, Keys.U))
+        {
+            if (_authoredWorldMode || _motionLabMode || _routeLabMode)
+                testWorld.RespawnPlayer(2);
+            else
+                testWorld.RespawnPlayer(SharedWorldClockGym.SecondPlayerId,
+                    SharedWorldClockGym.SpawnBounds(testWorld, SharedWorldClockGym.SecondPlayerId));
+            _worldP2Respawns++;
+        }
+        if (_worldClockTest is not null && JustPressed(keys, Keys.F3))
+        {
+            _recentWorldEvents.Clear(); // Presentation only; not world state.
+            _latestStateFeedback = "NONE";
+            _latestAbilityFeedback = "NONE";
+        }
+        if (_authoredWorldMode && _worldClockTest is WorldSession authoredWorld)
+        {
+            if (JustPressed(keys, Keys.N) && !authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
+                AuthoredWorldGym.JoinGuest(authoredWorld);
+            if (JustPressed(keys, Keys.M) && authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
+                authoredWorld.RemovePlayer(AuthoredWorldGym.ThirdPlayerId);
+            if (JustPressed(keys, Keys.V))
+            {
+                WorldPlayerSlotInfo p1Slot = authoredWorld.GetPlayerSlot(AuthoredWorldGym.FirstPlayerId);
+                authoredWorld.SetPlayerSpawn(AuthoredWorldGym.FirstPlayerId,
+                    p1Slot.SpawnId == AuthoredWorldGym.LeftSpawn
+                        ? AuthoredWorldGym.GroundSpawn : AuthoredWorldGym.LeftSpawn);
             }
         }
-
         if (!_paused)
         {
             // The same device-independent state/edge router feeds both
@@ -183,14 +481,212 @@ public sealed class Game1 : Game
 
             // One resolution and one authoritative physics step per Update.
             // Preserve only the diagnostics from a successfully completed step.
-            _gym.Step(MovementGymSession.FixedStepSeconds, _inputRequests,
-                out MovementResolution committedResolution);
-            _lastResolution = committedResolution;
+            if (_worldClockTest is WorldSession clockWorld)
+            {
+                // Resolve the same A08 requests as the ordinary gym, then
+                // associate them with logical PlayerId 1. Player 2 has an
+                // independent test source (J/L movement; I jump).
+                MovementFrameIntent resolved = MovementRequestResolver.Resolve(_inputRequests);
+                HorizontalDirection secondDirection =
+                    keys.IsKeyDown(Keys.J) == keys.IsKeyDown(Keys.L)
+                        ? HorizontalDirection.Neutral
+                        : keys.IsKeyDown(Keys.J)
+                            ? HorizontalDirection.Left : HorizontalDirection.Right;
+                // A09 gym requests are only interpreted by the WorldSession;
+                // the host never changes state, velocity or hitboxes directly.
+                _characterStateRequests.Clear();
+                if (JustPressed(keys, Keys.Z))
+                {
+                    CharacterActionState action = clockWorld.GetPlayer(1).State.Action;
+                    _characterStateRequests.Add(new CharacterStateRequest(1,
+                        action == CharacterActionState.None
+                            ? CharacterStateRequestKind.BeginAction
+                            : CharacterStateRequestKind.EndAction));
+                }
+                if (JustPressed(keys, Keys.X))
+                    _characterStateRequests.Add(new CharacterStateRequest(1,
+                        CharacterStateRequestKind.ApplyStun, 90));
+                if (JustPressed(keys, Keys.C))
+                    _characterStateRequests.Add(new CharacterStateRequest(1,
+                        CharacterStateRequestKind.ClearStun));
+                if (clockWorld.HasPlayer(2) && JustPressed(keys, Keys.O))
+                    _characterStateRequests.Add(new CharacterStateRequest(2,
+                        CharacterStateRequestKind.ApplyStun, 90));
+                // A10: ability requests are semantic and player attributed.
+                // Do not edit hitboxes, velocity, cooldowns or energy in Game1.
+                _characterAbilityRequests.Clear();
+                if (JustPressed(keys, Keys.B))
+                    _characterAbilityRequests.Add(new CharacterAbilityRequest(1,
+                        CharacterAbilityId.Pulse, CharacterAbilityRequestKind.Activate));
+                if (JustPressed(keys, Keys.G))
+                    _characterAbilityRequests.Add(new CharacterAbilityRequest(1,
+                        CharacterAbilityId.Focus, CharacterAbilityRequestKind.Activate));
+                if (JustPressed(keys, Keys.H))
+                    _characterAbilityRequests.Add(new CharacterAbilityRequest(1,
+                        CharacterAbilityId.Pulse, CharacterAbilityRequestKind.Cancel));
+                if (JustPressed(keys, Keys.K))
+                    _characterAbilityRequests.Add(new CharacterAbilityRequest(1,
+                        CharacterAbilityId.Focus, CharacterAbilityRequestKind.Cancel));
+                if (clockWorld.HasPlayer(2) && JustPressed(keys, Keys.Y))
+                    _characterAbilityRequests.Add(new CharacterAbilityRequest(2,
+                        CharacterAbilityId.Pulse, CharacterAbilityRequestKind.Activate));
+                _worldCommands.Clear();
+                _worldCommands.Add(new WorldPlayerCommand(
+                    SharedWorldClockGym.FirstPlayerId, resolved.Direction,
+                    resolved.JumpPressed, resolved.JumpReleased));
+                if (clockWorld.HasPlayer(SharedWorldClockGym.SecondPlayerId))
+                    _worldCommands.Add(new WorldPlayerCommand(
+                        SharedWorldClockGym.SecondPlayerId, secondDirection,
+                        JustPressed(keys, Keys.I),
+                        keys.IsKeyUp(Keys.I) && _previousKeyboard.IsKeyDown(Keys.I)));
+                _motionRequests.Clear();
+                // LDtk authored wind zones are event-driven. Only committed
+                // enter/exit results change the desired environment velocity;
+                // a typed request applies that velocity on the NEXT world tick.
+                if (_ldtkConnectedLevel is LdtkConnectedLevel activeContent && _ldtkWindDirty)
+                {
+                    double fraction = 0.0;
+                    foreach (int triggerId in _ldtkActiveWindIds)
+                        fraction += activeContent.WindRegions[triggerId].WalkingSpeedFraction;
+                    _motionRequests.Add(new WorldMotionRequest(1,
+                        WorldMotionRequestKind.SetEnvironmentVelocity,
+                        fraction * MotionContributionGym.NormalWalkingSpeed));
+                }
+                if (_motionLabMode)
+                {
+                    // A wind-region fixture: persistent signed world velocity,
+                    // not a key-press priority override or direct physics edit.
+                    if (JustPressed(keys, Keys.Q))
+                    {
+                        _windSelection = (_windSelection + 1) % 3;
+                        double wind = _windSelection switch
+                        {
+                            1 => MotionContributionGym.WindLeft75,
+                            2 => MotionContributionGym.WindRight75,
+                            _ => 0.0
+                        };
+                        _motionRequests.Add(new WorldMotionRequest(1,
+                            WorldMotionRequestKind.SetEnvironmentVelocity, wind));
+                    }
+                    if (JustPressed(keys, Keys.E))
+                        _motionRequests.Add(new WorldMotionRequest(1,
+                            WorldMotionRequestKind.AddHorizontalImpulse,
+                            MotionContributionGym.KnockbackAgainstFacing(
+                                clockWorld.GetPlayerMotion(1))));
+                }
+#if DEBUG
+                // D01 Phase 2 failed-tick acceptance: commit tick 1 normally, then
+                // submit one duplicate player command for tick 2. WorldSession.Step
+                // rejects duplicates before forking any simulation state. This
+                // produces a genuine in-Step exception while retaining tick 1 as
+                // the last known committed state and tick 2 as an in-flight attempt.
+                // No fault is injected in Release builds or normal Debug runs.
+                if (_devFailInsideWorldStep && clockWorld.WorldTick == 1 &&
+                    _worldCommands.Count > 0)
+                    _worldCommands.Add(_worldCommands[0]);
+#endif
+                _diagnostics?.BeginWorldStep(_flow, clockWorld, _gym.FaultSensitivity,
+                    _worldCommands, _characterStateRequests, _characterAbilityRequests,
+                    _motionRequests);
+                WorldStepResult committed = clockWorld.Step(_worldCommands,
+                    _characterStateRequests, _characterAbilityRequests,
+                    _motionRequests);
+                _diagnostics?.CompleteWorldStep(_flow, clockWorld, _gym.FaultSensitivity, committed);
+#if DEBUG
+                // Diagnostic-only test: block the game thread after a committed
+                // tick so a separate watchdog thread can write a stall report.
+                if (_devStallAfterWorldStep && !_devStallInjected)
+                {
+                    _devStallInjected = true;
+                    System.Threading.Thread.Sleep(TimeSpan.FromSeconds(4));
+                }
+#endif
+#if DEBUG
+                if (_devCrashAfterWorldStep)
+                    throw new InvalidOperationException("D01 Phase 2 intentional gameplay-context crash test.");
+#endif
+                if (_ldtkConnectedLevel is not null) _ldtkWindDirty = false;
+                foreach (WorldGameplayEvent gameplayEvent in committed.Events)
+                {
+                    if (gameplayEvent.Kind == WorldGameplayEventKind.CharacterStateRequestDenied)
+                        _latestStateFeedback = "DENIED P" + gameplayEvent.PlayerId + " " +
+                            gameplayEvent.StateRequestKind + " " + gameplayEvent.Rejection;
+                    else if (gameplayEvent.Kind == WorldGameplayEventKind.CharacterStateChanged &&
+                             gameplayEvent.StateChange is WorldCharacterStateChange change &&
+                             change.Lane != CharacterStateLane.Locomotion)
+                        _latestStateFeedback = "P" + gameplayEvent.PlayerId + " " +
+                            change.Lane + " " + change.Current;
+                    if (gameplayEvent.AbilityId is CharacterAbilityId abilityId)
+                        _latestAbilityFeedback = "P" + gameplayEvent.PlayerId + " " +
+                            abilityId + " " + (gameplayEvent.AbilityRejection is { } rejected
+                                ? "DENIED " + rejected
+                                : gameplayEvent.Kind.ToString().Replace("Ability", ""));
+                    // A confirmed end-of-tick trigger entry may request the
+                    // next level, but cannot replace the world during Step().
+                    // P1 owns exits in this two-player test; P2 continues to
+                    // be fully independent within the current level.
+                    if (_routeLabMode &&
+                        gameplayEvent.Kind == WorldGameplayEventKind.TriggerEntered &&
+                        gameplayEvent.PlayerId == 1 &&
+                        gameplayEvent.TriggerId is int exitTrigger &&
+                        _flow.Scenes.ActiveDestination is SceneDestination from &&
+                        RouteLevelGym.Catalog.TryResolveExit(from, exitTrigger,
+                            out SceneDestination? nextLevel) && nextLevel is not null &&
+                        _flow.RequestChangeLevel(nextLevel.LevelId,
+                            nextLevel.EntranceId) == SceneQueueResult.Queued)
+                        _lastRouteStatus = "P1 EXIT " + exitTrigger + " TO " +
+                            nextLevel.LevelId + "/" + nextLevel.EntranceId;
+                    if (_ldtkConnectedLevel is LdtkConnectedLevel authored &&
+                        gameplayEvent.PlayerId == 1 && gameplayEvent.TriggerId is int authoredTrigger)
+                    {
+                        if (gameplayEvent.Kind == WorldGameplayEventKind.TriggerEntered)
+                        {
+                            if (authored.Checkpoints.TryGetValue(authoredTrigger,
+                                out LdtkCheckpointLink? checkpoint))
+                            {
+                                clockWorld.SetPlayerSpawn(1, checkpoint.SpawnId);
+                                _lastLdtkInteraction = "CHECKPOINT " + checkpoint.SpawnId;
+                            }
+                            if (authored.WindRegions.ContainsKey(authoredTrigger) &&
+                                _ldtkActiveWindIds.Add(authoredTrigger))
+                            {
+                                _ldtkWindDirty = true;
+                                _lastLdtkInteraction = "WIND ENTER " + authoredTrigger;
+                            }
+                            if (authored.Exits.TryGetValue(authoredTrigger, out LdtkExitLink? exit))
+                            {
+                                if (_flow.RequestChangeLevel(exit.Destination.LevelId,
+                                    exit.Destination.EntranceId) == SceneQueueResult.Queued)
+                                    _lastLdtkInteraction = "EXIT TO " + exit.Destination.LevelId;
+                            }
+                        }
+                        else if (gameplayEvent.Kind == WorldGameplayEventKind.TriggerExited &&
+                            authored.WindRegions.ContainsKey(authoredTrigger) &&
+                            _ldtkActiveWindIds.Remove(authoredTrigger))
+                        {
+                            _ldtkWindDirty = true;
+                            _lastLdtkInteraction = "WIND EXIT " + authoredTrigger;
+                        }
+                    }
+                    _recentWorldEvents.Add(gameplayEvent);
+                    if (_recentWorldEvents.Count > 8)
+                        _recentWorldEvents.RemoveAt(0);
+                }
+            }
+            else
+            {
+                _diagnostics?.BeginGymStep(_flow, _gym, input);
+                _gym.Step(MovementGymSession.FixedStepSeconds, _inputRequests,
+                    out MovementResolution committedResolution);
+                _diagnostics?.CompleteGymStep(_flow, _gym);
+                _lastResolution = committedResolution;
+            }
             _lastPlayerInput = input;
             _lastKeyboardDirection = input.Direction;
         }
 
         _previousKeyboard = keys;
+        _previousGamepad = gamepadState;
         if (++_titleRefreshCounter >= 6)
         {
             _titleRefreshCounter = 0;
@@ -201,14 +697,70 @@ public sealed class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        using var diagnosticDrawScope = _diagnostics?.MonitorOperation("Game1.Draw");
         GraphicsDevice.Clear(new Color(18, 23, 35));
         if (_spriteBatch is not null && _pixel is not null)
         {
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            MovementGymRenderer.Draw(_spriteBatch, _pixel,
-                GraphicsDevice.Viewport, _gym, _paused);
-            DrawRequestTestHud(_spriteBatch, _pixel);
-            DrawDeviceInputHud(_spriteBatch, _pixel);
+            bool showFullHud = _debugHudMode == GameDebugHudMode.Full;
+            if (_flow.ActiveScene == MajorSceneKind.Title)
+                DrawTitleBackdrop(_spriteBatch, _pixel);
+            else
+            {
+                if (_worldClockTest is WorldSession clockWorld)
+                {
+                    if (_ldtkLevelMode && _ldtkLevel is LdtkImportedLevel imported)
+                        LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
+                            GraphicsDevice.Viewport, clockWorld, imported, _paused,
+                            _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
+                            _ldtkDrawCollisionBackdrop, _ldtkConnectedLevel);
+                    else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
+                        MovementGymRenderer.DrawAuthoredWorld(
+                            _spriteBatch, _pixel, GraphicsDevice.Viewport,
+                            clockWorld, _paused, _worldP1Respawns, _worldP2Respawns,
+                            _motionLabMode, showFullHud);
+                    else
+                        MovementGymRenderer.DrawSharedWorldClock(
+                            _spriteBatch, _pixel, GraphicsDevice.Viewport,
+                            clockWorld, _paused, _worldP1Respawns, _worldP2Respawns,
+                            showFullHud);
+                }
+                else
+                    MovementGymRenderer.Draw(_spriteBatch, _pixel,
+                        GraphicsDevice.Viewport, _gym, _paused, showFullHud);
+                if (showFullHud)
+                {
+                    if (_worldClockTest is WorldSession renderedWorld)
+                    {
+                        DrawWorldEventHud(_spriteBatch, _pixel, renderedWorld);
+                        DrawCharacterStateHud(_spriteBatch, _pixel, renderedWorld);
+                        DrawAbilityHud(_spriteBatch, _pixel, renderedWorld);
+                        if (_motionLabMode)
+                            DrawMotionLabHud(_spriteBatch, _pixel, renderedWorld);
+                        if (_routeLabMode)
+                            DrawRouteLabHud(_spriteBatch, _pixel, renderedWorld);
+                    }
+                    DrawRequestTestHud(_spriteBatch, _pixel);
+                    DrawDeviceInputHud(_spriteBatch, _pixel);
+                    if (_flow.ShowFlowHints && !_flow.IsMenuOpen && !_routeLabMode)
+                        DrawFlowHint(_spriteBatch, _pixel);
+                }
+                else if (_debugHudMode == GameDebugHudMode.Compact)
+                    DrawCompactDebugHud(_spriteBatch, _pixel);
+            }
+            if (_flow.IsMenuOpen)
+                DrawFlowMenu(_spriteBatch, _pixel);
+            DrawTransitionCurtain(_spriteBatch, _pixel);
+            if (_diagnostics is not null)
+            {
+                // Minimal always-available report UI, including when Title or
+                // Pause menus are open. No MonoGame dependencies in diagnostics.
+                string message = _diagnostics.StatusMessage;
+                if (message.Length > 105) message = message[..105];
+                GymDebugText.Draw(_spriteBatch, _pixel, 10,
+                    Math.Max(2, GraphicsDevice.Viewport.Height - 18),
+                    message, new Color(170, 219, 198), 1);
+            }
             _spriteBatch.End();
         }
         base.Draw(gameTime);
@@ -216,9 +768,466 @@ public sealed class Game1 : Game
 
     protected override void UnloadContent()
     {
+        _flow.Dispose();
         _pixel?.Dispose();
         _spriteBatch?.Dispose();
         base.UnloadContent();
+    }
+
+    private void ActivatePreparedScene(MovementGymSession gym, WorldSession? world,
+        string? levelId, LdtkImportedLevel? importedLdtk = null,
+        LdtkVisualSceneAssets? visuals = null,
+        LdtkConnectedLevel? connectedLdtk = null)
+    {
+        _gym = gym;
+        _worldClockTest = world;
+        _authoredWorldMode = levelId == GameLevelIds.AuthoredWorld;
+        _motionLabMode = levelId == GameLevelIds.MotionLab;
+        _routeLabMode = levelId is (GameLevelIds.RouteA or GameLevelIds.RouteB);
+        _ldtkLevelMode = levelId is (GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB);
+        // Default to a small overlay in illustrated LDtk scenes; existing
+        // diagnostics-rich gym fixtures retain Full unless user chooses a
+        // mode, which persists across reloads and scene changes.
+        if (!_debugHudUserSelected)
+            _debugHudMode = GameDebugHudModes.DefaultForScene(_ldtkLevelMode);
+        _ldtkLevel = importedLdtk;
+        _ldtkConnectedLevel = connectedLdtk;
+        _ldtkActiveWindIds.Clear();
+        _ldtkWindDirty = false;
+        _lastLdtkInteraction = "NONE";
+        _ldtkVisuals = visuals;
+        _ldtkShowCollisionDebug = false;
+        _ldtkDrawCollisionBackdrop = visuals?.Terrain?.DrawCollisionBackdrop ?? true;
+        _windSelection = 0;
+        _recentWorldEvents.Clear();
+        _latestStateFeedback = "NONE";
+        _latestAbilityFeedback = "NONE";
+        _worldP1Respawns = 0;
+        _worldP2Respawns = 0;
+        _requestTestEnabled = false;
+        _lastResolution = null;
+        _tuningLabel = "Baseline";
+        _paused = false;
+        _titleRefreshCounter = 6;
+    }
+
+    private static string FindLdtkFile(string fileName)
+    {
+        // In Visual Studio, the content file lives at solution-root/Content/Levels.
+        // Walk ancestor directories to make Debug/Release and local CLI launch
+        // paths work without touching Content.csproj or hardcoding a user path.
+        string? directory = AppContext.BaseDirectory;
+        for (int depth = 0; depth < 12 && directory is not null; depth++)
+        {
+            string candidate = Path.Combine(directory, "Content", "Levels", fileName);
+            if (File.Exists(candidate)) return candidate;
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+        throw new FileNotFoundException(
+            "Missing Content/Levels/" + fileName + ". Extract the ZIP at the solution root.");
+    }
+
+    // The scene factory prepares every new gameplay world BEFORE the old
+    // scene exits. SceneCoordinator alone owns the lifecycle/commit boundary.
+    private sealed class HostSceneFactory(Game1 host) : IGameFlowSceneFactory
+    {
+        public bool Supports(MajorSceneKind kind, SceneDestination? destination)
+        {
+            if (kind == MajorSceneKind.Title) return destination is null;
+            if (kind != MajorSceneKind.Gameplay || destination is null) return false;
+            if (RouteLevelGym.Catalog.Supports(destination)) return true;
+            if (destination.LevelId is (GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB))
+                return destination.EntranceId is ("START" or "WEST" or "EAST");
+            return destination.EntranceId == GameLevelIds.DefaultEntrance &&
+                GameLevelIds.IsStandalonePlayableLevel(destination.LevelId);
+        }
+
+        public bool TryPrepare(MajorSceneKind kind, SceneDestination? destination,
+            out IGameFlowScene? scene, out string? error)
+        {
+            scene = null;
+            if (!Supports(kind, destination))
+            {
+                error = "Invalid level or entrance ID";
+                return false;
+            }
+            error = null;
+            if (kind == MajorSceneKind.Gameplay &&
+                destination!.LevelId is (GameLevelIds.RouteA or GameLevelIds.RouteB) &&
+                host._failNextRoutePreparation)
+            {
+                host._failNextRoutePreparation = false;
+                error = "TEST: simulated route content preparation failure";
+                return false;
+            }
+            if (kind == MajorSceneKind.Title)
+            {
+                scene = new HostScene(MajorSceneKind.Title, null,
+                    () =>
+                    {
+                        host._worldClockTest = null;
+                        host._authoredWorldMode = false;
+                        host._motionLabMode = false;
+                        host._routeLabMode = false;
+                        host._ldtkLevelMode = false;
+                        host._ldtkLevel = null;
+                        host._ldtkConnectedLevel = null;
+                        host._ldtkActiveWindIds.Clear();
+                        host._ldtkVisuals = null;
+                        // Returning to Title ends the session; switching levels
+                        // or restarting never does.
+                        host._gameplaySession = null;
+                    });
+                return true;
+            }
+            // These fixtures already validate their geometry and identities.
+            // Preserve the user's selected fault sensitivity between scenes.
+            MovementGymSession preparedGym = new(
+                tuning: host._gym.Tuning,
+                faultSensitivity: host._gym.FaultSensitivity,
+                assistancePolicy: host._gym.AssistancePolicy);
+            // A session survives scene replacements, but creating a session
+            // during preparation must not replace the active one on failure.
+            GameplaySession preparedSession = host._gameplaySession ??
+                new GameplaySession(++host._nextGameplaySessionId,
+                [new GameSessionParticipant(1, 1001, host._inputRouter.SourceId),
+                 new GameSessionParticipant(2, 1002, 22)]);
+            IReadOnlyList<GameSessionParticipant> roster = preparedSession.PreviewRoster(
+                host._worldClockTest?.PlayerSlots, host._inputRouter.SourceId);
+            LdtkImportedLevel? importedLdtk = null;
+            LdtkConnectedLevel? preparedConnectedLdtk = null;
+            LdtkVisualSceneAssets? preparedVisuals = null;
+            WorldSession? preparedLdtkWorld = null;
+            if (destination!.LevelId is (GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB))
+            {
+                try
+                {
+                    bool connected = destination.LevelId is (GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB);
+                    string filename = FindLdtkFile(connected ? "ConnectedWorldDemo.ldtk" :
+                        destination.LevelId == GameLevelIds.LdtkTest
+                        ? "FirstAttempt.ldtk" : destination.LevelId == GameLevelIds.LdtkSceneryDemo
+                        ? "SceneryDemo.ldtk" : destination.LevelId == GameLevelIds.LdtkTerrainDemo
+                        ? "TerrainDemo.ldtk" : "ParallaxDemo.ldtk");
+                    // Read once so collision, artwork and textures are prepared
+                    // from the same on-disk snapshot. Never read live files
+                    // during an authoritative tick or in Draw().
+                    string json = File.ReadAllText(filename);
+                    string? selectedIdentifier = connected ? destination.LevelId : null;
+                    if (connected)
+                    {
+                        var linkedCatalog = LdtkConnectedWorldCatalog.FromJson(json);
+                        preparedConnectedLdtk = linkedCatalog.Require(destination);
+                        string spawn = preparedConnectedLdtk.Entrances[destination.EntranceId];
+                        importedLdtk = preparedConnectedLdtk.Imported with { StartSpawnId = spawn };
+                    }
+                    else importedLdtk = LdtkLevelImporter.FromJson(json);
+                    LdtkVisualDefinition visualData = LdtkVisualImporter.FromJson(json, selectedIdentifier);
+                    LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, selectedIdentifier);
+                    LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, selectedIdentifier);
+                    if (visualData.LevelId != importedLdtk.World.LevelId ||
+                        scenery.LevelId != importedLdtk.World.LevelId ||
+                        terrain.LevelId != importedLdtk.World.LevelId)
+                        throw new InvalidOperationException("LDtk visual/scenery/world IDs differ.");
+                    if (visualData.TileCount > 0 || scenery.SpriteCount > 0 ||
+                        terrain.ArtworkCount > 0)
+                        preparedVisuals = new LdtkVisualSceneAssets(
+                            host.GraphicsDevice, filename, visualData, scenery, terrain);
+                    preparedLdtkWorld = LdtkLevelGym.Create(importedLdtk,
+                        preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
+                        host._inputRouter.SourceId,
+                        worldInstanceId: ++host._nextWorldInstanceId);
+                }
+                catch (Exception ex) when (ex is IOException or
+                    UnauthorizedAccessException or System.Text.Json.JsonException or
+                    KeyNotFoundException or FormatException or
+                    ArgumentException or NotSupportedException or InvalidOperationException)
+                {
+                    preparedVisuals?.Dispose();
+                    error = "LDtk import failed: " + ex.Message;
+                    return false; // Existing scene remains untouched.
+                }
+            }
+            WorldSession? preparedWorld = destination!.LevelId switch
+            {
+                GameLevelIds.SharedWorld => SharedWorldClockGym.Create(
+                    preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
+                    worldInstanceId: ++host._nextWorldInstanceId),
+                GameLevelIds.AuthoredWorld => AuthoredWorldGym.Create(
+                    preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
+                    host._inputRouter.SourceId,
+                    worldInstanceId: ++host._nextWorldInstanceId),
+                GameLevelIds.MotionLab => MotionContributionGym.Create(
+                    preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
+                    host._inputRouter.SourceId,
+                    worldInstanceId: ++host._nextWorldInstanceId),
+                GameLevelIds.RouteA or GameLevelIds.RouteB => RouteLevelGym.Create(
+                    destination, roster, preparedGym.AssistancePolicy,
+                    preparedGym.FaultSensitivity,
+                    worldInstanceId: ++host._nextWorldInstanceId),
+                GameLevelIds.LdtkTest or GameLevelIds.LdtkParallaxDemo or GameLevelIds.LdtkSceneryDemo or GameLevelIds.LdtkTerrainDemo or GameLevelIds.LdtkConnectedA or GameLevelIds.LdtkConnectedB => preparedLdtkWorld,
+                _ => null
+            };
+            scene = new HostScene(MajorSceneKind.Gameplay, destination,
+                () =>
+                {
+                    host.ActivatePreparedScene(preparedGym, preparedWorld,
+                        destination.LevelId, importedLdtk, preparedVisuals, preparedConnectedLdtk);
+                    preparedSession.EnterLevel(destination, preparedWorld?.PlayerSlots);
+                    host._gameplaySession = preparedSession;
+                }, preparedVisuals);
+            return true;
+        }
+    }
+
+    private sealed class HostScene(MajorSceneKind kind,
+        SceneDestination? destination, Action enter,
+        LdtkVisualSceneAssets? assets = null) : IGameFlowScene
+    {
+        public MajorSceneKind Kind => kind;
+        public SceneDestination? Destination => destination;
+        public void Enter() => enter();
+        public void Exit() { } // No shared GPU assets are owned by these graybox fixtures.
+        private readonly SceneResourceScope _scope = new();
+        // The shared SpriteBatch/pixel live at application scope. Current
+        // graybox worlds own no GPU assets. Future level-local assets belong
+        // in this scene scope, never in a static cache by default.
+        public void Dispose()
+        {
+            assets?.Dispose();
+            _scope.Dispose();
+        }
+    }
+
+    private void HandleSceneNavigation(KeyboardState keys, GamePadState gamepad)
+    {
+        // Prevent a key press from acting on both a transition and the
+        // arriving scene. Also reject modal navigation during covered loads.
+        if (_flow.IsTransitionActive) return;
+        bool newStart = JustPressed(gamepad, Buttons.Start);
+        bool newBack = JustPressed(keys, Keys.Escape) ||
+            JustPressed(gamepad, Buttons.B);
+        bool newConfirm = JustPressed(keys, Keys.Enter) ||
+            JustPressed(keys, Keys.Space) && _flow.IsMenuOpen ||
+            JustPressed(gamepad, Buttons.A);
+        bool newUp = JustPressed(keys, Keys.Up) || JustPressed(keys, Keys.W) ||
+            JustPressed(gamepad, Buttons.DPadUp);
+        bool newDown = JustPressed(keys, Keys.Down) || JustPressed(keys, Keys.S) ||
+            JustPressed(gamepad, Buttons.DPadDown);
+
+        if (_flow.ActiveScene == MajorSceneKind.Title && !_flow.Ui.HasOverlay)
+        {
+            // Fast direct-to-fixture developer entry, without title-menu steps.
+            if (JustPressed(keys, Keys.F1)) _flow.RequestPlay(GameLevelIds.MovementGym);
+            else if (JustPressed(keys, Keys.F2)) _flow.RequestPlay(GameLevelIds.AuthoredWorld);
+            else if (JustPressed(keys, Keys.F3)) _flow.RequestPlay(GameLevelIds.MotionLab);
+            else if (JustPressed(keys, Keys.F4)) _flow.RequestPlay(GameLevelIds.SharedWorld);
+            else if (JustPressed(keys, Keys.F5)) _flow.RequestPlay(GameLevelIds.RouteA);
+            else if (JustPressed(keys, Keys.F6)) _flow.RequestPlay(
+                GameLevelIds.RouteB, RouteLevelGym.EastEntrance);
+            else if (JustPressed(keys, Keys.F7)) _flow.RequestPlay(GameLevelIds.LdtkTest);
+            else if (JustPressed(keys, Keys.F8)) _flow.RequestPlay(GameLevelIds.LdtkParallaxDemo);
+            else if (JustPressed(keys, Keys.F9)) _flow.RequestPlay(GameLevelIds.LdtkSceneryDemo);
+            else if (JustPressed(keys, Keys.F10)) _flow.RequestPlay(GameLevelIds.LdtkTerrainDemo);
+            if (JustPressed(keys, Keys.Q)) _flow.Execute(GameUiCommand.Quit);
+        }
+        if (newStart || JustPressed(keys, Keys.P))
+        {
+            if (_flow.ActiveScene == MajorSceneKind.Gameplay)
+                _flow.PauseOrResume();
+            return;
+        }
+        if (newBack)
+        {
+            _flow.Back();
+            return;
+        }
+        if (!_flow.IsMenuOpen) return;
+        if (newUp) _flow.Navigate(-1);
+        else if (newDown) _flow.Navigate(1);
+        else if (newConfirm) _flow.ConfirmSelection();
+    }
+
+    private bool JustPressed(GamePadState current, Buttons button) =>
+        current.IsButtonDown(button) && !_previousGamepad.IsButtonDown(button);
+
+    private void DrawTitleBackdrop(SpriteBatch batch, Texture2D pixel)
+    {
+        int width = GraphicsDevice.Viewport.Width;
+        int height = GraphicsDevice.Viewport.Height;
+        batch.Draw(pixel, new Rectangle(0, 0, width, height), new Color(18, 23, 35));
+        batch.Draw(pixel, new Rectangle(0, height - 84, width, 84), new Color(39, 57, 72));
+        batch.Draw(pixel, new Rectangle(0, height - 85, width, 4), new Color(63, 171, 158));
+        int left = Math.Max(18, width / 2 - 300);
+        GymDebugText.Draw(batch, pixel, left, Math.Max(28, height / 2 - 239),
+            "PLATFORMER SANDBOX", new Color(99, 217, 183), 3);
+        GymDebugText.Draw(batch, pixel, left, Math.Max(66, height / 2 - 199),
+            "SCENE FLOW LAB - TITLE / PLAY / PAUSE", new Color(190, 206, 223), 1);
+    }
+
+    private void DrawFlowMenu(SpriteBatch batch, Texture2D pixel)
+    {
+        GameUiScreen? screen = _flow.CurrentMenu;
+        if (screen is null) return;
+        int viewWidth = GraphicsDevice.Viewport.Width;
+        int viewHeight = GraphicsDevice.Viewport.Height;
+        if (screen != GameUiScreen.Title)
+            batch.Draw(pixel, new Rectangle(0, 0, viewWidth, viewHeight),
+                new Color(6, 11, 20) * 0.78f);
+        int width = Math.Min(660, Math.Max(200, viewWidth - 36));
+        int x = Math.Max(8, (viewWidth - width) / 2);
+        int height = screen switch
+        {
+            GameUiScreen.Controls => 260,
+            GameUiScreen.Title => 242,
+            GameUiScreen.LevelSelect => 110 + _flow.MenuItems.Count * 30,
+            _ => 242
+        };
+        height = Math.Min(height, Math.Max(140, viewHeight - 32));
+        int y = Math.Max(8, (viewHeight - height) / 2);
+        batch.Draw(pixel, new Rectangle(x, y, width, height),
+            new Color(20, 30, 44) * 0.98f);
+        batch.Draw(pixel, new Rectangle(x, y, 5, height), new Color(82, 202, 169));
+        string heading = screen switch
+        {
+            GameUiScreen.Title => "PLATFORMER SANDBOX",
+            GameUiScreen.LevelSelect => "SELECT LEVEL",
+            GameUiScreen.Pause => "PAUSED - WORLD TICKS FROZEN",
+            GameUiScreen.Settings => "SETTINGS - APPLICATION SCOPE",
+            _ => "CONTROLS - SCENE FLOW"
+        };
+        GymDebugText.Draw(batch, pixel, x + 22, y + 20,
+            heading, new Color(103, 214, 183), 2);
+        if (screen == GameUiScreen.Controls)
+        {
+            string[] help =
+            [
+                "UP DOWN OR DPAD: SELECT",
+                "ENTER OR PAD A: CONFIRM",
+                "ESC OR PAD B: BACK",
+                "P OR PAD START: PAUSE RESUME",
+                "TITLE: SELECT LEVEL, THEN CHOOSE SCENE",
+                "IN GAME: P PAUSE  T RESTART  R RESPAWN",
+                "LDTK: F9 COLLISIONS F10 BACKDROP F11 HUD"
+            ];
+            for (int i = 0; i < help.Length; i++)
+                GymDebugText.Draw(batch, pixel, x + 24, y + 57 + 18 * i,
+                    help[i], new Color(191, 209, 225), 1);
+            batch.Draw(pixel, new Rectangle(x + 18, y + 187, width - 36, 23),
+                new Color(42, 84, 91));
+            GymDebugText.Draw(batch, pixel, x + 27, y + 192,
+                "BACK", new Color(250, 220, 139), 2);
+        }
+        else
+        {
+            IReadOnlyList<GameUiMenuItem> entries = _flow.MenuItems;
+            int itemY = y + 62;
+            const int rowHeight = 30;
+            int visibleRows = Math.Max(1, (height - 106) / rowHeight);
+            int selection = _flow.SelectionIndex;
+            int first = Math.Clamp(selection - visibleRows / 2,
+                0, Math.Max(0, entries.Count - visibleRows));
+            for (int i = first; i < Math.Min(entries.Count, first + visibleRows); i++)
+            {
+                int rowY = itemY + (i - first) * rowHeight;
+                bool focused = selection == i;
+                if (focused)
+                    batch.Draw(pixel, new Rectangle(x + 18, rowY - 4,
+                        width - 36, 25), new Color(42, 84, 91));
+                GymDebugText.Draw(batch, pixel, x + 27, rowY,
+                    (focused ? "> " : "  ") + entries[i].Label,
+                    focused ? new Color(250, 220, 139) : new Color(189, 207, 223), 2);
+            }
+            if (screen == GameUiScreen.LevelSelect)
+                GymDebugText.Draw(batch, pixel, x + width - 87, y + 26,
+                    (selection + 1) + "/" + entries.Count,
+                    new Color(164, 187, 207), 1);
+        }
+        GymDebugText.Draw(batch, pixel, x + 22, y + height - 29,
+            screen == GameUiScreen.Title
+                ? "UP/DOWN SELECT  ENTER/A CONFIRM  Q QUIT"
+                : screen == GameUiScreen.LevelSelect
+                ? "UP/DOWN BROWSE  ENTER/A PLAY  ESC/B BACK"
+                : "ENTER SELECT  ESC BACK  P RESUME",
+            new Color(161, 184, 201), 1);
+        if (_flow.LastFailure is string error)
+            GymDebugText.Draw(batch, pixel, x + 22, y + height - 13,
+                error.ToUpperInvariant(), new Color(245, 155, 124), 1);
+    }
+
+    private void DrawTransitionCurtain(SpriteBatch batch, Texture2D pixel)
+    {
+        SceneTransitionCurtain curtain = _flow.Curtain;
+        int width = GraphicsDevice.Viewport.Width;
+        int height = GraphicsDevice.Viewport.Height;
+        if (curtain.Opacity > 0f)
+        {
+            batch.Draw(pixel, new Rectangle(0, 0, width, height),
+                Color.Black * curtain.Opacity);
+            if (curtain.Opacity >= 0.80f)
+            {
+                string status = curtain.Phase switch
+                {
+                    SceneCurtainPhase.FadingOut => "LEAVING SCENE",
+                    SceneCurtainPhase.Covered => "PREPARING DESTINATION",
+                    SceneCurtainPhase.FadingIn when curtain.LastSucceeded == false =>
+                        "PREPARATION FAILED - RETURNING TO PREVIOUS SCENE",
+                    _ => "ENTERING SCENE"
+                };
+                GymDebugText.Draw(batch, pixel, Math.Max(10, width / 2 - 270),
+                    Math.Max(10, height / 2 - 14), status,
+                    new Color(240, 221, 168), 2);
+            }
+        }
+        // A genuine observed prepare duration, not a fabricated percentage.
+        // An invalid destination preserves the active scene and shows this
+        // notice after the cover is released, including in gameplay (where
+        // there is no menu to carry the existing error line).
+        if (!curtain.IsActive && _flow.FailureNoticeSecondsRemaining > 0 &&
+            _flow.LastFailure is string error)
+        {
+            batch.Draw(pixel, new Rectangle(18, 36, Math.Max(1, Math.Min(width - 36, 920)), 44),
+                new Color(94, 34, 37) * 0.97f);
+            GymDebugText.Draw(batch, pixel, 28, 47,
+                "LOAD FAILED: " + error.ToUpperInvariant(),
+                new Color(255, 200, 176), 1);
+            GymDebugText.Draw(batch, pixel, 28, 64,
+                "PREVIOUS SCENE RESTORED - RETRY EXIT 1/2 OR USE PAUSE MENU",
+                new Color(224, 217, 196), 1);
+        }
+    }
+
+    private void DrawFlowHint(SpriteBatch batch, Texture2D pixel)
+    {
+        int x = 18;
+        int y = Math.Max(0, GraphicsDevice.Viewport.Height - 22);
+        batch.Draw(pixel, new Rectangle(x - 4, y - 4, 590, 20),
+            new Color(17, 25, 37) * 0.85f);
+        GymDebugText.Draw(batch, pixel, x, y,
+            _routeLabMode ? "P PAUSE  R/U RESPAWN  T RESTART  1/2 EXITS  F9 SMOKE" :
+                "P OR START: PAUSE  ESC: MENU  F4: TEST WORLD",
+            new Color(124, 221, 180), 1);
+    }
+
+    private void DrawCompactDebugHud(SpriteBatch batch, Texture2D pixel)
+    {
+        string scene = _ldtkLevelMode
+            ? "LDTK " + (_ldtkLevel?.World.LevelId ?? "UNKNOWN")
+            : _routeLabMode ? "ROUTE LAB"
+            : _motionLabMode ? "MOTION LAB"
+            : _authoredWorldMode ? "AUTHORED WORLD"
+            : _worldClockTest is not null ? "SHARED WORLD" : "MOVEMENT GYM";
+        string state = _worldClockTest is WorldSession world
+            ? "TICK " + world.WorldTick + "  P:" + world.PlayerCount
+            : "CRUSH:" + _gym.CrushRespawns;
+        string toggle = _ldtkLevelMode ? "F11 OR TILDE HUD" : "TILDE HUD";
+        string summary = scene + "  -  " + state + "  -  " + toggle;
+        int width = Math.Max(1, Math.Min(GraphicsDevice.Viewport.Width - 24, 590));
+        batch.Draw(pixel, new Rectangle(12, 12, width, 25),
+            new Color(16, 25, 37) * 0.80f);
+        batch.Draw(pixel, new Rectangle(12, 12, 3, 25),
+            new Color(108, 224, 178));
+        GymDebugText.Draw(batch, pixel, 23, 19, summary,
+            new Color(206, 231, 227), 1);
     }
 
     private void ResetRequestTestBaseline()
@@ -227,6 +1236,204 @@ public sealed class Game1 : Game
         _lastResolution = null;
         _lastKeyboardDirection = HorizontalDirection.Neutral;
         _titleRefreshCounter = 6;
+    }
+
+    private void DrawCharacterStateHud(SpriteBatch batch, Texture2D pixel, WorldSession world)
+    {
+        int x = Math.Max(12, GraphicsDevice.Viewport.Width - 365);
+        int y = 309;
+        batch.Draw(pixel, new Rectangle(x, y, 350, 169),
+            new Color(17, 25, 37) * 0.96f);
+        batch.Draw(pixel, new Rectangle(x, y, 4, 169), new Color(237, 174, 109));
+        GymDebugText.Draw(batch, pixel, x + 12, y + 8,
+            "A09 CHARACTER STATES", new Color(237, 174, 109), 2);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 30,
+            "Z P1 ACTION   X P1 STUN  C CLEAR", new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 45,
+            "O P2 STUN (90 TICKS)", new Color(196, 217, 235), 1);
+        int row = 65;
+        foreach (WorldPlayerSnapshot player in world.Snapshot().Players)
+        {
+            CharacterStateSnapshot state = player.State;
+            GymDebugText.Draw(batch, pixel, x + 12, y + row,
+                "P" + player.PlayerId + " " + state.Locomotion + " / " + state.Action,
+                player.PlayerId == 1 ? new Color(68, 214, 177) :
+                    player.PlayerId == 2 ? new Color(161, 145, 246) :
+                    new Color(242, 220, 93), 1);
+            GymDebugText.Draw(batch, pixel, x + 12, y + row + 14,
+                "   " + state.Condition + "  STUN LEFT: " + state.StunTicksRemaining,
+                new Color(196, 217, 235), 1);
+            row += 29;
+        }
+        GymDebugText.Draw(batch, pixel, x + 12, y + 153,
+            _latestStateFeedback.ToUpperInvariant(), new Color(237, 174, 109), 1);
+    }
+
+    private void DrawAbilityHud(SpriteBatch batch, Texture2D pixel, WorldSession world)
+    {
+        int x = Math.Max(12, GraphicsDevice.Viewport.Width - 365);
+        int y = 485;
+        batch.Draw(pixel, new Rectangle(x, y, 350, 195),
+            new Color(17, 25, 37) * 0.96f);
+        batch.Draw(pixel, new Rectangle(x, y, 4, 195), new Color(110, 192, 242));
+        GymDebugText.Draw(batch, pixel, x + 12, y + 8,
+            "A10 ABILITY COORDINATOR", new Color(110, 192, 242), 2);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 30,
+            "B P1 PULSE   G P1 FOCUS   Y P2 PULSE", new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 45,
+            "H CANCEL PULSE   K CANCEL FOCUS", new Color(196, 217, 235), 1);
+        int line = 64;
+        foreach (WorldPlayerSnapshot player in world.Snapshot().Players)
+        {
+            if (line > 144) break;
+            CharacterAbilitySnapshot abilities = world.GetPlayerAbilities(player.PlayerId);
+            GymDebugText.Draw(batch, pixel, x + 12, y + line,
+                "P" + player.PlayerId + " ENERGY " + abilities.Energy + "/100",
+                player.PlayerId == 1 ? new Color(68, 214, 177) :
+                    player.PlayerId == 2 ? new Color(161, 145, 246) :
+                    new Color(242, 220, 93), 1);
+            GymDebugText.Draw(batch, pixel, x + 12, y + line + 14,
+                " PULSE A" + abilities.Pulse.ActiveTicksRemaining +
+                " C" + abilities.Pulse.CooldownTicksRemaining +
+                "  FOCUS A" + abilities.Focus.ActiveTicksRemaining +
+                " C" + abilities.Focus.CooldownTicksRemaining,
+                new Color(196, 217, 235), 1);
+            line += 29;
+        }
+        GymDebugText.Draw(batch, pixel, x + 12, y + 166,
+            _latestAbilityFeedback.ToUpperInvariant(), new Color(110, 192, 242), 1);
+    }
+
+    private void DrawMotionLabHud(SpriteBatch batch, Texture2D pixel,
+        WorldSession world)
+    {
+        int x = 18;
+        int y = 468;
+        batch.Draw(pixel, new Rectangle(x, y, 570, 185),
+            new Color(17, 25, 37) * 0.96f);
+        batch.Draw(pixel, new Rectangle(x, y, 4, 185), new Color(245, 190, 99));
+        GymDebugText.Draw(batch, pixel, x + 12, y + 8,
+            "MOTION LAB  F1 EXIT  F2 AUTHORED", new Color(245, 190, 99), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 30,
+            "Q WIND: " + (_windSelection == 1 ? "LEFT 75%" :
+                _windSelection == 2 ? "RIGHT 75%" : "OFF"),
+            new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 47,
+            "E HIT OPPOSITE FACING   B PULSE DASH   X STUN",
+            new Color(196, 217, 235), 1);
+        WorldPlayerSnapshot p = world.GetPlayer(1);
+        WorldMotionSnapshot motion = world.GetPlayerMotion(1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 68,
+            "PLAYER X VELOCITY: " + p.Velocity.X.ToString("F2"),
+            new Color(68, 214, 177), 2);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 95,
+            "WIND: " + motion.EnvironmentVelocityX.ToString("F2") +
+            "  IMPULSE: " + motion.ImpulseVelocityX.ToString("F2"),
+            new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 113,
+            "DASH: " + motion.DashVelocityX.ToString("F2") +
+            "  EXTERNAL: " + motion.CombinedExternalVelocityX.ToString("F2"),
+            new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 132,
+            "FACING: " + (motion.FacingDirection > 0 ? "RIGHT" : "LEFT") +
+            "  WALK MAX: " + MotionContributionGym.NormalWalkingSpeed.ToString("F2"),
+            new Color(196, 217, 235), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 153,
+            "WALK WITH/AGAINST WIND, JUMP, DASH INTO WALL",
+            new Color(245, 190, 99), 1);
+    }
+
+    private void DrawWorldEventHud(SpriteBatch batch, Texture2D pixel, WorldSession world)
+    {
+        int x = 18;
+        int y = _authoredWorldMode ? 271 : 230;
+        int width = 570;
+        batch.Draw(pixel, new Rectangle(x, y, width, 189),
+            new Color(17, 25, 37) * 0.96f);
+        batch.Draw(pixel, new Rectangle(x, y, 4, 189),
+            new Color(238, 190, 105));
+        GymDebugText.Draw(batch, pixel, x + 12, y + 9,
+            "WORLD EVENTS  F3 CLEAR HISTORY", new Color(238, 190, 105), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 26,
+            "RUN: " + world.WorldInstanceId + "  TICK: " + world.WorldTick +
+            "  LOG: " + _recentWorldEvents.Count,
+            new Color(187, 206, 222), 1);
+        if (_recentWorldEvents.Count == 0)
+            GymDebugText.Draw(batch, pixel, x + 12, y + 49,
+                "NO COMMITTED EVENTS YET", new Color(187, 206, 222), 1);
+        for (int i = 0; i < _recentWorldEvents.Count; i++)
+        {
+            WorldGameplayEvent e = _recentWorldEvents[_recentWorldEvents.Count - 1 - i];
+            string source = e.TriggerId is int trigger
+                ? "ZONE:" + trigger
+                : e.ColliderId is int collider
+                    ? "COL:" + collider : "";
+            string line = "T" + e.WorldTick + " S" + e.Sequence +
+                " P" + e.PlayerId + " " + e.Kind + " " + source;
+            GymDebugText.Draw(batch, pixel, x + 12, y + 49 + i * 16,
+                line, i == 0 ? new Color(124, 224, 179) :
+                    new Color(187, 206, 222), 1);
+        }
+    }
+
+    private void DrawRouteLabHud(SpriteBatch batch, Texture2D pixel, WorldSession world)
+    {
+        int x = 18;
+        int y = Math.Max(427, GraphicsDevice.Viewport.Height - 190);
+        batch.Draw(pixel, new Rectangle(x, y, 715, 155),
+            new Color(17, 25, 37) * 0.96f);
+        batch.Draw(pixel, new Rectangle(x, y, 4, 155), new Color(115, 220, 169));
+        GymDebugText.Draw(batch, pixel, x + 12, y + 8,
+            "SM PHASE 6  ROUTE / SESSION / SCENE VALIDATION",
+            new Color(115, 220, 169), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 25,
+            "SESSION: " + _gameplaySession?.SessionId +
+            "  ENTRIES: " + _gameplaySession?.LevelEntryCount +
+            "  WORLD ID: " + world.WorldInstanceId +
+            "  TICK: " + world.WorldTick, new Color(205, 221, 237), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 42,
+            "LEVEL: " + _flow.Scenes.ActiveDestination?.LevelId +
+            "  ENTRANCE: " + _flow.Scenes.ActiveDestination?.EntranceId,
+            new Color(240, 207, 128), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 59,
+            "P1: TOUCH GATES  1/2 EXIT  F10 FAIL NEXT LOAD  F9 AUTO TEST",
+            new Color(205, 221, 237), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 76,
+            "R/U RESPAWN  T RESTART  F10 FAILURE THEN 1/2 RETRY",
+            new Color(205, 221, 237), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 91,
+            _lastRouteStatus + (_flow.LastPreparationMilliseconds is double ms
+                ? "  PREP+COMMIT " + ms.ToString("F2") + " MS" : ""),
+            new Color(161, 217, 204), 1);
+        SceneFlowValidationMetrics metrics = _flow.Validation;
+        GymDebugText.Draw(batch, pixel, x + 12, y + 108,
+            "FLOW: QUEUED " + metrics.Queued + " OK " + metrics.SuccessfulCommits +
+            " FAIL " + metrics.FailedPreparations + " BUSY " + metrics.Busy +
+            " DUP " + metrics.Duplicates + " INVALID " + metrics.Invalid,
+            new Color(194, 208, 232), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 124,
+            "SCENES: LIVE " + _flow.Scenes.LiveSceneInstances +
+            " PEAK " + _flow.Scenes.PeakLiveSceneInstances +
+            "  PREP MS: AVG " + metrics.MeanPreparationMilliseconds.ToString("F2") +
+            " MAX " + metrics.MaximumPreparationMilliseconds.ToString("F2"),
+            new Color(194, 208, 232), 1);
+        GymDebugText.Draw(batch, pixel, x + 12, y + 140,
+            "F9 SMOKE (ESC CANCEL): " + _sceneFlowSmoke.Status,
+            _sceneFlowSmoke.HasRun
+                ? (_sceneFlowSmoke.Passed ? new Color(105, 231, 162) :
+                    _sceneFlowSmoke.IsRunning ? new Color(241, 209, 126) :
+                    new Color(244, 141, 127)) : new Color(161, 217, 204), 1);
+    }
+
+    private SceneFlowProbeSnapshot? CurrentRouteProbe()
+    {
+        if (!_routeLabMode || _worldClockTest is not WorldSession world ||
+            _gameplaySession is not GameplaySession session ||
+            _flow.Scenes.ActiveDestination is not SceneDestination destination)
+            return null;
+        return new SceneFlowProbeSnapshot(destination.LevelId, destination.EntranceId,
+            session.SessionId, session.LevelEntryCount,
+            world.WorldInstanceId, world.WorldTick);
     }
 
     private void DrawRequestTestHud(SpriteBatch batch, Texture2D pixel)
@@ -335,6 +1542,80 @@ public sealed class Game1 : Game
 
     private void UpdateWindowTitle()
     {
+        if (_flow.IsTransitionActive)
+        {
+            Window.Title = "PlatformerSandbox | TRANSITION " +
+                _flow.Curtain.Phase +
+                " | World paused | Preparing at safe update boundary";
+            return;
+        }
+        if (_flow.ActiveScene == MajorSceneKind.Title)
+        {
+            Window.Title = "PlatformerSandbox | TITLE | Select Level (Enter) | " +
+                "Up/Down or D-Pad Navigate | Esc Back | F1-F10 Dev Shortcuts";
+            return;
+        }
+        if (_flow.IsMenuOpen)
+        {
+            Window.Title = "PlatformerSandbox | " + _flow.CurrentMenu +
+                " | Simulation frozen | P/Start Resume | Esc/B Back";
+            return;
+        }
+        if (_worldClockTest is WorldSession world)
+        {
+            // LDtk-authored levels may have only one registered player.
+            // Do not assume every WorldSession is the two-player test gym.
+            if (_ldtkLevelMode)
+            {
+                Window.Title =
+                    $"PlatformerSandbox | LDTK {_ldtkLevel?.World.LevelId} | " +
+                    $"tick={world.WorldTick} players={world.PlayerCount} " +
+                    $"colliders={_ldtkLevel?.ColliderCount} " +
+                    $"visualTiles={_ldtkVisuals?.Definition.TileCount ?? 0} | " +
+                    "A/D Space  R Respawn T Reload P Pause F9 Outlines F10 Backdrop";
+                return;
+            }
+            if (_routeLabMode)
+            {
+                Window.Title =
+                    $"PlatformerSandbox | ROUTES {_flow.Scenes.ActiveDestination?.LevelId}/" +
+                    $"{_flow.Scenes.ActiveDestination?.EntranceId} session={_gameplaySession?.SessionId} " +
+                    $"entry={_gameplaySession?.LevelEntryCount} tick={world.WorldTick} " +
+                    "P1 A/D Space P2 J/L I | R/U Respawn T Restart 1/2 Exits F9 SM Smoke";
+                return;
+            }
+            if (_motionLabMode)
+            {
+                Window.Title =
+                    $"PlatformerSandbox | MOTION LAB | tick={world.WorldTick} " +
+                    $"wind={world.GetPlayerMotion(1).EnvironmentVelocityX:F2} | " +
+                    "F1 EXIT Q WIND E KNOCKBACK B PULSE DASH R RESPAWN";
+                return;
+            }
+            if (_authoredWorldMode)
+            {
+                Window.Title =
+                    $"PlatformerSandbox | AUTHORED WORLD {world.Definition?.LevelId} | " +
+                    $"tick={world.WorldTick} players={world.PlayerCount} | " +
+                    $"P1 spawn={world.GetPlayerSlot(1).SpawnId} " +
+                    $"P1 source={world.GetPlayerSlot(1).InputSourceId} | " +
+                    "F4 Exit F2 Mode R/U Respawn T Restart N Join M Leave V Spawn " +
+                    "B/G/H/K P1 Abilities Y P2 Pulse F3 Events";
+                return;
+            }
+            // Only the dedicated shared-world fixture requires both players.
+            var p1 = world.GetPlayer(SharedWorldClockGym.FirstPlayerId);
+            var p2 = world.GetPlayer(SharedWorldClockGym.SecondPlayerId);
+            Window.Title =
+                $"PlatformerSandbox | SHARED WORLD TEST | tick={world.WorldTick} " +
+                $"time={world.WorldTimeSeconds:F3} | " +
+                $"P1 x={p1.Bounds.Left:F2} support={p1.MovingSupportId} " +
+                $"P2 x={p2.Bounds.Left:F2} support={p2.MovingSupportId} | " +
+                "F4 Exit  R P1 Respawn  U P2 Respawn  T Restart World " +
+                "J/L P2 Move I P2 Jump P Pause F8 Device " +
+                "B/G/H/K P1 Abilities Y P2 Pulse";
+            return;
+        }
         var v = _gym.PlayerVelocity;
         var p = _gym.PlayerBounds;
         string mode = _paused ? "PAUSED" :
@@ -355,7 +1636,7 @@ public sealed class Game1 : Game
             $"CollisionAssist={(_gym.AssistancePolicy.AnyEnabled ? "ON" : "OFF")} " +
             $"AssistCount={_gym.TotalAssists} " +
             "| F1/F2/F3: Presets  F5/F6/F7: Fault Mode  Tab: Setting  -/+: Adjust  " +
-            "F8: Input Source  F9: Assist  F10: Request Test  F11: Case  F12: Reverse Order  " +
+            "F4: Shared World  F8: Input Source  F9: Assist  F10: Request Test  F11: Case  F12: Reverse Order  " +
             $"Input={_inputRouter.Source} PadConnected={_gamepadOneConnected} " +
             $"RequestTest={(_requestTestEnabled ? _requestScenario.ToString() : "OFF")}" +
             "  A/D: Move  Space: Jump  R: Reset  P: Pause";

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\PlatformerSandbox.Foundation\PlatformerSandbox.Foundation.csproj" />
     <ProjectReference Include="..\PlatformerSandbox.Gameplay\PlatformerSandbox.Gameplay.csproj" />
     <ProjectReference Include="..\PlatformerSandbox.Simulation\PlatformerSandbox.Simulation.csproj" />
+    <ProjectReference Include="..\PlatformerSandbox.Diagnostics\PlatformerSandbox.Diagnostics.csproj" />
   </ItemGroup>
 
   <ItemGroup>

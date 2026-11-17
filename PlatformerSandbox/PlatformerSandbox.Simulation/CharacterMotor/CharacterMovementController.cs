@@ -45,6 +45,9 @@ public sealed class CharacterMovementController
     private bool _grounded;
     private SteerableJumpMotor? _jumpMotor;
     private double _elapsedSeconds;
+    // Persistent world-space horizontal transport contribution, separate from
+    // locomotion speed and its designer maximum. Set only on a staged motor.
+    private double _externalHorizontalSpeed;
     private int _jumpsStarted;
     private bool _ledgeCatchUsed;
 
@@ -63,8 +66,12 @@ public sealed class CharacterMovementController
         IReadOnlyList<MovingPlatformTrajectory>? additionalMovingPlatforms = null,
         PlatformObstructionPolicy obstructionPolicy =
             PlatformObstructionPolicy.FollowAuthoredTrajectories,
-        CollisionAssistancePolicy? assistancePolicy = null)
+        CollisionAssistancePolicy? assistancePolicy = null,
+        double initialWorldTimeSeconds = 0.0)
     {
+        if (!double.IsFinite(initialWorldTimeSeconds) ||
+            initialWorldTimeSeconds < 0.0)
+            throw new ArgumentOutOfRangeException(nameof(initialWorldTimeSeconds));
         if (!Enum.IsDefined(obstructionPolicy))
             throw new ArgumentOutOfRangeException(nameof(obstructionPolicy));
         if (!initialBounds.IsValid)
@@ -125,7 +132,7 @@ public sealed class CharacterMovementController
                     "Moving and static collider IDs must be globally unique.",
                     nameof(additionalMovingPlatforms));
             if (AabbCollisionDetector.Overlaps(initialBounds,
-                    platform.Evaluate(0.0).Bounds))
+                    platform.Evaluate(initialWorldTimeSeconds).Bounds))
                 throw new InvalidOperationException(
                     $"Initial body overlaps moving platform {platform.Id}.");
         }
@@ -134,16 +141,16 @@ public sealed class CharacterMovementController
         _assistancePolicy = assistancePolicy ?? CollisionAssistancePolicy.Disabled;
         if (obstructionPolicy == PlatformObstructionPolicy.RejectWorldObstructions &&
             MovingPlatformObstructionDetector.FindFirst(
-                0.0, 0.0, _obstacles, _movingPlatforms) is { } initialObstruction)
+                initialWorldTimeSeconds, 0.0, _obstacles, _movingPlatforms) is { } initialObstruction)
             throw new PlatformObstructionException(initialObstruction);
         _faultPolicy = faultPolicy ?? SimulationFaultPolicy.Development;
         _supportPlatform = _movingPlatforms.FirstOrDefault(platform =>
             MovingPlatformRideSolver.IsSupported(initialBounds,
-                platform.Evaluate(0.0).Bounds));
+                platform.Evaluate(initialWorldTimeSeconds).Bounds));
         _onMovingPlatform = _supportPlatform is not null;
         _bounds = initialBounds;
         _velocity = _supportPlatform is not null
-            ? _supportPlatform.Evaluate(0.0).Velocity : Vector2D.Zero;
+            ? _supportPlatform.Evaluate(initialWorldTimeSeconds).Velocity : Vector2D.Zero;
         _groundMotion = groundMotion;
         _airMotion = airMotion;
         _heldFlight = heldFlight;
@@ -152,6 +159,7 @@ public sealed class CharacterMovementController
         _gravity = gravityAcceleration;
         _maxContactEvents = maxContactEvents;
         _grounded = _onMovingPlatform || HasFloorSupport(initialBounds, _velocity);
+        _elapsedSeconds = initialWorldTimeSeconds;
     }
 
     public Aabb Bounds => _bounds;
@@ -161,6 +169,7 @@ public sealed class CharacterMovementController
     public bool IsJumpEarlyReleased => _jumpMotor?.IsEarlyReleased ?? false;
     public int JumpsStarted => _jumpsStarted;
     public double ElapsedSeconds => _elapsedSeconds;
+    public double ExternalHorizontalSpeed => _externalHorizontalSpeed;
     public int? MovingSupportId => _supportPlatform?.Id;
     public PlatformObstructionPolicy ObstructionPolicy => _obstructionPolicy;
     public CollisionAssistancePolicy AssistancePolicy => _assistancePolicy;
@@ -190,6 +199,45 @@ public sealed class CharacterMovementController
     }
 
     /// <summary>
+    /// Create an independent working copy for transactional multi-character
+    /// world updates. Immutable geometry/profiles are shared; the mutable
+    /// analytical jump motor is independently forked.
+    /// </summary>
+    public CharacterMovementController Fork()
+    {
+        var copy = (CharacterMovementController)MemberwiseClone();
+        copy._jumpMotor = _jumpMotor?.Fork();
+        return copy;
+    }
+
+    /// <summary>
+    /// Execute exactly the world-owned fixed tick interval. This is opt-in;
+    /// legacy single-player callers retain the duration-based Step API.
+    /// Recalculate the duration from world timestamps to prevent independent
+    /// floating-point clock drift across characters or late spawns.
+    /// </summary>
+    public CharacterControlStepResult StepOnWorldTimeline(
+        double worldStartSeconds, double worldEndSeconds,
+        HorizontalDirection direction, bool jumpPressedThisStep,
+        bool jumpReleasedThisStep = false, bool jumpGraceAuthorized = false,
+        double externalHorizontalSpeed = 0.0)
+    {
+        if (!double.IsFinite(worldStartSeconds) ||
+            !double.IsFinite(worldEndSeconds) ||
+            worldStartSeconds < 0.0 || worldEndSeconds <= worldStartSeconds)
+            throw new ArgumentOutOfRangeException(nameof(worldEndSeconds));
+        if (_elapsedSeconds != worldStartSeconds)
+            throw new InvalidOperationException(
+                "Character world clock is not aligned to scheduled tick start.");
+        double durationSeconds = worldEndSeconds - worldStartSeconds;
+        if (_elapsedSeconds + durationSeconds != worldEndSeconds)
+            throw new InvalidOperationException(
+                "Scheduled interval cannot be represented on character clock.");
+        return Step(durationSeconds, direction, jumpPressedThisStep,
+            jumpReleasedThisStep, jumpGraceAuthorized, externalHorizontalSpeed);
+    }
+
+    /// <summary>
     /// Advance by the scheduler-specified time. jumpPressedThisStep is a
     /// discrete action edge (not a continuously held button). A release edge
     /// cuts an active ascending reference once if release is configured.
@@ -200,8 +248,11 @@ public sealed class CharacterMovementController
     public CharacterControlStepResult Step(
         double durationSeconds, HorizontalDirection direction,
         bool jumpPressedThisStep, bool jumpReleasedThisStep = false,
-        bool jumpGraceAuthorized = false)
+        bool jumpGraceAuthorized = false, double externalHorizontalSpeed = 0.0)
     {
+        if (!double.IsFinite(externalHorizontalSpeed) ||
+            Math.Abs(externalHorizontalSpeed) > 10000.0)
+            throw new ArgumentOutOfRangeException(nameof(externalHorizontalSpeed));
         if (!double.IsFinite(durationSeconds) || durationSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(durationSeconds));
         if (direction is not (HorizontalDirection.Left or
@@ -222,6 +273,14 @@ public sealed class CharacterMovementController
                 is { } obstruction)
             throw new PlatformObstructionException(obstruction);
 
+        // Change the external transport channel at the tick boundary. Only
+        // the incremental difference is applied: ordinary locomotion remains
+        // limited by its own profile while the *combined* speed may exceed it.
+        Vector2D startVelocity = new(
+            _velocity.X + externalHorizontalSpeed - _externalHorizontalSpeed,
+            _velocity.Y);
+        if (!double.IsFinite(startVelocity.X))
+            throw new OverflowException("Combined motion exceeds finite velocity.");
         Aabb nextBounds;
         Vector2D nextVelocity;
         bool nextGrounded;
@@ -247,7 +306,8 @@ public sealed class CharacterMovementController
             MovingPlatformTrajectory? jumpReference =
                 nextSupport ?? _movingPlatforms.FirstOrDefault();
             nextJump = new SteerableJumpMotor(
-                _bounds, _velocity.X, _airMotion, _heldFlight,
+                StaticFloorPrecisionAlignment.Align(_bounds, _obstacles),
+                startVelocity.X, _airMotion, _heldFlight,
                 _obstacles, _gravity, _maxContactEvents,
                 _releaseConstraints, _descentConstraints,
                 jumpReference, _elapsedSeconds,
@@ -255,7 +315,8 @@ public sealed class CharacterMovementController
                     ? nextSupport.Evaluate(_elapsedSeconds).Velocity.Y : 0.0,
                 additionalMovingPlatforms: _movingPlatforms.Where(
                     p => p != jumpReference).ToArray(),
-                assistancePolicy: _assistancePolicy);
+                assistancePolicy: _assistancePolicy,
+                externalHorizontalSpeed: externalHorizontalSpeed);
             started = true;
             nextSupport = null;
         }
@@ -263,7 +324,8 @@ public sealed class CharacterMovementController
         if (nextJump is not null)
         {
             SteerableJumpStepResult result = nextJump.Step(
-                durationSeconds, direction, jumpReleasedThisStep);
+                durationSeconds, direction, jumpReleasedThisStep,
+                externalHorizontalSpeed);
             stepAssists = result.Assists;
             nextBounds = result.Bounds;
             nextVelocity = result.Velocity;
@@ -376,7 +438,8 @@ public sealed class CharacterMovementController
         else
         {
             var free = StepFreeOrGround(durationSeconds, direction,
-                faultSession, nextLedgeCatchUsed);
+                faultSession, nextLedgeCatchUsed, startVelocity,
+                externalHorizontalSpeed);
             nextBounds = free.Bounds;
             nextVelocity = free.Velocity;
             nextGrounded = free.Grounded;
@@ -429,10 +492,64 @@ public sealed class CharacterMovementController
             }
         }
 
+        // A static top contact can finish one or two binary64 ULPs below the
+        // authored grid surface after multiple analytical motion phases.
+        // Align ONLY such representational floor drift before committing.
+        // This does not loosen the unified scheduler's strict start validator
+        // or convert a meaningful penetration into a successful step.
+        if (nextJump is null)
+        {
+            nextBounds = StaticFloorPrecisionAlignment.Align(nextBounds, _obstacles);
+            foreach (StaticAabbCollider obstacle in _obstacles)
+                if (AabbCollisionDetector.Overlaps(nextBounds, obstacle.Bounds))
+                    throw new SimulationNoProgressException(
+                        $"Motor ended penetrating static collider {obstacle.Id}; " +
+                        "the failed step was not committed.");
+        }
+
+        // An inward external transport has been consumed by a hard side
+        // contact. Do not retain its *unrealized* velocity as a reverse kick
+        // when the wind or dash ends on the next tick. The continuing source
+        // can reapply its velocity through collision arbitration next tick.
+        double realizedExternalSpeed = externalHorizontalSpeed;
+        // Even if a persistent face constraint did not emit a NEW contact
+        // this tick, its outward normal proves that inward transport was
+        // fully suppressed. Account for the actually realized component
+        // rather than inventing a recoil when that source is later removed.
+        bool blockedByStaticFace = externalHorizontalSpeed != 0.0 &&
+            _obstacles.Any(c =>
+            nextBounds.Bottom < c.Bounds.Top && nextBounds.Top > c.Bounds.Bottom &&
+            ((externalHorizontalSpeed > 0.0 &&
+                Math.Abs(nextBounds.Right - c.Bounds.Left) <= 1e-8) ||
+             (externalHorizontalSpeed < 0.0 &&
+                Math.Abs(nextBounds.Left - c.Bounds.Right) <= 1e-8)));
+        bool blockedByMovingFace = externalHorizontalSpeed != 0.0 &&
+            _movingPlatforms.Any(p =>
+        {
+            MovingPlatformSample sample = p.Evaluate(endTime);
+            return nextBounds.Bottom < sample.Bounds.Top &&
+                nextBounds.Top > sample.Bounds.Bottom &&
+                Math.Abs(nextVelocity.X - sample.Velocity.X) < 1e-8 &&
+                ((externalHorizontalSpeed > 0.0 &&
+                    Math.Abs(nextBounds.Right - sample.Bounds.Left) <= 1e-8) ||
+                 (externalHorizontalSpeed < 0.0 &&
+                    Math.Abs(nextBounds.Left - sample.Bounds.Right) <= 1e-8));
+        });
+        if (externalHorizontalSpeed != 0.0 &&
+            ((Math.Abs(nextVelocity.X) < 1e-8 && blockedByStaticFace) ||
+             blockedByMovingFace ||
+             contacts.Any(c => c.Normal.X * externalHorizontalSpeed < 0.0 &&
+                 Math.Abs(nextVelocity.X) < 1e-8)))
+        {
+            realizedExternalSpeed = 0.0;
+            nextJump?.NormalizeBlockedExternalTransport();
+        }
+
         // Never publish a partially completed update: all potentially failing
         // collision calculations above execute before committing these fields.
         _bounds = nextBounds;
         _velocity = nextVelocity;
+        _externalHorizontalSpeed = realizedExternalSpeed;
         _grounded = nextGrounded;
         _supportPlatform = nextSupport;
         _onMovingPlatform = nextSupport is not null;
@@ -466,10 +583,11 @@ public sealed class CharacterMovementController
         MovingPlatformTrajectory? Support, CharacterControlContact[] Contacts,
         CollisionAssistEvent[] Assists, bool LedgeCatchUsed) StepFreeOrGround(
         double duration, HorizontalDirection direction,
-        SimulationFaultSession faultSession, bool ledgeCatchUsed)
+        SimulationFaultSession faultSession, bool ledgeCatchUsed,
+        Vector2D startingVelocity, double externalHorizontalSpeed)
     {
         Aabb bounds = _bounds;
-        Vector2D velocity = _velocity;
+        Vector2D velocity = startingVelocity;
         bool grounded = _grounded;
         MovingPlatformTrajectory? support = _supportPlatform;
         double elapsed = 0.0;
@@ -477,13 +595,57 @@ public sealed class CharacterMovementController
         var contacts = new List<CharacterControlContact>();
         var assists = new List<CollisionAssistEvent>();
 
+        // Diagnostic-only loop watchdog. Analytical phase boundaries may be
+        // smaller than one representable clock increment; a re-plan must
+        // eventually advance time, change the constraint state, or fail.
+        // This guard does not alter position, velocity, collision policy, or
+        // normal step results. It only reports a suspected infinite loop.
+        const int maxFreeGroundIterations = 16384;
+        const int maxSameTimeIterations = 128;
+        int freeGroundIterations = 0;
+        int sameTimeIterations = 0;
+        double previousLoopElapsed = double.NaN;
+        string lastPath = "entry";
+
         // Re-plan at horizontal acceleration phases and support departures.
         // Walking off a ledge switches to AIR acceleration in the same update.
         // The accelerated stepper may process an internal landing; ground
         // profile selection after that landing occurs at the next phase/step.
         while (elapsed < duration)
         {
+            ++freeGroundIterations;
+            if (elapsed == previousLoopElapsed)
+                ++sameTimeIterations;
+            else
+            {
+                previousLoopElapsed = elapsed;
+                sameTimeIterations = 0;
+            }
+            if (freeGroundIterations > maxFreeGroundIterations ||
+                sameTimeIterations > maxSameTimeIterations)
+            {
+                double selfVelocity = velocity.X - externalHorizontalSpeed;
+                double speedLimit = grounded ?
+                    _groundMotion.MaximumSpeed : _airMotion.MaximumSpeed;
+                throw new SimulationNoProgressException(
+                    $"Free/ground analytical no-progress watchdog: " +
+                    $"iterations={freeGroundIterations}, " +
+                    $"sameTimeIterations={sameTimeIterations}, lastPath={lastPath}, " +
+                    $"elapsed={elapsed:R}, duration={duration:R}, " +
+                    $"worldTime={_elapsedSeconds + elapsed:R}, " +
+                    $"direction={direction}, grounded={grounded}, " +
+                    $"supportId={(support is null ? "none" : support.Id.ToString())}, " +
+                    $"velocityX={velocity.X:R}, velocityY={velocity.Y:R}, " +
+                    $"personalVelocityX={selfVelocity:R}, " +
+                    $"speedLimit={speedLimit:R}, externalX={externalHorizontalSpeed:R}, " +
+                    $"bounds=({bounds.Left:R}, {bounds.Bottom:R}, " +
+                    $"{bounds.Right:R}, {bounds.Top:R}), " +
+                    $"contacts={contacts.Count}, supportDepartures={supportDepartures}.");
+            }
+
             double remaining = duration - elapsed;
+            if (support is null)
+                bounds = StaticFloorPrecisionAlignment.Align(bounds, _obstacles);
             // Last-resort repair for a small overlap inherited from a previous
             // contact event. The pure sweep detector remains strict; deep or
             // ambiguous intersections still fail with useful diagnostics.
@@ -522,7 +684,11 @@ public sealed class CharacterMovementController
                     corrected = true;
                     break;
                 }
-                if (corrected) continue;
+                if (corrected)
+                {
+                    lastPath = "moving-overlap-repair";
+                    continue;
+                }
             }
             if (support is not null)
             {
@@ -534,12 +700,28 @@ public sealed class CharacterMovementController
                 bounds = CanonicalizeMovingSupport(
                     bounds, support, movingFloorWorldTime);
                 MovingPlatformSample floor = support.Evaluate(movingFloorWorldTime);
+                double localV = velocity.X - floor.Velocity.X - externalHorizontalSpeed;
+                // On a moving support with wind, the stored world velocity may
+                // already be the exact representable sum of platform + current
+                // + requested cruise, while subtracting those contributions
+                // reconstructs a relative speed a few ULPs outside the limit.
+                // Reassigning the cruise world velocity then changes NO bits,
+                // and the sub-ULP phase is selected forever without clock
+                // progress. Use the exact relative cruise only when the stored
+                // world velocity ALREADY equals that representable sum. A real
+                // overspeed remains on the normal analytical deceleration path.
+                if (direction != HorizontalDirection.Neutral)
+                {
+                    double cruiseLocal = (int)direction * _groundMotion.MaximumSpeed;
+                    double cruiseWorld = floor.Velocity.X + externalHorizontalSpeed + cruiseLocal;
+                    if (velocity.X == cruiseWorld)
+                        localV = cruiseLocal;
+                }
                 HorizontalMotionTrajectory relative = _groundMotion.CreateTrajectory(
-                    0.0, velocity.X - floor.Velocity.X, direction);
+                    0.0, localV, direction);
                 double rideDuration = remaining;
                 if (relative.TimeToCruiseSeconds > 0.0)
                     rideDuration = Math.Min(rideDuration, relative.TimeToCruiseSeconds);
-                double localV = velocity.X - floor.Velocity.X;
                 double reversalStopTime = 0.0;
                 if (direction != HorizontalDirection.Neutral &&
                     (int)direction * localV < 0.0)
@@ -563,14 +745,18 @@ public sealed class CharacterMovementController
                     if (reversalStopTime > 0.0 &&
                         rideDuration == reversalStopTime)
                     {
-                        velocity = new Vector2D(floor.Velocity.X, velocity.Y);
+                        velocity = new Vector2D(
+                            floor.Velocity.X + externalHorizontalSpeed, velocity.Y);
+                        lastPath = "moving-support-subresolution-reversal";
                         continue;
                     }
                     if (relative.TimeToCruiseSeconds > 0.0 &&
                         rideDuration == relative.TimeToCruiseSeconds)
                     {
                         velocity = new Vector2D(
-                            floor.Velocity.X + relative.CruiseVelocity, velocity.Y);
+                            floor.Velocity.X + externalHorizontalSpeed +
+                            relative.CruiseVelocity, velocity.Y);
+                        lastPath = "moving-support-subresolution-cruise";
                         continue;
                     }
                     if (rideDuration == remaining)
@@ -628,13 +814,13 @@ public sealed class CharacterMovementController
                 CharacterCrushEvent? movingSqueeze =
                     OpposingSurfaceCrushDetector.AboveMovingSupport(
                         support, bounds, movingFloorWorldTime, rideDuration,
-                        localV, relativeAcceleration, _movingPlatforms);
+                        localV + externalHorizontalSpeed, relativeAcceleration, _movingPlatforms);
                 if (movingSqueeze is not null)
                     throw new CharacterCrushException(movingSqueeze);
 
                 MovingPlatformRideEventResult ride = MovingPlatformRideEventScheduler.Step(
                     support, movingFloorWorldTime, rideDuration, bounds,
-                    localV, relativeAcceleration, _obstacles,
+                    localV + externalHorizontalSpeed, relativeAcceleration, _obstacles,
                     _movingPlatforms.Where(p => p.Id != support.Id).ToArray(),
                     Math.Max(1, _maxContactEvents - contacts.Count - supportDepartures));
                 foreach (CharacterControlContact contact in ride.Contacts)
@@ -658,6 +844,7 @@ public sealed class CharacterMovementController
                     : null;
                 grounded = support is not null || HasFloorSupport(bounds, velocity);
                 elapsed += ride.AdvancedSeconds;
+                lastPath = "moving-support-ride";
                 if (support is null)
                 {
                     if (++supportDepartures + contacts.Count > _maxContactEvents)
@@ -667,22 +854,43 @@ public sealed class CharacterMovementController
             }
             HorizontalMotionProfile profile = grounded ? _groundMotion : _airMotion;
             HorizontalMotionTrajectory reference = profile.CreateTrajectory(
-                0.0, velocity.X, direction);
+                0.0, velocity.X - externalHorizontalSpeed, direction);
 
             double phaseDuration = remaining;
             if (reference.TimeToCruiseSeconds > 0.0 &&
                 reference.TimeToCruiseSeconds < phaseDuration)
                 phaseDuration = reference.TimeToCruiseSeconds;
             if (direction != HorizontalDirection.Neutral &&
-                (int)direction * velocity.X < 0.0)
+                (int)direction * (velocity.X - externalHorizontalSpeed) < 0.0)
             {
-                double reversalStop = Math.Abs(velocity.X) /
+                double reversalStop = Math.Abs(velocity.X - externalHorizontalSpeed) /
                     profile.ReversalDecelerationRate;
                 if (reversalStop > 0.0 && reversalStop < phaseDuration)
                     phaseDuration = reversalStop;
             }
 
             double ax = reference.Evaluate(0.0).Acceleration;
+            // A constant external current can leave the body exactly flush
+            // with a static side face while its personal neutral-braking
+            // profile still requests inward acceleration. Constrain that
+            // acceleration BEFORE sending a t=0 wall event to the scheduler.
+            // This does not alter legacy (no external transport) motion.
+            if (externalHorizontalSpeed != 0.0)
+            {
+                foreach (StaticAabbCollider wallCollider in _obstacles)
+                {
+                    Aabb wallBounds = wallCollider.Bounds;
+                    bool verticalOverlap = bounds.Bottom < wallBounds.Top &&
+                        bounds.Top > wallBounds.Bottom;
+                    int normalX = verticalOverlap &&
+                        Math.Abs(bounds.Right - wallBounds.Left) <= 1e-8 ? -1 :
+                        verticalOverlap &&
+                        Math.Abs(bounds.Left - wallBounds.Right) <= 1e-8 ? 1 : 0;
+                    if (normalX != 0 && velocity.X * normalX <= 0.0 &&
+                        ax * normalX < 0.0)
+                        ax = 0.0;
+                }
+            }
             if (_movingPlatforms.Length > 0)
             {
                 // Both static-grounded and airborne bodies must arbitrate
@@ -748,25 +956,29 @@ public sealed class CharacterMovementController
                     bounds = bounds.Translated(new Vector2D(
                         subResolutionEdge.BodyLeftAtDeparture - bounds.Left, 0.0));
                     grounded = false;
+                    lastPath = "static-subresolution-ledge-departure";
                     if (++supportDepartures + contacts.Count > _maxContactEvents)
                         throw EventBudgetExceeded("Controller event limit exceeded.", contacts);
                     continue;
                 }
 
                 double reversalStop = direction != HorizontalDirection.Neutral &&
-                    (int)direction * velocity.X < 0.0
-                    ? Math.Abs(velocity.X) / profile.ReversalDecelerationRate
+                    (int)direction * (velocity.X - externalHorizontalSpeed) < 0.0
+                    ? Math.Abs(velocity.X - externalHorizontalSpeed) / profile.ReversalDecelerationRate
                     : 0.0;
                 if (reversalStop > 0.0 && reversalStop == advance)
                 {
-                    velocity = new Vector2D(0.0, velocity.Y);
+                    velocity = new Vector2D(externalHorizontalSpeed, velocity.Y);
+                    lastPath = "static-subresolution-reversal";
                     continue;
                 }
 
                 if (reference.TimeToCruiseSeconds > 0.0 &&
                     reference.TimeToCruiseSeconds == advance)
                 {
-                    velocity = new Vector2D(reference.CruiseVelocity, velocity.Y);
+                    velocity = new Vector2D(
+                        reference.CruiseVelocity + externalHorizontalSpeed, velocity.Y);
+                    lastPath = "static-subresolution-cruise";
                     continue;
                 }
 
@@ -852,6 +1064,7 @@ public sealed class CharacterMovementController
                 bounds = unified.Bounds;
                 velocity = unified.Velocity;
                 elapsed += unified.AdvancedSeconds;
+                lastPath = "unified-moving-static-collision-step";
                 if (unified.MovingFloorId is int landingId)
                 {
                     // Transfer to the specific platform that was hit.
@@ -905,6 +1118,7 @@ public sealed class CharacterMovementController
             }
             grounded = nextGrounded;
             elapsed += advance;
+            lastPath = "unified-static-collision-step";
         }
         // Normalize a precision-sized moving SIDE corner overlap at the
         // authoritative end time before the general bounded overlap resolver.
