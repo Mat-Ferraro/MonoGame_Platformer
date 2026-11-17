@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "scenes": [
+    {
+      "id": "CAVERN",
+      "ambient": {
+        "r": 0.13,
+        "g": 0.17,
+        "b": 0.23
+      },
+      "lights": [
+        {
+          "id": "amber_torch",
+          "position": {
+            "x": -4.7,
+            "y": 1.5
+          },
+          "color": {
+            "r": 1,
+            "g": 0.52,
+            "b": 0.19
+          },
+          "radius": 5.2,
+          "intensity": 1.9,
+          "castShadows": true,
+          "priority": 4,
+          "channels": "All"
+        },
+        {
+          "id": "azure_glow",
+          "position": {
+            "x": 3.2,
+            "y": 2.3
+          },
+          "color": {
+            "r": 0.22,
+            "g": 0.6,
+            "b": 1
+          },
+          "radius": 5.3,
+          "intensity": 1.65,
+          "castShadows": false,
+          "priority": 3,
+          "channels": "All"
+        },
+        {
+          "id": "violet_lamp",
+          "position": {
+            "x": -1.0,
+            "y": -1.1
+          },
+          "color": {
+            "r": 0.56,
+            "g": 0.32,
+            "b": 1
+          },
+          "radius": 3.2,
+          "intensity": 1.2,
+          "castShadows": false,
+          "priority": 1,
+          "channels": "All"
+        }
+      ],
+      "occluders": [
+        {
+          "id": "stone_column",
+          "vertices": [
+            {
+              "x": -2.9,
+              "y": -2.5
+            },
+            {
+              "x": -2.1,
+              "y": -2.5
+            },
+            {
+              "x": -2.1,
+              "y": 2.1
+            },
+            {
+              "x": -2.9,
+              "y": 2.1
+            }
+          ]
+        },
+        {
+          "id": "stone_plinth",
+          "vertices": [
+            {
+              "x": 2,
+              "y": -2.4
+            },
+            {
+              "x": 3.1,
+              "y": -2.4
+            },
+            {
+              "x": 3.1,
+              "y": -1.6
+            },
+            {
+              "x": 2,
+              "y": -1.6
+            }
+          ]
+        }
+      ],
+      "materials": [
+        {
+          "id": "neutral_map",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": -5,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "authored_normals",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": -2,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "normal": "SlateNormal.png",
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "rotated_mirrored",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": 1,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 90,
+          "flipX": true,
+          "normal": "SlateNormal.png",
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "emissive_mask",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": 4,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "normal": "SlateNormal.png",
+          "emission": "SlateEmission.png",
+          "mask": "SlateMask.png",
+          "receivesOccluderShadows": false
+        }
+      ]
+    },
+    {
+      "id": "ATRIUM",
+      "ambient": {
+        "r": 0.29,
+        "g": 0.27,
+        "b": 0.24
+      },
+      "lights": [
+        {
+          "id": "gold_sun",
+          "position": {
+            "x": -2.5,
+            "y": 2.1
+          },
+          "color": {
+            "r": 1,
+            "g": 0.91,
+            "b": 0.6
+          },
+          "radius": 7,
+          "intensity": 1.45,
+          "castShadows": true,
+          "priority": 4,
+          "channels": "All"
+        },
+        {
+          "id": "teal_magic",
+          "position": {
+            "x": 4,
+            "y": -0.2
+          },
+          "color": {
+            "r": 0.2,
+            "g": 1,
+            "b": 0.84
+          },
+          "radius": 5,
+          "intensity": 1.9,
+          "castShadows": true,
+          "priority": 2,
+          "channels": "All"
+        }
+      ],
+      "occluders": [
+        {
+          "id": "arch_left",
+          "vertices": [
+            {
+              "x": -0.6,
+              "y": -1.9
+            },
+            {
+              "x": 0.3,
+              "y": -1.9
+            },
+            {
+              "x": 0.3,
+              "y": 2
+            },
+            {
+              "x": -0.6,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "alcove_concave",
+          "vertices": [
+            {
+              "x": 1.2,
+              "y": 1.1
+            },
+            {
+              "x": 2.9,
+              "y": 1.1
+            },
+            {
+              "x": 2.9,
+              "y": 0.3
+            },
+            {
+              "x": 2,
+              "y": 0.3
+            },
+            {
+              "x": 2,
+              "y": -0.6
+            },
+            {
+              "x": 1.2,
+              "y": -0.6
+            }
+          ]
+        }
+      ],
+      "materials": [
+        {
+          "id": "neutral_map",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": -5,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "authored_normals",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": -2,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "normal": "SlateNormal.png",
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "rotated_mirrored",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": 1,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 90,
+          "flipX": true,
+          "normal": "SlateNormal.png",
+          "receivesOccluderShadows": false
+        },
+        {
+          "id": "emissive_mask",
+          "mode": "Lit",
+          "channel": "Terrain",
+          "albedo": "SlateAlbedo.png",
+          "center": {
+            "x": 4,
+            "y": -3
+          },
+          "width": 2,
+          "height": 2,
+          "rotationDegrees": 0,
+          "flipX": false,
+          "normal": "SlateNormal.png",
+          "emission": "SlateEmission.png",
+          "mask": "SlateMask.png",
+          "receivesOccluderShadows": false
+        }
+      ]
+    }
+  ]
+}

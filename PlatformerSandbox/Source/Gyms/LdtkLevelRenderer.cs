@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Foundation.Presentation;
+using PlatformerSandbox.Foundation.Presentation.Particles;
 using PlatformerSandbox.Presentation;
 using PlatformerSandbox.Gameplay.Content;
 using PlatformerSandbox.Gameplay.World;
@@ -23,7 +24,8 @@ internal static class LdtkLevelRenderer
         LdtkConnectedLevel? connected = null,
         Camera2DView? camera = null,
         LdtkGrayboxAnimator? playerAnimations = null,
-        LdtkCharacterSpriteAssets? characterSprites = null)
+        LdtkCharacterSpriteAssets? characterSprites = null,
+        Action<ParticleVisualLayer>? drawParticleLayer = null)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         WorldPlayerSnapshot player = world.GetPlayer(1);
@@ -34,6 +36,16 @@ internal static class LdtkLevelRenderer
             viewport.Width, viewport.Height, scale);
         double cameraLeftPx = view.CameraLeftPx;
         double cameraTopPx = view.CameraTopPx;
+
+        // The caller owns the outer SpriteBatch. This hook respects existing
+        // BG/terrain/player/FG layering without changing visual content logic.
+        void DrawParticleLayer(ParticleVisualLayer layer)
+        {
+            if (drawParticleLayer is null) return;
+            batch.End();
+            drawParticleLayer(layer);
+            batch.Begin(samplerState: SamplerState.PointClamp);
+        }
 
         Rectangle WorldRect(Aabb box)
         {
@@ -48,6 +60,7 @@ internal static class LdtkLevelRenderer
             hasVisuals ? new Color(15, 22, 35) : new Color(30, 43, 57));
         visuals?.Draw(batch, LdtkVisualPlane.Background,
             cameraLeftPx, cameraTopPx, viewport);
+        DrawParticleLayer(ParticleVisualLayer.Background);
 
         // Graybox fallback makes collision terrain recognizable until actual
         // independent terrain artwork is authored. It is NOT a physics query
@@ -76,6 +89,8 @@ internal static class LdtkLevelRenderer
             batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
                 Math.Max(1, rect.Width), 2), new Color(189, 231, 235));
         }
+
+        DrawParticleLayer(ParticleVisualLayer.World);
 
         foreach (WorldPlayerSnapshot entity in world.Snapshot().Players)
         {
@@ -137,6 +152,7 @@ internal static class LdtkLevelRenderer
             GymDebugText.Draw(batch, pixel, rect.Left + 4, rect.Top + 5,
                 entity.PlayerId.ToString(), new Color(18, 23, 35));
         }
+        DrawParticleLayer(ParticleVisualLayer.Foreground);
         visuals?.Draw(batch, LdtkVisualPlane.Foreground,
             cameraLeftPx, cameraTopPx, viewport);
 

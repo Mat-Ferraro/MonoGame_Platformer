@@ -61,6 +61,21 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- P02 editable particle playground presets. Runtime JSON, not XNB assets. -->
+  <ItemGroup>
+    <Content Include="..\..\Content\Particles\*.json"
+             Link="Content\Particles\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- L01 phases 1-3: authored lighting lab scenes and optional material maps.
+       These PNG/JSON files load directly; no MGCB/XNB shader step is required. -->
+  <ItemGroup>
+    <Content Include="..\..\Content\Lighting\**\*.*"
+             Link="Content\Lighting\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <Import Project="..\..\Content\BuildContent.targets" />
   <!-- Generates Info.plist for a hand-packaged macOS .app bundle, when building for macOS. -->
   <Import Project="..\..\Resources\macOS\MacBundle.targets" Condition="$(RuntimeIdentifier.StartsWith('osx'))" />

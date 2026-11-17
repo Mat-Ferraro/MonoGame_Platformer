@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "jumpStarted": "fx.jump",
+  "landed": "fx.landing",
+  "wallHit": "fx.wall",
+  "pulseActivated": "fx.dash",
+  "playerRespawned": "fx.respawn",
+  "sceneAmbient": "fx.sceneMotes",
+  "uiConfirm": "fx.uiSelect",
+  "uiBack": "fx.uiSelect",
+  "uiNavigate": "fx.uiNavigate"
+}

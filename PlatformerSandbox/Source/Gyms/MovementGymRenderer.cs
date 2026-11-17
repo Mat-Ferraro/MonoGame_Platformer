@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Presentation.Particles;
 using System;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -134,13 +135,21 @@ internal static class MovementGymRenderer
     public static void DrawSharedWorldClock(
         SpriteBatch batch, Texture2D pixel, Viewport viewport,
         WorldSession world, bool paused, int p1Respawns, int p2Respawns,
-        bool showDebugHud = true)
+        bool showDebugHud = true, Action<ParticleVisualLayer>? drawParticleLayer = null)
     {
         WorldPlayerSnapshot p1 = world.GetPlayer(SharedWorldClockGym.FirstPlayerId);
         WorldPlayerSnapshot p2 = world.GetPlayer(SharedWorldClockGym.SecondPlayerId);
         double cameraX = (p1.Bounds.Center.X + p2.Bounds.Center.X) * 0.5;
         float originX = viewport.Width * 0.5f;
         float groundY = viewport.Height * 0.78f;
+
+        void DrawParticleLayer(ParticleVisualLayer layer)
+        {
+            if (drawParticleLayer is null) return;
+            batch.End();
+            drawParticleLayer(layer);
+            batch.Begin(samplerState: SamplerState.PointClamp);
+        }
 
         int visibleHalfWidth = (int)Math.Ceiling(viewport.Width /
             (2.0 * PixelsPerWorldUnit)) + 1;
@@ -156,6 +165,7 @@ internal static class MovementGymRenderer
             if (sy >= 0 && sy < viewport.Height)
                 batch.Draw(pixel, new Rectangle(0, sy, viewport.Width, 1), GridColor);
         }
+        DrawParticleLayer(ParticleVisualLayer.Background);
         foreach (var staticBody in world.StaticColliders)
         {
             Rectangle screen = WorldToScreen(staticBody.Bounds, cameraX, originX, groundY);
@@ -168,6 +178,7 @@ internal static class MovementGymRenderer
             batch.Draw(pixel, screen, MovingFloor);
             DrawOutline(batch, pixel, screen, Color.White * 0.6f);
         }
+        DrawParticleLayer(ParticleVisualLayer.World);
         foreach (WorldPlayerSnapshot p in world.Snapshot().Players)
         {
             Rectangle screen = WorldToScreen(p.Bounds, cameraX, originX, groundY);
@@ -180,6 +191,7 @@ internal static class MovementGymRenderer
                 new Color(18, 23, 35), 1);
         }
 
+        DrawParticleLayer(ParticleVisualLayer.Foreground);
         if (showDebugHud)
         {
             batch.Draw(pixel, new Rectangle(18, 42, 494, 178),
@@ -223,7 +235,8 @@ internal static class MovementGymRenderer
     public static void DrawAuthoredWorld(
         SpriteBatch batch, Texture2D pixel, Viewport viewport,
         WorldSession world, bool paused, int p1Respawns, int p2Respawns,
-        bool motionLab = false, bool showDebugHud = true)
+        bool motionLab = false, bool showDebugHud = true,
+        Action<ParticleVisualLayer>? drawParticleLayer = null)
     {
         WorldStepResult snapshot = world.Snapshot();
         WorldPlayerSnapshot p1 = world.GetPlayer(AuthoredWorldGym.FirstPlayerId);
@@ -231,6 +244,14 @@ internal static class MovementGymRenderer
         double cameraX = (p1.Bounds.Center.X + p2.Bounds.Center.X) * 0.5;
         float originX = viewport.Width * 0.5f;
         float groundY = viewport.Height * 0.78f;
+
+        void DrawParticleLayer(ParticleVisualLayer layer)
+        {
+            if (drawParticleLayer is null) return;
+            batch.End();
+            drawParticleLayer(layer);
+            batch.Begin(samplerState: SamplerState.PointClamp);
+        }
 
         int half = (int)Math.Ceiling(viewport.Width / (2.0 * PixelsPerWorldUnit)) + 1;
         for (int x = (int)Math.Floor(cameraX) - half;
@@ -245,6 +266,7 @@ internal static class MovementGymRenderer
             if (sy >= 0 && sy < viewport.Height)
                 batch.Draw(pixel, new Rectangle(0, sy, viewport.Width, 1), GridColor);
         }
+        DrawParticleLayer(ParticleVisualLayer.Background);
         foreach (var collider in world.StaticColliders)
         {
             Rectangle screen = WorldToScreen(collider.Bounds, cameraX, originX, groundY);
@@ -266,6 +288,7 @@ internal static class MovementGymRenderer
             GymDebugText.Draw(batch, pixel, zone.Left + 4, zone.Top + 4,
                 "ZONE " + trigger.Id, new Color(248, 224, 144), 1);
         }
+        DrawParticleLayer(ParticleVisualLayer.World);
         foreach (WorldPlayerSnapshot p in snapshot.Players)
         {
             Rectangle screen = WorldToScreen(p.Bounds, cameraX, originX, groundY);
@@ -280,6 +303,7 @@ internal static class MovementGymRenderer
             GymDebugText.Draw(batch, pixel, screen.Left + 5, screen.Top + 5,
                 p.PlayerId.ToString(), new Color(18, 23, 35), 1);
         }
+        DrawParticleLayer(ParticleVisualLayer.Foreground);
         // Separate from the normal F4 dashboard: shows authored ID, player
         // slot ownership, spawn selection, and all actions under test.
         if (showDebugHud)

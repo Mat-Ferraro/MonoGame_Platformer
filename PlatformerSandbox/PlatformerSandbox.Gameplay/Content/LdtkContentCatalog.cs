@@ -22,7 +22,8 @@ public sealed record LdtkContentEntry(string LevelId, string Identifier,
 /// </summary>
 public sealed record LdtkPreparedContent(string FilePath, LdtkImportedLevel Imported,
     LdtkConnectedLevel Connected, LdtkVisualDefinition Visuals,
-    LdtkSceneryDefinition Scenery, LdtkTerrainArtworkDefinition Terrain);
+    LdtkSceneryDefinition Scenery, LdtkTerrainArtworkDefinition Terrain,
+    LdtkParticleSceneDefinition? ParticleZones = null);
 
 /// <summary>
 /// Headless discovery and validation of every embedded level in Content/Levels.
@@ -82,6 +83,7 @@ public sealed class LdtkContentCatalog
                     LdtkVisualDefinition visuals = LdtkVisualImporter.FromJson(json, level.LevelId);
                     LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, level.LevelId);
                     LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, level.LevelId);
+                    LdtkParticleZoneImporter.FromJson(json, level.LevelId);
                     if (visuals.LevelId != level.LevelId || scenery.LevelId != level.LevelId ||
                         terrain.LevelId != level.LevelId)
                         throw new ArgumentException("Authored presentation IDs differ from world: " + level.LevelId);
@@ -116,10 +118,11 @@ public sealed class LdtkContentCatalog
         LdtkVisualDefinition visual = LdtkVisualImporter.FromJson(json, entry.Identifier);
         LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, entry.Identifier);
         LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, entry.Identifier);
+        LdtkParticleSceneDefinition particles = LdtkParticleZoneImporter.FromJson(json, entry.Identifier);
         if (visual.LevelId != imported.World.LevelId || scenery.LevelId != imported.World.LevelId ||
             terrain.LevelId != imported.World.LevelId)
             throw new InvalidOperationException("LDtk gameplay and visual level identifiers differ.");
-        return new LdtkPreparedContent(entry.FilePath, imported, level, visual, scenery, terrain);
+        return new LdtkPreparedContent(entry.FilePath, imported, level, visual, scenery, terrain, particles);
     }
 
     private static string AliasFor(string filename, string identifier) =>

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "emitters": [
+    {
+      "id": "test.landingDust",
+      "burstCount": 12,
+      "ratePerSecond": 0,
+      "maxSpawnsPerUpdate": 24,
+      "shape": "Box",
+      "spawnOffsetX": { "min": -0.3, "max": 0.3 },
+      "spawnOffsetY": { "min": 0, "max": 0.06 },
+      "lifetimeSeconds": { "min": 0.18, "max": 0.45 },
+      "speed": { "min": 0.4, "max": 1.8 },
+      "directionRadians": { "min": 0.2, "max": 2.94 },
+      "accelerationY": -2.2,
+      "startSize": { "min": 0.08, "max": 0.18 },
+      "endSize": { "min": 0.22, "max": 0.42 },
+      "startColor": { "r": 0.72, "g": 0.69, "b": 0.65, "a": 0.65 },
+      "endColor": { "r": 0.72, "g": 0.69, "b": 0.65, "a": 0 }
+    },
+    {
+      "id": "test.ambientMotes",
+      "ratePerSecond": 7.5,
+      "burstCount": 0,
+      "maxSpawnsPerUpdate": 16,
+      "maxEmissionDeltaSeconds": 0.1,
+      "shape": "Disk",
+      "spawnRadius": 2.0,
+      "lifetimeSeconds": { "min": 2.0, "max": 4.0 },
+      "speed": { "min": 0.02, "max": 0.2 },
+      "directionRadians": { "min": 0, "max": 6.283185307179586 },
+      "accelerationY": 0.01,
+      "startSize": { "min": 0.02, "max": 0.06 },
+      "endSize": { "min": 0.04, "max": 0.09 },
+      "startColor": { "r": 0.8, "g": 0.85, "b": 0.7, "a": 0.3 },
+      "endColor": { "r": 0.8, "g": 0.85, "b": 0.7, "a": 0 }
+    }
+  ]
+}

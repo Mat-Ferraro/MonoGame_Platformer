@@ -19,9 +19,13 @@ using PlatformerSandbox.Simulation.Diagnostics;
 using PlatformerSandbox.Simulation.CharacterMotor;
 using PlatformerSandbox.Gyms;
 using PlatformerSandbox.Foundation.Presentation;
+using PlatformerSandbox.Foundation.Presentation.Particles;
+using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Foundation.Audio;
 using PlatformerSandbox.Audio;
 using PlatformerSandbox.Presentation;
+using PlatformerSandbox.Particles;
+using PlatformerSandbox.Lighting;
 
 namespace PlatformerSandbox;
 
@@ -33,6 +37,24 @@ namespace PlatformerSandbox;
 public sealed class Game1 : Game
 {
     private readonly GraphicsDeviceManager _graphics;
+    // Dedicated developer-only P02 visual laboratory. Not a new gameplay scene
+    // or physics system; --dev-particles bypasses normal scene update/drawing.
+    private readonly bool _particleLabMode = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--dev-particles", StringComparison.OrdinalIgnoreCase));
+    private ParticlePlayground? _particlePlayground;
+    // L01 P1-P3 isolated lighting laboratory; game/LDtk/particles remain unaffected.
+    private readonly bool _lightingLabMode = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--dev-lights", StringComparison.OrdinalIgnoreCase));
+    private LightingPlayground? _lightingPlayground;
+    // P04 world/scene/UI cosmetics. Never referenced by WorldSession.Step().
+    private PlatformerParticleVfx? _particleVfx;
+    private LdtkParticleSceneDefinition? _ldtkParticleZones;
+    private string? _particleWarning;
+    private readonly bool _noParticles = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--no-particles", StringComparison.OrdinalIgnoreCase));
     private readonly GameDiagnosticBridge? _diagnostics;
 #if DEBUG
     private readonly bool _devCrashAfterWorldStep = Array.Exists(
@@ -166,6 +188,22 @@ public sealed class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        if (_lightingLabMode)
+        {
+            string lightingManifest = Path.Combine(AppContext.BaseDirectory,
+                "Content", "Lighting", "L123_LightingLab.json");
+            _lightingPlayground = new LightingPlayground(GraphicsDevice, lightingManifest);
+            Window.Title = "PlatformerSandbox - L01 Phase 1-3 Lighting Lab";
+            return;
+        }
+        if (_particleLabMode)
+        {
+            string particleManifest = Path.Combine(AppContext.BaseDirectory,
+                "Content", "Particles", "P02_PlaygroundEmitters.json");
+            _particlePlayground = new ParticlePlayground(GraphicsDevice, particleManifest);
+            Window.Title = "PlatformerSandbox - P02 Particle Playground";
+            return;
+        }
         // C02 test artwork. Missing/malformed optional art must not prevent
         // opening LDtk scenes: retain the C01 procedural character fallback.
         try
@@ -228,11 +266,102 @@ public sealed class Game1 : Game
             _music?.Dispose();
             _music = null;
         }
+        if (!_noParticles)
+        {
+            try
+            {
+                _particleVfx = new PlatformerParticleVfx(GraphicsDevice,
+                    Path.Combine(AppContext.BaseDirectory, "Content", "Particles"));
+                ActivateParticleWorld(); // also handles direct --dev-level boot
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                System.Diagnostics.Debug.WriteLine("P04 optional particle fallback: " + ex);
+                _particleWarning = ex.GetType().Name + ": " + ex.Message;
+                _particleVfx?.Dispose();
+                _particleVfx = null;
+            }
+        }
+    }
+
+    // Initialize presentation-only gameplay particles AFTER the scene (which
+    // may have been direct-booted) and the shared renderer are available.
+    // No VFX asset failure should prevent the existing game from launching.
+    private void ActivateParticleWorld()
+    {
+        if (_particleVfx is null) return;
+        if (_worldClockTest is not WorldSession world)
+        {
+            _particleVfx.Presenter.LeaveWorld();
+            _particleVfx.ConfigureEnvironment(null);
+            return;
+        }
+        // Temporary scene-level ambient follows P1 in LDtk. Authored LDtk
+        // placements belong to P05. No ambient effect in graybox gym fixtures.
+        Vector2D? ambientOrigin = _ldtkLevelMode && world.HasPlayer(1)
+            ? world.GetPlayer(1).Bounds.Center : null;
+        // P05 authored LDtk rectangles replace the P04 camera-followed haze.
+        // A zero-zone older project deliberately retains the P04 fallback.
+        if (_ldtkParticleZones is { Zones.Count: > 0 })
+            ambientOrigin = null;
+        try
+        {
+            _particleVfx.ConfigureEnvironment(_ldtkLevelMode ? _ldtkParticleZones : null);
+            _particleWarning = null;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // An invalid cosmetic zone must never prevent the gameplay scene
+            // from committing. Display the authoring error in the debug HUD.
+            _particleVfx.ConfigureEnvironment(null);
+            _particleWarning = "P05 ZONE: " + ex.Message;
+            ambientOrigin = null;
+        }
+        _particleVfx.Presenter.EnterWorld(world.WorldInstanceId, ambientOrigin);
+    }
+
+    private Action<ParticleVisualLayer>? CreateGymParticleDraw(WorldSession world,
+        SpriteBatch batch)
+    {
+        if (_particleVfx is null || !world.HasPlayer(1) || !world.HasPlayer(2))
+            return null;
+        Vector2D one = world.GetPlayer(1).Bounds.Center;
+        Vector2D two = world.GetPlayer(2).Bounds.Center;
+        ParticleViewport view = ParticleViewportAdapters.FromMovementGym(
+            GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+            (one.X + two.X) * .5);
+        return layer => _particleVfx.DrawLayer(batch, view, layer);
+    }
+
+    private void PlayParticleUi(ParticleUiFeedback feedback)
+    {
+        if (_particleVfx is null) return;
+        _particleVfx.Presenter.PresentUi(feedback, new Vector2D(
+            GraphicsDevice.Viewport.Width * .67,
+            GraphicsDevice.Viewport.Height * .51));
     }
 
     protected override void Update(GameTime gameTime)
     {
         using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
+        if (_lightingPlayground is LightingPlayground lightingLab)
+        {
+            lightingLab.Update(gameTime.ElapsedGameTime.TotalSeconds,
+                Keyboard.GetState(), Mouse.GetState(),
+                GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+            if (lightingLab.ExitRequested) Exit();
+            base.Update(gameTime);
+            return;
+        }
+        if (_particlePlayground is ParticlePlayground particleLab)
+        {
+            particleLab.Update(gameTime.ElapsedGameTime.TotalSeconds,
+                Keyboard.GetState(), Mouse.GetState(),
+                GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+            if (particleLab.ExitRequested) Exit();
+            base.Update(gameTime);
+            return;
+        }
         // Listener uses only committed player state from the previous tick.
         // It is intentionally never part of a solver or gameplay command.
         if (_audio is not null)
@@ -390,6 +519,15 @@ public sealed class Game1 : Game
             _paused = _flow.IsGameplaySuspended;
             _titleRefreshCounter = 6;
         }
+        if (changedScene) ActivateParticleWorld();
+        // UI cosmetic clock continues during menus/covered scene transitions.
+        // World cosmetics freeze whenever the authoritative world is suspended.
+        _particleVfx?.Presenter.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused);
+        // Use committed player location for cosmetic culling; no world mutation.
+        if (_particleVfx is not null && _worldClockTest is WorldSession particleWorld &&
+            particleWorld.HasPlayer(1))
+            _particleVfx.UpdateEnvironment(particleWorld.GetPlayer(1).Bounds.Center,
+                gameTime.ElapsedGameTime.TotalSeconds, _paused);
         if (_flow.ExitRequested)
         {
             Exit();
@@ -769,6 +907,9 @@ public sealed class Game1 : Game
                     throw new InvalidOperationException("D01 Phase 2 intentional gameplay-context crash test.");
 #endif
                 if (_ldtkConnectedLevel is not null) _ldtkWindDirty = false;
+                // Consume only successfully committed semantic events. VFX is
+                // presentation-only and never enters the fixed-step solver.
+                _particleVfx?.Presenter.PresentCommitted(committed);
                 foreach (WorldGameplayEvent gameplayEvent in committed.Events)
                 {
                     // A01: only post-commit world events create game audio.
@@ -865,8 +1006,23 @@ public sealed class Game1 : Game
     {
         using var diagnosticDrawScope = _diagnostics?.MonitorOperation("Game1.Draw");
         GraphicsDevice.Clear(new Color(18, 23, 35));
+        if (_lightingPlayground is LightingPlayground lightingLab &&
+            _spriteBatch is not null && _pixel is not null)
+        {
+            lightingLab.Draw(_spriteBatch, _pixel);
+            base.Draw(gameTime);
+            return;
+        }
+        if (_particlePlayground is ParticlePlayground particleLab &&
+            _spriteBatch is not null && _pixel is not null)
+        {
+            particleLab.Draw(GraphicsDevice, _spriteBatch, _pixel);
+            base.Draw(gameTime);
+            return;
+        }
         if (_spriteBatch is not null && _pixel is not null)
         {
+            _particleVfx?.BeginFrame();
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             bool showFullHud = _debugHudMode == GameDebugHudMode.Full;
             if (_flow.ActiveScene == MajorSceneKind.Title)
@@ -884,22 +1040,31 @@ public sealed class Game1 : Game
                         _ldtkCharacterAnimations.Advance(
                             _paused ? 0 : gameTime.ElapsedGameTime.TotalSeconds,
                             clockWorld.Snapshot().Players);
+                        // Interleave each VFX layer with the existing camera
+                        // and scene renderer, rather than drawing all effects
+                        // over the character or beneath the level background.
+                        ParticleViewport particleView =
+                            ParticleViewportAdapters.FromLdtkCamera(camera);
+                        Action<ParticleVisualLayer>? layerHook = _particleVfx is null
+                            ? null : layer => _particleVfx.DrawLayer(_spriteBatch, particleView, layer);
                         LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
                             _ldtkDrawCollisionBackdrop, _ldtkConnectedLevel,
-                            camera, _ldtkCharacterAnimations, _ldtkCharacterSprites);
+                            camera, _ldtkCharacterAnimations, _ldtkCharacterSprites,
+                            layerHook);
                     }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
                         MovementGymRenderer.DrawAuthoredWorld(
                             _spriteBatch, _pixel, GraphicsDevice.Viewport,
                             clockWorld, _paused, _worldP1Respawns, _worldP2Respawns,
-                            _motionLabMode, showFullHud);
+                            _motionLabMode, showFullHud,
+                            CreateGymParticleDraw(clockWorld, _spriteBatch));
                     else
                         MovementGymRenderer.DrawSharedWorldClock(
                             _spriteBatch, _pixel, GraphicsDevice.Viewport,
                             clockWorld, _paused, _worldP1Respawns, _worldP2Respawns,
-                            showFullHud);
+                            showFullHud, CreateGymParticleDraw(clockWorld, _spriteBatch));
                 }
                 else
                     MovementGymRenderer.Draw(_spriteBatch, _pixel,
@@ -926,6 +1091,16 @@ public sealed class Game1 : Game
             }
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
+            // Screen-space UI effects are drawn above menus, but below the
+            // transition curtain. Gameplay pause never freezes this layer.
+            if (_particleVfx is not null)
+            {
+                _spriteBatch.End();
+                _particleVfx.DrawLayer(_spriteBatch, new ParticleViewport(
+                    GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+                    Vector2D.Zero, 1), ParticleVisualLayer.Ui);
+                _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            }
             DrawTransitionCurtain(_spriteBatch, _pixel);
             if (_ldtkLevelMode && _ldtkCharacterSprites is null)
             {
@@ -947,6 +1122,28 @@ public sealed class Game1 : Game
                     "A01 AUDIO UNAVAILABLE - " + (_audioWarning.Length > 70
                         ? _audioWarning[..70] : _audioWarning),
                     new Color(255, 189, 112), 1);
+            if (_particleVfx is not null && _debugHudMode == GameDebugHudMode.Full)
+            {
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 113),
+                    "P04 VFX WORLD " + _particleVfx.Presenter.ActiveWorldEffects +
+                    "  UI " + _particleVfx.Presenter.ActiveUiEffects +
+                    "  DROPPED " + _particleVfx.Presenter.DroppedWorldEffects,
+                    new Color(156, 223, 255), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 150),
+                    "P05 ZONES " + _particleVfx.ActiveEnvironmentZones + "/" +
+                    _particleVfx.EnvironmentZones + "  PARTICLES " +
+                    _particleVfx.EnvironmentParticles + "  CAPPED FRAMES " +
+                    _particleVfx.CappedZoneFrames,
+                    new Color(174, 220, 169), 1);
+            }
+            if (_particleWarning is not null)
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 131),
+                    "P04 PARTICLES UNAVAILABLE - " +
+                    (_particleWarning.Length > 58 ? _particleWarning[..58] : _particleWarning),
+                    new Color(255, 189, 112), 1);
             if (_diagnostics is not null)
             {
                 // Minimal always-available report UI, including when Title or
@@ -964,6 +1161,12 @@ public sealed class Game1 : Game
 
     protected override void UnloadContent()
     {
+        _lightingPlayground?.Dispose();
+        _lightingPlayground = null;
+        _particlePlayground?.Dispose();
+        _particlePlayground = null;
+        _particleVfx?.Dispose();
+        _particleVfx = null;
         _music?.Dispose();
         _music = null;
         _soundscapes = null;
@@ -1038,7 +1241,8 @@ public sealed class Game1 : Game
     private void ActivatePreparedScene(MovementGymSession gym, WorldSession? world,
         string? levelId, LdtkImportedLevel? importedLdtk = null,
         LdtkVisualSceneAssets? visuals = null,
-        LdtkConnectedLevel? connectedLdtk = null)
+        LdtkConnectedLevel? connectedLdtk = null,
+        LdtkParticleSceneDefinition? particleZones = null)
     {
         _gym = gym;
         _worldClockTest = world;
@@ -1053,6 +1257,7 @@ public sealed class Game1 : Game
             _debugHudMode = GameDebugHudModes.DefaultForScene(_ldtkLevelMode);
         _ldtkLevel = importedLdtk;
         _ldtkConnectedLevel = connectedLdtk;
+        _ldtkParticleZones = particleZones;
         _ldtkActiveWindIds.Clear();
         _ldtkWindDirty = false;
         _lastLdtkInteraction = "NONE";
@@ -1133,6 +1338,7 @@ public sealed class Game1 : Game
                         host._ldtkLevelMode = false;
                         host._ldtkLevel = null;
                         host._ldtkConnectedLevel = null;
+                        host._ldtkParticleZones = null;
                         host._ldtkActiveWindIds.Clear();
                         host._ldtkVisuals = null;
                         host._ldtkCamera = null;
@@ -1160,6 +1366,7 @@ public sealed class Game1 : Game
             LdtkImportedLevel? importedLdtk = null;
             LdtkConnectedLevel? preparedConnectedLdtk = null;
             LdtkVisualSceneAssets? preparedVisuals = null;
+            LdtkParticleSceneDefinition? preparedParticleZones = null;
             WorldSession? preparedLdtkWorld = null;
             if (host._ldtkCatalog.Supports(destination!))
             {
@@ -1171,6 +1378,7 @@ public sealed class Game1 : Game
                     LdtkPreparedContent content = host._ldtkCatalog.Prepare(destination!);
                     importedLdtk = content.Imported;
                     preparedConnectedLdtk = content.Connected;
+                    preparedParticleZones = content.ParticleZones;
                     if (content.Visuals.TileCount > 0 || content.Scenery.SpriteCount > 0 ||
                         content.Terrain.ArtworkCount > 0)
                         preparedVisuals = new LdtkVisualSceneAssets(
@@ -1214,7 +1422,8 @@ public sealed class Game1 : Game
                 () =>
                 {
                     host.ActivatePreparedScene(preparedGym, preparedWorld,
-                        destination.LevelId, importedLdtk, preparedVisuals, preparedConnectedLdtk);
+                        destination.LevelId, importedLdtk, preparedVisuals, preparedConnectedLdtk,
+                        preparedParticleZones);
                     preparedSession.EnterLevel(destination, preparedWorld?.PlayerSlots);
                     host._gameplaySession = preparedSession;
                 }, preparedVisuals);
@@ -1279,6 +1488,7 @@ public sealed class Game1 : Game
             {
                 _flow.PauseOrResume();
                 _audio?.Play(new AudioCueRequest("ui.confirm", "ui"));
+                PlayParticleUi(ParticleUiFeedback.Confirm);
             }
             return;
         }
@@ -1286,6 +1496,7 @@ public sealed class Game1 : Game
         {
             _flow.Back();
             _audio?.Play(new AudioCueRequest("ui.back", "ui"));
+            PlayParticleUi(ParticleUiFeedback.Back);
             return;
         }
         if (!_flow.IsMenuOpen) return;
@@ -1293,11 +1504,13 @@ public sealed class Game1 : Game
         {
             _flow.Navigate(newUp ? -1 : 1);
             _audio?.Play(new AudioCueRequest("ui.navigate", "ui"));
+            PlayParticleUi(ParticleUiFeedback.Navigate);
         }
         else if (newConfirm)
         {
             _flow.ConfirmSelection();
             _audio?.Play(new AudioCueRequest("ui.confirm", "ui"));
+            PlayParticleUi(ParticleUiFeedback.Confirm);
         }
     }
 

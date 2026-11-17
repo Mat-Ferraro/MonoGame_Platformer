@@ -151,7 +151,7 @@ public sealed class LdtkEntityImportRegistry
     private readonly Dictionary<string, Action<LdtkEntityImportContext, LdtkAuthoredEntity>> _handlers =
         new(StringComparer.Ordinal);
     private static readonly HashSet<string> VisualOrSpawnKinds = new(StringComparer.Ordinal)
-        { "PlayerSpawn", "ScenerySprite", "PaintedSprite", "TerrainArtwork" };
+        { "PlayerSpawn", "ScenerySprite", "PaintedSprite", "TerrainArtwork", "ParticleZone" };
 
     public void Register(string kind, Action<LdtkEntityImportContext, LdtkAuthoredEntity> handler)
     {

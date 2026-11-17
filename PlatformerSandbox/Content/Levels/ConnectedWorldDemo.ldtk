@@ -11,7 +11,7 @@
   "iid": "0800b4bc-13e9-41bf-9c62-5f4961741f5b",
   "jsonVersion": "1.5.3",
   "appBuildId": 473703,
-  "nextUid": 4054,
+  "nextUid": 5113,
   "identifierStyle": "Capitalize",
   "toc": [],
   "worldLayout": "Free",
@@ -2134,6 +2134,153 @@
             "editorDisplayPos": "Beneath",
             "editorDisplayScale": 1,
             "editorShowInWorld": true,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          }
+        ]
+      },
+      {
+        "identifier": "ParticleZone",
+        "uid": 510,
+        "tags": [],
+        "exportToToc": false,
+        "allowOutOfBounds": false,
+        "doc": "Visual-only, resizable particle emission region. No collision; coordinates and dimensions are independent of tiles.",
+        "width": 500,
+        "height": 300,
+        "resizableX": true,
+        "resizableY": true,
+        "minWidth": 8,
+        "maxWidth": 4096,
+        "minHeight": 8,
+        "maxHeight": 4096,
+        "keepAspectRatio": false,
+        "tileOpacity": 1,
+        "fillOpacity": 0.25,
+        "lineOpacity": 1,
+        "hollow": false,
+        "color": "#87E2AC",
+        "renderMode": "Rectangle",
+        "showName": true,
+        "tilesetId": null,
+        "tileRenderMode": "FitInside",
+        "tileRect": null,
+        "uiTileRect": null,
+        "nineSliceBorders": [],
+        "maxCount": 0,
+        "limitScope": "PerLevel",
+        "limitBehavior": "MoveLastOne",
+        "pivotX": 0,
+        "pivotY": 0,
+        "fieldDefs": [
+          {
+            "identifier": "EffectId",
+            "uid": 5110,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Continuous composite effect ID (fx.zoneDust / fx.zoneSpores / fx.zoneEmbers)",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": true,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "DensityPercent",
+            "uid": 5111,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Emission density multiplier, 1 to 200 percent",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ActivationPaddingWorld",
+            "uid": 5112,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 40,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "How many world units beyond the zone remain active (0 to 40)",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
             "editorAlwaysShow": false,
             "editorCutLongValues": true,
             "editorDisplayColor": null,
@@ -5287,6 +5434,106 @@
               ],
               "__worldX": 1300,
               "__worldY": 600
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                6,
+                9
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "c0c3c403-a683-526e-921a-d65e8c9be235",
+              "width": 930,
+              "height": 510,
+              "defUid": 510,
+              "px": [
+                220,
+                300
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneDust",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 75.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 10.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 220,
+              "__worldY": 300
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                38,
+                9
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "2db46c70-58ab-5b8a-8284-21399669f3d9",
+              "width": 1040,
+              "height": 690,
+              "defUid": 510,
+              "px": [
+                1230,
+                315
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneSpores",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 45.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 12.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1230,
+              "__worldY": 315
             }
           ]
         },
@@ -12794,6 +13041,106 @@
               ],
               "__worldX": 4350,
               "__worldY": 520
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                5,
+                9
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "6b7043a4-a75a-5c24-9ec6-3e7ede4b81a0",
+              "width": 1030,
+              "height": 555,
+              "defUid": 510,
+              "px": [
+                170,
+                290
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneSpores",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 50.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 10.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 2730,
+              "__worldY": 290
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                39,
+                9
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "3e59db4a-6d42-57cf-8870-16835af7cb61",
+              "width": 1080,
+              "height": 680,
+              "defUid": 510,
+              "px": [
+                1260,
+                315
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneEmbers",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 40.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 12.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 3820,
+              "__worldY": 315
             }
           ]
         },
@@ -20251,6 +20598,106 @@
               ],
               "__worldX": 6420,
               "__worldY": 600
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                5,
+                9
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "f8bcc28f-0025-546a-ba64-0462aee3137a",
+              "width": 1020,
+              "height": 525,
+              "defUid": 510,
+              "px": [
+                180,
+                300
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneEmbers",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 38.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 10.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 5300,
+              "__worldY": 300
+            },
+            {
+              "__identifier": "ParticleZone",
+              "__grid": [
+                38,
+                11
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#87E2AC",
+              "iid": "fdfbcaf7-3f27-5234-952c-0ef0d855515c",
+              "width": 1040,
+              "height": 660,
+              "defUid": 510,
+              "px": [
+                1220,
+                360
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "EffectId",
+                  "__type": "String",
+                  "__value": "fx.zoneDust",
+                  "__tile": null,
+                  "defUid": 5110,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "DensityPercent",
+                  "__type": "Float",
+                  "__value": 75.0,
+                  "__tile": null,
+                  "defUid": 5111,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ActivationPaddingWorld",
+                  "__type": "Float",
+                  "__value": 12.0,
+                  "__tile": null,
+                  "defUid": 5112,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 6340,
+              "__worldY": 360
             }
           ]
         },
