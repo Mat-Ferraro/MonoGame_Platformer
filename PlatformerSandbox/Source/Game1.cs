@@ -20,6 +20,7 @@ using PlatformerSandbox.Simulation.CharacterMotor;
 using PlatformerSandbox.Gyms;
 using PlatformerSandbox.Foundation.Presentation;
 using PlatformerSandbox.Foundation.Presentation.Particles;
+using PlatformerSandbox.Foundation.Presentation.Lighting;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Foundation.Audio;
 using PlatformerSandbox.Audio;
@@ -48,6 +49,38 @@ public sealed class Game1 : Game
         Environment.GetCommandLineArgs(), arg =>
         string.Equals(arg, "--dev-lights", StringComparison.OrdinalIgnoreCase));
     private LightingPlayground? _lightingPlayground;
+    // L-BASIC: isolated ambient + one-light visual acceptance using the real compositor.
+    private readonly bool _lightingBasicsMode = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--dev-lighting-basics", StringComparison.OrdinalIgnoreCase));
+    private BasicLightingLab? _lightingBasicsLab;
+    private bool IsLightingBasicsScene =>
+        _flow.ActiveScene == MajorSceneKind.Gameplay &&
+        _flow.Scenes.ActiveDestination?.LevelId == GameLevelIds.LightingBasics;
+    // L03A GPU per-pixel material workbench. Separate from production LDtk path
+    // until shader/content/device validation is completed on target hardware.
+    private readonly bool _materialLabMode = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--dev-materials", StringComparison.OrdinalIgnoreCase));
+    private SurfaceMaterialWorkbench? _materialWorkbench;
+    // L01 P4-P6: scene-owned lighting is presentation only, independent of physics.
+    private GameplayLightingRenderer? _gameLighting;
+    private LightingGameCatalog? _lightingCatalog;
+    private GameplayLightingPresenter? _lightingEvents;
+    private LdtkLightingScene? _ldtkLighting;
+    private string? _lightingWarning;
+    private string _lightingPresetId = "Illustrated";
+    private double _lightingPresetNoticeSeconds;
+    private LightingQuality _lightingQuality = LightingQuality.Balanced;
+    private bool _reducedLightingFlashes;
+    // Debug-only movable inspection light for the dedicated LDtk flat test.
+    private bool _lightingInspectionLight;
+    private bool _lightingEnabled = true;
+    private bool _lightingStress;
+    private readonly bool _noLighting = Array.Exists(
+        Environment.GetCommandLineArgs(), arg =>
+        string.Equals(arg, "--no-lighting", StringComparison.OrdinalIgnoreCase));
+
     // P04 world/scene/UI cosmetics. Never referenced by WorldSession.Step().
     private PlatformerParticleVfx? _particleVfx;
     private LdtkParticleSceneDefinition? _ldtkParticleZones;
@@ -70,6 +103,7 @@ public sealed class Game1 : Game
 #endif
     private readonly GameFlowController _flow;
     private readonly LdtkContentCatalog _ldtkCatalog;
+    private readonly SceneLightingLayerCatalog _sceneLayers;
     private GamePadState _previousGamepad;
     // Gameplay assistance starts enabled in the *playable* gym. Unit-test
     // fixtures may still explicitly select the unassisted baseline.
@@ -154,7 +188,11 @@ public sealed class Game1 : Game
         IsFixedTimeStep = true;
         TargetElapsedTime = TimeSpan.FromSeconds(MovementGymSession.FixedStepSeconds);
         Window.AllowUserResizing = true;
-        _ldtkCatalog = LdtkContentCatalog.Discover(FindLdtkDirectory());
+        _sceneLayers = SceneLightingLayerCatalog.FromJson(File.ReadAllText(
+            Path.Combine(Path.GetDirectoryName(FindLdtkDirectory())!, "Lighting",
+                "L02_SceneLayers.json")));
+        _ldtkCatalog = LdtkContentCatalog.Discover(FindLdtkDirectory(),
+            layerSettings: _sceneLayers);
         _flow = new GameFlowController(new HostSceneFactory(this),
             GameLevelMenuCatalog.WithDiscoveredLevels(_ldtkCatalog.Levels.Keys));
     }
@@ -188,6 +226,20 @@ public sealed class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        if (_lightingBasicsMode)
+        {
+            _lightingBasicsLab = new BasicLightingLab(GraphicsDevice, Content);
+            Window.Title = "PlatformerSandbox - Basic Lighting Lab (Stages 1-5)";
+            return;
+        }
+        if (_materialLabMode)
+        {
+            string materialManifest = Path.Combine(AppContext.BaseDirectory,
+                "Content", "Lighting", "L03_SurfaceMaterials.json");
+            _materialWorkbench = new SurfaceMaterialWorkbench(GraphicsDevice, Content, materialManifest);
+            Window.Title = "PlatformerSandbox - L03 GPU Surface Materials Lab";
+            return;
+        }
         if (_lightingLabMode)
         {
             string lightingManifest = Path.Combine(AppContext.BaseDirectory,
@@ -282,6 +334,145 @@ public sealed class Game1 : Game
                 _particleVfx = null;
             }
         }
+        // L01 P4-P6 lighting is optional presentation; asset/hardware failures
+        // never change a committed game level or authoritative world state.
+        if (!_noLighting)
+        {
+            try
+            {
+                string path = Path.Combine(AppContext.BaseDirectory,
+                    "Content", "Lighting", "L456_GameplayLighting.json");
+                _lightingCatalog = LightingGameCatalog.FromJson(File.ReadAllText(path));
+                _lightingPresetId = _lightingCatalog.DefaultPreset;
+                _gameLighting = new GameplayLightingRenderer(GraphicsDevice);
+                _lightingEvents = new GameplayLightingPresenter();
+                ActivateLightingWorld();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                System.Diagnostics.Debug.WriteLine("L456 optional lighting unavailable: " + ex);
+                _lightingWarning = ex.GetType().Name + ": " + ex.Message;
+                _gameLighting?.Dispose();
+                _gameLighting = null;
+                _lightingEvents = null;
+                _lightingCatalog = null;
+            }
+        }
+    }
+
+    private void ActivateLightingWorld()
+    {
+        if (_lightingEvents is null) return;
+        if (_lightingCatalog is not null)
+        {
+            _lightingPresetId = _lightingCatalog.GetDefaultPresetForScene(_ldtkLighting?.LevelId);
+            if (_ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
+                _lightingPresetNoticeSeconds = 4;
+        }
+        _lightingEvents.Clear();
+        if (_ldtkLighting is not null && _worldClockTest is WorldSession world)
+            _lightingEvents.EnterWorld(world.WorldInstanceId, _ldtkLighting);
+    }
+
+    private IEnumerable<RadialLight> EnumerateParticleLights()
+    {
+        if (_particleVfx is null || _lightingCatalog is null) yield break;
+        int sequence = 0;
+        foreach (var (id, position) in _particleVfx.LightCandidates())
+        {
+            LightingParticleBinding? binding = _lightingCatalog.ForParticle(id);
+            if (binding is null) continue;
+            yield return new RadialLight
+            {
+                Id = "particle_" + sequence++,
+                Owner = "particle",
+                Position = new LightPoint(position.X, position.Y),
+                Color = binding.Color, Radius = binding.Radius,
+                Intensity = binding.Intensity, Priority = binding.Priority,
+                CastShadows = binding.CastShadows,
+                Channels = LightChannel.Terrain | LightChannel.Hero | LightChannel.Effects
+            };
+        }
+    }
+
+    private IEnumerable<RadialLight> LightingStressCandidates(Camera2DView camera)
+    {
+        // Actual LDtk world-projection inspection. No light is written to the
+        // authoritative world, and changing this never advances a simulation tick.
+        if (_lightingInspectionLight &&
+            _ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
+        {
+            MouseState mouse = Mouse.GetState();
+            Vector2D worldPoint = camera.ScreenToWorld(mouse.X, mouse.Y);
+            yield return new RadialLight
+            {
+                Id = "flat_inspector", Owner = "stress",
+                Position = new LightPoint(worldPoint.X, worldPoint.Y),
+                Color = new LightRgb(1, .95, .79), Radius = 8.5,
+                Intensity = 1.55, Priority = 100, CastShadows = true,
+                Channels = LightChannel.All
+            };
+        }
+        if (!_lightingStress) yield break;
+        // Fixed grid relative to the view for a reproducible culling / budget
+        // stress case. These lights never enter a gameplay tick or input path.
+        for (int i = 0; i < 120; i++)
+            yield return new RadialLight
+            {
+                Id = "stress_" + i, Owner = "stress",
+                Position = new LightPoint(camera.Left + (i % 12 + .5) *
+                    camera.VisibleWidth / 12,
+                    camera.Bottom + (i / 12 + .5) * camera.VisibleHeight / 10),
+                Radius = 1.9, Intensity = .34, Priority = -25,
+                Color = (i % 3) switch
+                {
+                    0 => new LightRgb(.8, .4, .24),
+                    1 => new LightRgb(.28, .56, .95),
+                    _ => new LightRgb(.45, .8, .48)
+                },
+                CastShadows = true
+            };
+    }
+
+    private Color ShadeGameplaySurface(string iid, IReadOnlyList<RadialLight> lights,
+        LightingArtPreset art)
+    {
+        if (_ldtkLighting is not LdtkLightingScene scene ||
+            !scene.SurfaceCenters.TryGetValue(iid, out LightPoint point))
+            return Color.White;
+        LightingSurfaceOptions options = scene.GetSurface(iid);
+        SceneLightingLayer layer = scene.Layers.Get(options.LayerId);
+        // A light-receiving sprite may independently cast shadows. Passing its
+        // IID into the sampler excludes its own hull from front-face shading.
+        // Silhouettes normally stay dark, but an explicitly front-facing
+        // gameplay flash can reveal their visible face. This runs in the same
+        // sprite post-pass as ordinary prop lighting, after the back-wall pass.
+        LightRgb? reveal = options.LightingMode == LightingSurfaceMode.Silhouette
+            ? LightingWorldSampler.SampleSilhouetteReveal(point, options.Channel,
+                options.ReceivesShadows, iid, art, lights, scene.Occluders, layer)
+            : null;
+        LightRgb sampled = options.LightingMode is LightingSurfaceMode.Silhouette or
+            LightingSurfaceMode.Unlit
+            ? LightRgb.White
+            : LightingWorldSampler.Sample(point, options.Channel,
+                options.ReceivesShadows, iid, art, lights, scene.Occluders, layer);
+        return GameplayLightingRenderer.ToColor(
+            LightingSurfaceShading.ResolveTint(options, layer, sampled, reveal));
+    }
+
+    private Color ShadeGameplayHero(LightPoint point, IReadOnlyList<RadialLight> lights,
+        LightingArtPreset art)
+    {
+        if (_ldtkLighting is not LdtkLightingScene scene) return Color.White;
+        SceneLightingLayer playerLayer = scene.Layers.Gameplay;
+        if (playerLayer.Mode == RenderLayerLightingMode.Unlit) return Color.White;
+        LightRgb rgb = LightingWorldSampler.Sample(point, LightChannel.Hero,
+            playerLayer.ReceivesShadows, null, art, lights, scene.Occluders, playerLayer);
+        // Accessibility: player silhouette remains legible in dark art presets.
+        return GameplayLightingRenderer.ToColor(new LightRgb(
+            Math.Max(art.HeroMinimumBrightness, rgb.R),
+            Math.Max(art.HeroMinimumBrightness, rgb.G),
+            Math.Max(art.HeroMinimumBrightness, rgb.B)));
     }
 
     // Initialize presentation-only gameplay particles AFTER the scene (which
@@ -344,6 +535,60 @@ public sealed class Game1 : Game
     protected override void Update(GameTime gameTime)
     {
         using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
+        if (_lightingBasicsMode && _lightingBasicsLab is BasicLightingLab basicsLab)
+        {
+            basicsLab.Update(Keyboard.GetState(), Mouse.GetState(),
+                GraphicsDevice.PresentationParameters.BackBufferWidth,
+                GraphicsDevice.PresentationParameters.BackBufferHeight);
+            if (basicsLab.ExitRequested) Exit();
+            base.Update(gameTime);
+            return;
+        }
+        // Level-select can enter this same lab as a normal scene. Preserve the
+        // flow controller's pause, restart, transition and return-to-title paths.
+        if (!_lightingBasicsMode && IsLightingBasicsScene)
+        {
+            _lightingBasicsLab ??= new BasicLightingLab(GraphicsDevice, Content);
+            KeyboardState labKeys = Keyboard.GetState();
+            GamePadState labPad = GamePad.GetState(PlayerIndex.One);
+            HandleSceneNavigation(labKeys, labPad);
+            bool sceneChanged = _flow.AdvanceTransition(
+                gameTime.ElapsedGameTime.TotalSeconds);
+            if (sceneChanged)
+            {
+                _lightingBasicsLab.Dispose();
+                _lightingBasicsLab = null;
+                ActivateParticleWorld();
+                ActivateLightingWorld();
+                UpdateAudioListener();
+                if (IsLightingBasicsScene)
+                    _lightingBasicsLab = new BasicLightingLab(GraphicsDevice, Content);
+            }
+            else
+            {
+                _lightingBasicsLab.Update(labKeys, Mouse.GetState(),
+                    GraphicsDevice.PresentationParameters.BackBufferWidth,
+                    GraphicsDevice.PresentationParameters.BackBufferHeight,
+                    interactive: !_flow.IsGameplaySuspended, standalone: false);
+            }
+            if (_flow.ExitRequested) Exit();
+            _previousKeyboard = labKeys;
+            _previousGamepad = labPad;
+            if (++_titleRefreshCounter >= 6)
+            {
+                _titleRefreshCounter = 0;
+                UpdateWindowTitle();
+            }
+            base.Update(gameTime);
+            return;
+        }
+        if (_materialWorkbench is SurfaceMaterialWorkbench materialLab)
+        {
+            materialLab.Update(Keyboard.GetState(), Mouse.GetState());
+            if (materialLab.ExitRequested) Exit();
+            base.Update(gameTime);
+            return;
+        }
         if (_lightingPlayground is LightingPlayground lightingLab)
         {
             lightingLab.Update(gameTime.ElapsedGameTime.TotalSeconds,
@@ -373,7 +618,48 @@ public sealed class Game1 : Game
         if (_audioControlNoticeSeconds > 0)
             _audioControlNoticeSeconds = Math.Max(0,
                 _audioControlNoticeSeconds - gameTime.ElapsedGameTime.TotalSeconds);
+        if (_lightingPresetNoticeSeconds > 0)
+            _lightingPresetNoticeSeconds = Math.Max(0,
+                _lightingPresetNoticeSeconds - gameTime.ElapsedGameTime.TotalSeconds);
         KeyboardState keys = Keyboard.GetState();
+        // Dedicated modifier chord. Does not consume the existing F-keys,
+        // movement, sound, pause, or diagnostic shortcuts.
+        bool lightingChord = _ldtkLevelMode &&
+            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
+            (keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt));
+        if (lightingChord)
+        {
+            if (JustPressed(keys, Keys.D1))
+                _lightingEnabled = !_lightingEnabled;
+            if (JustPressed(keys, Keys.D2) && _lightingCatalog is not null)
+            {
+                string[] presets = new List<string>(_lightingCatalog.GetPresetIdsForScene(
+                    _ldtkLighting?.LevelId)).ToArray();
+                int i = Array.IndexOf(presets, _lightingPresetId);
+                _lightingPresetId = presets[(i + 1) % presets.Length];
+                _lightingPresetNoticeSeconds = 4;
+            }
+            if (JustPressed(keys, Keys.D3))
+                _lightingQuality = _lightingQuality switch
+                {
+                    LightingQuality.Low => LightingQuality.Balanced,
+                    LightingQuality.Balanced => LightingQuality.High,
+                    _ => LightingQuality.Low
+                };
+            if (JustPressed(keys, Keys.D4))
+                _reducedLightingFlashes = !_reducedLightingFlashes;
+            if (JustPressed(keys, Keys.D5))
+                _lightingStress = !_lightingStress;
+            if (JustPressed(keys, Keys.D6) &&
+                _ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
+                _lightingInspectionLight = !_lightingInspectionLight;
+        }
+        if (_lightingEvents is not null)
+        {
+            _lightingEvents.Enabled = _lightingEnabled;
+            _lightingEvents.Quality = _lightingQuality;
+            _lightingEvents.ReducedFlashes = _reducedLightingFlashes;
+        }
         // Presentation-only quick mute, leaving existing F12/F6 gym and menu
         // shortcuts untouched. Ctrl+Shift+M toggles all SFX and ambience.
         bool audioMuteChord = JustPressed(keys, Keys.M) &&
@@ -519,10 +805,19 @@ public sealed class Game1 : Game
             _paused = _flow.IsGameplaySuspended;
             _titleRefreshCounter = 6;
         }
-        if (changedScene) ActivateParticleWorld();
+        if (changedScene)
+        {
+            ActivateParticleWorld();
+            ActivateLightingWorld();
+            // Construct after the scene has committed. The lab shares the
+            // normal menu, but its GPU resources are presentation-owned.
+            if (IsLightingBasicsScene)
+                _lightingBasicsLab ??= new BasicLightingLab(GraphicsDevice, Content);
+        }
         // UI cosmetic clock continues during menus/covered scene transitions.
         // World cosmetics freeze whenever the authoritative world is suspended.
         _particleVfx?.Presenter.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused);
+        _lightingEvents?.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused);
         // Use committed player location for cosmetic culling; no world mutation.
         if (_particleVfx is not null && _worldClockTest is WorldSession particleWorld &&
             particleWorld.HasPlayer(1))
@@ -561,6 +856,12 @@ public sealed class Game1 : Game
                 ? GameLevelIds.SharedWorld : GameLevelIds.MotionLab);
         if (_worldClockTest is not null && JustPressed(keys, Keys.T))
             _flow.RequestRestart();
+        // Lighting chords must not double as developer level-switch digits.
+        // Route and LDtk shortcuts respond to *plain* 1/2/3 only.
+        bool unmodifiedLevelDigit =
+            !(keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl) ||
+              keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt) ||
+              keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
         // Direct route-debug shortcuts still use the real, validated exit
         // mapping. One changes level only at this safe game-loop boundary.
         if (_routeLabMode && _flow.Scenes.ActiveDestination is SceneDestination currentRoute)
@@ -591,7 +892,8 @@ public sealed class Game1 : Game
                     _lastRouteStatus = "TEST: NEXT ROUTE PREPARATION WILL FAIL";
                 }
             }
-            int? selectedGate = JustPressed(keys, Keys.D1) ? RouteLevelGym.LeftGateId :
+            int? selectedGate = !unmodifiedLevelDigit ? null :
+                JustPressed(keys, Keys.D1) ? RouteLevelGym.LeftGateId :
                 JustPressed(keys, Keys.D2) ? RouteLevelGym.RightGateId : null;
             if (selectedGate is int gate &&
                 RouteLevelGym.Catalog.TryResolveExit(currentRoute, gate,
@@ -605,7 +907,7 @@ public sealed class Game1 : Game
         // Developer inspection of an LDtk exit without needing to traverse an
         // unfinished art-level layout. Gameplay trigger crossings use the
         // exact same validated exit destinations through committed events.
-        if (_ldtkConnectedLevel is LdtkConnectedLevel authoredLevel &&
+        if (unmodifiedLevelDigit && _ldtkConnectedLevel is LdtkConnectedLevel authoredLevel &&
             _flow.Scenes.ActiveDestination is SceneDestination authoredDestination)
         {
             int index = JustPressed(keys, Keys.D1) ? 0 :
@@ -915,6 +1217,7 @@ public sealed class Game1 : Game
                     // A01: only post-commit world events create game audio.
                     // This never calls from WorldSession.Step() or a solver.
                     _audioEvents?.Present(gameplayEvent);
+                    _lightingEvents?.Present(gameplayEvent);
                     if (gameplayEvent.Kind == WorldGameplayEventKind.CharacterStateRequestDenied)
                         _latestStateFeedback = "DENIED P" + gameplayEvent.PlayerId + " " +
                             gameplayEvent.StateRequestKind + " " + gameplayEvent.Rejection;
@@ -979,6 +1282,10 @@ public sealed class Game1 : Game
                     if (_recentWorldEvents.Count > 8)
                         _recentWorldEvents.RemoveAt(0);
                 }
+                // A moving Pulse's light must use the newly committed player
+                // position, not the frozen position of the activation event.
+                // Presentation-only: no feedback to the movement simulation.
+                _lightingEvents?.FollowCommittedPlayers(committed);
             }
             else
             {
@@ -1006,6 +1313,30 @@ public sealed class Game1 : Game
     {
         using var diagnosticDrawScope = _diagnostics?.MonitorOperation("Game1.Draw");
         GraphicsDevice.Clear(new Color(18, 23, 35));
+        if (_lightingBasicsLab is BasicLightingLab basicsLab &&
+            (_lightingBasicsMode || IsLightingBasicsScene) &&
+            _spriteBatch is not null && _pixel is not null)
+        {
+            basicsLab.Draw(_spriteBatch, _pixel);
+            if (!_lightingBasicsMode)
+            {
+                // Menu overlays and transition curtain are drawn above the
+                // inspector, exactly as in ordinary gameplay scenes.
+                _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                if (_flow.IsMenuOpen) DrawFlowMenu(_spriteBatch, _pixel);
+                DrawTransitionCurtain(_spriteBatch, _pixel);
+                _spriteBatch.End();
+            }
+            base.Draw(gameTime);
+            return;
+        }
+        if (_materialWorkbench is SurfaceMaterialWorkbench materialLab &&
+            _spriteBatch is not null && _pixel is not null)
+        {
+            materialLab.Draw(_spriteBatch, _pixel);
+            base.Draw(gameTime);
+            return;
+        }
         if (_lightingPlayground is LightingPlayground lightingLab &&
             _spriteBatch is not null && _pixel is not null)
         {
@@ -1023,6 +1354,12 @@ public sealed class Game1 : Game
         if (_spriteBatch is not null && _pixel is not null)
         {
             _particleVfx?.BeginFrame();
+            bool lightingWorldActive = _gameLighting is not null &&
+                _lightingCatalog is not null && _lightingEvents?.Scene is not null &&
+                _lightingEnabled && _ldtkLevelMode && _ldtkLevel is not null &&
+                _worldClockTest is not null && _flow.ActiveScene == MajorSceneKind.Gameplay;
+            // L02 captures each authored render depth plane individually, so
+            // the active layer (not the whole scene) is the light receiver.
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             bool showFullHud = _debugHudMode == GameDebugHudMode.Full;
             if (_flow.ActiveScene == MajorSceneKind.Title)
@@ -1047,12 +1384,32 @@ public sealed class Game1 : Game
                             ParticleViewportAdapters.FromLdtkCamera(camera);
                         Action<ParticleVisualLayer>? layerHook = _particleVfx is null
                             ? null : layer => _particleVfx.DrawLayer(_spriteBatch, particleView, layer);
+                        LightingArtPreset? art = lightingWorldActive
+                            ? _lightingCatalog!.GetPreset(_lightingPresetId) : null;
+                        IReadOnlyList<RadialLight> lights = lightingWorldActive
+                            ? _lightingEvents!.BuildVisible(
+                                GameplayLightingRenderer.View(camera), EnumerateParticleLights(),
+                                LightingStressCandidates(camera))
+                            : Array.Empty<RadialLight>();
+                        if (lightingWorldActive)
+                            _gameLighting!.BeginLayeredFrame(lights,
+                                LightingFrameBudget.For(_lightingQuality));
                         LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
                             _ldtkDrawCollisionBackdrop, _ldtkConnectedLevel,
                             camera, _ldtkCharacterAnimations, _ldtkCharacterSprites,
-                            layerHook);
+                            layerHook,
+                            null,
+                            lightingWorldActive ? _ldtkLighting : null,
+                            lightingWorldActive ? id => ShadeGameplaySurface(id, lights, art!) : null,
+                            lightingWorldActive ? point => ShadeGameplayHero(point, lights, art!) : null,
+                            lightingWorldActive ? _gameLighting!.ContactShadowTexture : null,
+                            lightingWorldActive ? () => _gameLighting!.BeginLayer() : null,
+                            lightingWorldActive ? (view, layer) => _gameLighting!.ComposeLayer(
+                                _spriteBatch, view, lights, _ldtkLighting!.Occluders,
+                                art!, LightingFrameBudget.For(_lightingQuality), layer) : null,
+                            lightingWorldActive ? () => _gameLighting!.EndLayeredFrame(_spriteBatch) : null);
                     }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
                         MovementGymRenderer.DrawAuthoredWorld(
@@ -1144,6 +1501,30 @@ public sealed class Game1 : Game
                     "P04 PARTICLES UNAVAILABLE - " +
                     (_particleWarning.Length > 58 ? _particleWarning[..58] : _particleWarning),
                     new Color(255, 189, 112), 1);
+            if (_gameLighting is not null && _lightingEvents is not null &&
+                _ldtkLevelMode && _debugHudMode == GameDebugHudMode.Full)
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 170),
+                    "L456 LIGHTS " + _gameLighting.LastLights +
+                    " SHADOWS " + _gameLighting.LastShadowLights +
+                    " TRI " + _gameLighting.LastShadowTriangles +
+                    " CPU AVG/PEAK " + _gameLighting.AverageSubmitMilliseconds.ToString("F2") +
+                    "/" + _gameLighting.PeakSubmitMilliseconds.ToString("F2") +
+                    "  PRESET " + _lightingPresetId +
+                    "  QUALITY " + _lightingQuality +
+                    "  STRESS " + (_lightingStress ? "ON" : "OFF"),
+                    new Color(184, 208, 255), 1);
+            if (_lightingPresetNoticeSeconds > 0 &&
+                _ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
+                GymDebugText.Draw(_spriteBatch, _pixel, 14, 120,
+                    "FLAT LIGHTING: " + _lightingPresetId.ToUpperInvariant() +
+                    "  (CTRL ALT 2: SWITCH)", new Color(255, 221, 159), 1);
+            if (_lightingWarning is not null)
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 189),
+                    "L456 LIGHTING UNAVAILABLE - " +
+                        (_lightingWarning.Length > 55 ? _lightingWarning[..55] : _lightingWarning),
+                    new Color(255, 189, 112), 1);
             if (_diagnostics is not null)
             {
                 // Minimal always-available report UI, including when Title or
@@ -1161,6 +1542,15 @@ public sealed class Game1 : Game
 
     protected override void UnloadContent()
     {
+        _gameLighting?.Dispose();
+        _gameLighting = null;
+        _lightingEvents?.Clear();
+        _lightingEvents = null;
+        _lightingCatalog = null;
+        _materialWorkbench?.Dispose();
+        _materialWorkbench = null;
+        _lightingBasicsLab?.Dispose();
+        _lightingBasicsLab = null;
         _lightingPlayground?.Dispose();
         _lightingPlayground = null;
         _particlePlayground?.Dispose();
@@ -1242,7 +1632,8 @@ public sealed class Game1 : Game
         string? levelId, LdtkImportedLevel? importedLdtk = null,
         LdtkVisualSceneAssets? visuals = null,
         LdtkConnectedLevel? connectedLdtk = null,
-        LdtkParticleSceneDefinition? particleZones = null)
+        LdtkParticleSceneDefinition? particleZones = null,
+        LdtkLightingScene? lighting = null)
     {
         _gym = gym;
         _worldClockTest = world;
@@ -1258,6 +1649,7 @@ public sealed class Game1 : Game
         _ldtkLevel = importedLdtk;
         _ldtkConnectedLevel = connectedLdtk;
         _ldtkParticleZones = particleZones;
+        _ldtkLighting = lighting;
         _ldtkActiveWindIds.Clear();
         _ldtkWindDirty = false;
         _lastLdtkInteraction = "NONE";
@@ -1305,7 +1697,8 @@ public sealed class Game1 : Game
             if (host._ldtkCatalog.Supports(destination)) return true;
             return destination.EntranceId == GameLevelIds.DefaultEntrance &&
                 destination.LevelId is (GameLevelIds.MovementGym or
-                    GameLevelIds.SharedWorld or GameLevelIds.AuthoredWorld or GameLevelIds.MotionLab);
+                    GameLevelIds.SharedWorld or GameLevelIds.AuthoredWorld or
+                    GameLevelIds.MotionLab or GameLevelIds.LightingBasics);
         }
 
         public bool TryPrepare(MajorSceneKind kind, SceneDestination? destination,
@@ -1339,6 +1732,7 @@ public sealed class Game1 : Game
                         host._ldtkLevel = null;
                         host._ldtkConnectedLevel = null;
                         host._ldtkParticleZones = null;
+                        host._ldtkLighting = null;
                         host._ldtkActiveWindIds.Clear();
                         host._ldtkVisuals = null;
                         host._ldtkCamera = null;
@@ -1367,6 +1761,7 @@ public sealed class Game1 : Game
             LdtkConnectedLevel? preparedConnectedLdtk = null;
             LdtkVisualSceneAssets? preparedVisuals = null;
             LdtkParticleSceneDefinition? preparedParticleZones = null;
+            LdtkLightingScene? preparedLighting = null;
             WorldSession? preparedLdtkWorld = null;
             if (host._ldtkCatalog.Supports(destination!))
             {
@@ -1379,6 +1774,7 @@ public sealed class Game1 : Game
                     importedLdtk = content.Imported;
                     preparedConnectedLdtk = content.Connected;
                     preparedParticleZones = content.ParticleZones;
+                    preparedLighting = content.Lighting;
                     if (content.Visuals.TileCount > 0 || content.Scenery.SpriteCount > 0 ||
                         content.Terrain.ArtworkCount > 0)
                         preparedVisuals = new LdtkVisualSceneAssets(
@@ -1423,7 +1819,7 @@ public sealed class Game1 : Game
                 {
                     host.ActivatePreparedScene(preparedGym, preparedWorld,
                         destination.LevelId, importedLdtk, preparedVisuals, preparedConnectedLdtk,
-                        preparedParticleZones);
+                        preparedParticleZones, preparedLighting);
                     preparedSession.EnterLevel(destination, preparedWorld?.PlayerSlots);
                     host._gameplaySession = preparedSession;
                 }, preparedVisuals);
@@ -2031,6 +2427,12 @@ public sealed class Game1 : Game
         {
             Window.Title = "PlatformerSandbox | " + _flow.CurrentMenu +
                 " | Simulation frozen | P/Start Resume | Esc/B Back";
+            return;
+        }
+        if (IsLightingBasicsScene)
+        {
+            Window.Title = "PlatformerSandbox | LIGHTING BASICS | " +
+                "Click inspector for controls | Esc Pause";
             return;
         }
         if (_worldClockTest is WorldSession world)

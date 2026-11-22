@@ -1,0 +1,330 @@
+// PlatformerSandbox Lighting Basics — Stage 8 bounded convex polygon occlusion.
+// The material response from Stage 5 is retained; hard visibility is evaluated
+// independently PER LIGHT (ambient is never shadowed). This is a deliberate
+// three-shape lab fixture, not arbitrary production shadow geometry.
+// DesktopGL ps_3_0: no POSITION/SV_POSITION pixel-shader semantic.
+#if OPENGL
+    #define PS_SHADERMODEL ps_3_0
+#else
+    #define PS_SHADERMODEL ps_4_0_level_9_1
+#endif
+
+Texture2D SpriteTexture;
+sampler2D SpriteTextureSampler = sampler_state
+{
+    Texture = <SpriteTexture>;
+    MinFilter = POINT;
+    MagFilter = POINT;
+    MipFilter = NONE;
+    AddressU = CLAMP;
+    AddressV = CLAMP;
+};
+Texture2D NormalMap;
+sampler2D NormalSampler = sampler_state
+{
+    Texture = <NormalMap>;
+    MinFilter = POINT;
+    MagFilter = POINT;
+    MipFilter = NONE;
+    AddressU = CLAMP;
+    AddressV = CLAMP;
+};
+Texture2D EdgeMap;
+sampler2D EdgeSampler = sampler_state
+{
+    Texture = <EdgeMap>;
+    MinFilter = POINT;
+    MagFilter = POINT;
+    MipFilter = NONE;
+    AddressU = CLAMP;
+    AddressV = CLAMP;
+};
+
+float2 ViewportPixels;
+float3 AmbientRgb;
+float ShadingMode;             // Flat=0, Normal=1, Rim=2, Hybrid=3
+float NormalStrength;
+float RimStrength;
+float4 Light0PositionRadius;   // x, y, radius in pixels, virtual height in pixels
+float4 Light1PositionRadius;
+float4 Light0ColorIntensity;  // RGB and brightness (zero means disabled)
+float4 Light1ColorIntensity;
+
+// Stage 8: three bounded convex polygons (rectangle/triangle/trapezoid).
+// Two packed xy-pairs per shape; unused fourth vertex of triangle duplicates C.
+// The CPU binds these on EVERY draw, including empty slots.
+float4 ShadowPoly0AB;
+float4 ShadowPoly0CD;
+float4 ShadowPoly1AB;
+float4 ShadowPoly1CD;
+float4 ShadowPoly2AB;
+float4 ShadowPoly2CD;
+float4 ShadowVertexCounts;      // per polygon slot: 0, 3 or 4
+float4 ShadowSlotEnable;       // per polygon slot on/off
+float4 ShadowSettings;         // per-light cast0, cast1, receiver, any-blocker
+float DebugOutputMode;
+float DebugLightIndex;
+// Per-wall draw only: x/y mark which overlapping lights are behind this wall.
+// z = inside-rim width in pixels; w = rim intensity. Zero x/y for all other
+// surfaces. Wall shadows still use PolygonVisibility independently per light.
+float4 WallOverlapSettings;
+// Per currently shaded wall: x/y = light origin inside its silhouette,
+// z/w = wall silhouette center in SCREEN PIXELS. These are reset for every draw.
+float4 WallRimContext;
+// The exact polygon for the CURRENTLY drawn wall, in screen pixels. This is
+// separate from the three global shadow occluders (which affect other surfaces).
+// Winding is clockwise in screen coordinates (Y down), so outward is (dy,-dx).
+float4 WallRimPolygonAB;
+float4 WallRimPolygonCD;
+float WallRimPolygonCount;
+// Index in the compact active shadow array of the wall currently being drawn.
+// -1 for non-wall surfaces. Only that wall is exempt from blocking its OWN rim.
+float WallRimSelfSlot;
+
+// A convex polygon is the intersection of its inward-facing half planes.
+// Clip the light-to-pixel segment to each half plane; this handles triangle,
+// trapezoid and rectangle with the same analytic per-light visibility logic.
+float Cross2(float2 a, float2 b) { return a.x * b.y - a.y * b.x; }
+
+float3 ClipEdge(float2 light, float2 pixel, float2 a, float2 b, float3 interval)
+{
+    if (interval.z < 0.5) return interval;
+    float2 edge = b - a;
+    float signedStart = Cross2(edge, light - a);
+    float gradient = Cross2(edge, pixel - light);
+    if (abs(gradient) < 0.000001)
+    {
+        if (signedStart <= 0.000001) interval.z = 0.0;
+        return interval;
+    }
+    float limit = -signedStart / gradient;
+    if (gradient > 0.0) interval.x = max(interval.x, limit);
+    else interval.y = min(interval.y, limit);
+    if (interval.y < interval.x) interval.z = 0.0;
+    return interval;
+}
+
+float PointInsidePolygon(float2 p, float2 a, float2 b, float2 c, float2 d, float count)
+{
+    if (Cross2(b-a,p-a) < -0.00001 || Cross2(c-b,p-b) < -0.00001)
+        return 0.0;
+    if (count < 3.5)
+        return Cross2(a-c,p-c) >= -0.00001 ? 1.0 : 0.0;
+    return Cross2(d-c,p-c) >= -0.00001 && Cross2(a-d,p-d) >= -0.00001
+        ? 1.0 : 0.0;
+}
+
+float PolygonVisibility(float2 light, float2 pixel, float4 ab, float4 cd, float count)
+{
+    if (count < 2.5) return 1.0;
+    float2 a = ab.xy, b = ab.zw, c = cd.xy, d = cd.zw;
+    // Self-shadowing and light-inside cases intentionally stay unshadowed in
+    // this flat 2D lab, until the explicit depth model is introduced.
+    if (PointInsidePolygon(light,a,b,c,d,count) > 0.5 ||
+        PointInsidePolygon(pixel,a,b,c,d,count) > 0.5) return 1.0;
+    float3 clip = float3(0.0, 1.0, 1.0);
+    clip = ClipEdge(light,pixel,a,b,clip);
+    clip = ClipEdge(light,pixel,b,c,clip);
+    if (count > 3.5)
+    {
+        clip = ClipEdge(light,pixel,c,d,clip);
+        clip = ClipEdge(light,pixel,d,a,clip);
+    }
+    else clip = ClipEdge(light,pixel,c,a,clip);
+    if (clip.z > 0.5 && clip.y > clip.x + 0.00001 &&
+        clip.x < 0.99999 && clip.y > 0.00001) return 0.0;
+    return 1.0;
+}
+
+// One visibility calculation per light, shared by diffuse and back-rim.
+// The wall face opts out of regular projected shadows, but its back-rim must
+// still trace against OTHER active walls. Skip only its exact compact GPU slot.
+// Reusing this visibility avoids doubling the polygon clipping cost on ps_3_0.
+float VisibilityForLight(float2 lightPosition, float2 receiverPosition,
+    float casts, float backRimReceiver)
+{
+    if (ShadowSettings.w < 0.5 || casts < 0.5 ||
+        (ShadowSettings.z < 0.5 && backRimReceiver < 0.5))
+        return 1.0;
+    float result = 1.0;
+    if (ShadowSlotEnable.x > 0.5 &&
+        (backRimReceiver < 0.5 || abs(WallRimSelfSlot - 0.0) > 0.5))
+        result = min(result, PolygonVisibility(lightPosition, receiverPosition,
+            ShadowPoly0AB, ShadowPoly0CD, ShadowVertexCounts.x));
+    if (ShadowSlotEnable.y > 0.5 &&
+        (backRimReceiver < 0.5 || abs(WallRimSelfSlot - 1.0) > 0.5))
+        result = min(result, PolygonVisibility(lightPosition, receiverPosition,
+            ShadowPoly1AB, ShadowPoly1CD, ShadowVertexCounts.y));
+    if (ShadowSlotEnable.z > 0.5 &&
+        (backRimReceiver < 0.5 || abs(WallRimSelfSlot - 2.0) > 0.5))
+        result = min(result, PolygonVisibility(lightPosition, receiverPosition,
+            ShadowPoly2AB, ShadowPoly2CD, ShadowVertexCounts.z));
+    return result;
+}
+
+void EvaluateLight(float2 screenPosition, float3 normal, float2 edgeNormal,
+    float edgeEligibility, float useNormals, float useRim,
+    float4 positionRadius, float4 colorIntensity, float visibility,
+    out float3 diffuseEnergy, out float3 rimEnergy)
+{
+    float2 toLight = positionRadius.xy - screenPosition;
+    float radius = max(1.0, positionRadius.z);
+    float distanceToLight = length(toLight);
+    float falloff = saturate(1.0 - distanceToLight / radius);
+    float3 energy = colorIntensity.rgb * (colorIntensity.a * falloff * falloff * visibility);
+    float3 unitLight = normalize(float3(toLight, max(1.0, positionRadius.w)));
+    float directional = lerp(1.0, saturate(dot(normal, unitLight)), useNormals * NormalStrength);
+    diffuseEnergy = energy * directional;
+    float2 planarDirection = toLight / max(0.0001, distanceToLight);
+    float facing = saturate(dot(edgeNormal, planarDirection));
+    rimEnergy = energy * facing * edgeEligibility * RimStrength * useRim;
+}
+
+// Analytic silhouette rim: measure perpendicular distance to the actual
+// polygon SEGMENTS, not alpha samples at horizontal/vertical texture offsets.
+// x = distance to segment in screen pixels; y = signed facing cosine.
+float2 BackRimEdgeSample(float2 pixelPos, float2 a, float2 b,
+    float2 lightPos, float2 insideDirection, float originInside)
+{
+    float2 segment = b - a;
+    float lenSquared = max(0.0001, dot(segment, segment));
+    float t = saturate(dot(pixelPos - a, segment) / lenSquared);
+    float2 nearestPoint = a + t * segment;
+    float2 outward = float2(segment.y, -segment.x) * rsqrt(lenSquared);
+    // Outside light: use this edge's true outward normal and the light's
+    // position relative to its nearest boundary point. This eliminates
+    // midpoint-based light-facing errors on angled segments and near corners.
+    // Inside light: use its displacement from the polygon centroid as the
+    // artistic direction. A truly centered light has no preferred rim side.
+    float2 towardLight = originInside > 0.5
+        ? insideDirection : (lightPos - nearestPoint);
+    float towardLen = length(towardLight);
+    float facing = towardLen > 2.0 ? dot(outward, towardLight / towardLen) : 0.0;
+    return float2(length(pixelPos - nearestPoint), facing);
+}
+
+float BackWallRimFactor(float2 pixelPos, float2 lightPos, float originInside)
+{
+    if (WallRimPolygonCount < 2.5) return 0.0;
+    float2 a = WallRimPolygonAB.xy;
+    float2 b = WallRimPolygonAB.zw;
+    float2 c = WallRimPolygonCD.xy;
+    float2 d = WallRimPolygonCD.zw;
+    float2 innerDirection = lightPos - WallRimContext.zw;
+    // Find the nearest edge of the ENTIRE polygon, including unlit sides.
+    // Also track nearby back-facing edges: at convex corners, a light-facing
+    // edge must never smear a highlight onto its shadow-facing neighbor.
+    float2 nearest = BackRimEdgeSample(pixelPos, a, b,
+        lightPos, innerDirection, originInside);
+    float nearestDark = nearest.y <= 0.15 ? nearest.x : 99999.0;
+    float2 sample = BackRimEdgeSample(pixelPos, b, c,
+        lightPos, innerDirection, originInside);
+    if (sample.x < nearest.x) nearest = sample;
+    if (sample.y <= 0.15) nearestDark = min(nearestDark, sample.x);
+    if (WallRimPolygonCount > 3.5)
+    {
+        sample = BackRimEdgeSample(pixelPos, c, d,
+            lightPos, innerDirection, originInside);
+        if (sample.x < nearest.x) nearest = sample;
+        if (sample.y <= 0.15) nearestDark = min(nearestDark, sample.x);
+        sample = BackRimEdgeSample(pixelPos, d, a,
+            lightPos, innerDirection, originInside);
+        if (sample.x < nearest.x) nearest = sample;
+        if (sample.y <= 0.15) nearestDark = min(nearestDark, sample.x);
+    }
+    else
+    {
+        sample = BackRimEdgeSample(pixelPos, c, a,
+            lightPos, innerDirection, originInside);
+        if (sample.x < nearest.x) nearest = sample;
+        if (sample.y <= 0.15) nearestDark = min(nearestDark, sample.x);
+    }
+    float widthPx = max(0.5, WallOverlapSettings.z);
+    // Two edges within ~2px of one another form a corner. Honor the dark
+    // side there, rather than leaking across a diagonal/grazing corner.
+    if (nearestDark <= nearest.x + 2.0 && nearestDark <= widthPx + 2.0)
+        return 0.0;
+    float band = 1.0 - smoothstep(0.0, widthPx, nearest.x);
+    float facing = smoothstep(0.20, 0.50, nearest.y);
+    return band * facing;
+}
+
+float3 BackWallLight(float2 screenPosition, float4 positionRadius,
+    float4 colorIntensity)
+{
+    float radius = max(1.0, positionRadius.z);
+    float falloff = saturate(1.0 - length(positionRadius.xy - screenPosition) / radius);
+    return colorIntensity.rgb * (colorIntensity.a * falloff * falloff);
+}
+
+float4 MainPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float2 pixelPos = uv * ViewportPixels;
+    float visibility0 = VisibilityForLight(Light0PositionRadius.xy, pixelPos,
+        ShadowSettings.x, WallOverlapSettings.x);
+    float visibility1 = VisibilityForLight(Light1PositionRadius.xy, pixelPos,
+        ShadowSettings.y, WallOverlapSettings.y);
+
+    // Debug views share EXACTLY the same per-light visibility calculation as
+    // final shading. They do not apply per-surface normal/rim modifiers.
+    if (DebugOutputMode > 0.5 && DebugOutputMode < 1.5)
+    {
+        float v = DebugLightIndex > 0.5 ? visibility1 : visibility0;
+        return float4(v, v, v, 1);
+    }
+
+    float4 albedo = tex2D(SpriteTextureSampler, uv) * vertexColor;
+    float4 sampledNormal = tex2D(NormalSampler, uv);
+    float3 n = sampledNormal.xyz * 2.0 - 1.0;
+    n = normalize(float3(n.xy * NormalStrength, max(0.001, n.z)));
+    float4 edge = tex2D(EdgeSampler, uv);
+    float2 e = edge.xy * 2.0 - 1.0;
+    e = e / max(0.0001, length(e));
+    float useNormal = (ShadingMode > 0.5 && ShadingMode < 1.5) || (ShadingMode > 2.5) ? 1.0 : 0.0;
+    float useRim = ShadingMode > 1.5 ? 1.0 : 0.0;
+    float3 diffuse0, rim0, diffuse1, rim1;
+    EvaluateLight(pixelPos, n, e, edge.a, useNormal, useRim,
+        Light0PositionRadius, Light0ColorIntensity, visibility0, diffuse0, rim0);
+    EvaluateLight(pixelPos, n, e, edge.a, useNormal, useRim,
+        Light1PositionRadius, Light1ColorIntensity, visibility1, diffuse1, rim1);
+
+    // When a light is authored BEHIND this intersected wall, it cannot
+    // illuminate the visible face. Other lights and ambient are unaffected.
+    float back0 = saturate(WallOverlapSettings.x);
+    float back1 = saturate(WallOverlapSettings.y);
+    diffuse0 *= 1.0 - back0;
+    diffuse1 *= 1.0 - back1;
+    rim0 *= 1.0 - back0;
+    rim1 *= 1.0 - back1;
+    float3 backRim = float3(0, 0, 0);
+    if (back0 + back1 > 0.5)
+    {
+        // Reuse the same per-light shadow visibility already computed above.
+        // On a back-rim receiver it excludes only this wall's shadow slot and
+        // correctly accounts for all other enabled casting occluders.
+        float3 lightRims =
+            back0 * visibility0 * BackWallRimFactor(pixelPos, Light0PositionRadius.xy,
+                WallRimContext.x) * BackWallLight(pixelPos, Light0PositionRadius, Light0ColorIntensity) +
+            back1 * visibility1 * BackWallRimFactor(pixelPos, Light1PositionRadius.xy,
+                WallRimContext.y) * BackWallLight(pixelPos, Light1PositionRadius, Light1ColorIntensity);
+        backRim = WallOverlapSettings.w * lightRims;
+    }
+
+    if (DebugOutputMode > 1.5 && DebugOutputMode < 2.5)
+        return float4(saturate(AmbientRgb + diffuse0 + diffuse1), 1);
+    if (DebugOutputMode > 2.5)
+        return float4(saturate(DebugLightIndex > 0.5 ? diffuse1 : diffuse0), 1);
+
+    float3 illumination = AmbientRgb + diffuse0 + diffuse1;
+    // Albedo was captured premultiplied by alpha; rim must be alpha-gated.
+    float3 rgb = saturate(albedo.rgb * illumination + albedo.a * (rim0 + rim1 + backRim));
+    return float4(rgb, albedo.a);
+}
+
+technique SpriteDrawing
+{
+    pass P0
+    {
+        PixelShader = compile PS_SHADERMODEL MainPS();
+    }
+}

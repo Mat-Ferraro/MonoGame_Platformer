@@ -75,7 +75,7 @@ public sealed class GameLevelSelectionTests
             GameLevelIds.LdtkConnectedA, GameLevelIds.LdtkConnectedB,
             GameLevelIds.MovementGym, GameLevelIds.SharedWorld,
             GameLevelIds.AuthoredWorld, GameLevelIds.MotionLab,
-            GameLevelIds.RouteA, GameLevelIds.RouteB
+            GameLevelIds.RouteA, GameLevelIds.RouteB, GameLevelIds.LightingBasics
         ];
         Assert.Equal(required.Length, flow.MenuItems.Count);
         foreach (string level in required)

@@ -6,10 +6,13 @@ namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 public sealed record LightingOccluder
 {
     public string Id { get; init; } = "";
+    /// <summary>Presentation depth plane that owns this occluder.</summary>
+    public string LayerId { get; init; } = "PLAYER";
     public LightPoint[] Vertices { get; init; } = Array.Empty<LightPoint>();
     public void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Id) || Vertices is null || Vertices.Length is < 3 or > 64)
+        if (string.IsNullOrWhiteSpace(Id) || !SceneLightingLayer.IsId(LayerId) ||
+            Vertices is null || Vertices.Length is < 3 or > 64)
             throw new ArgumentException("An occluder requires a name and 3–64 polygon vertices.");
         foreach (LightPoint p in Vertices) p.Validate();
         if (Math.Abs(ShadowGeometry.SignedDoubleArea(Vertices)) < 1e-9)
@@ -82,8 +85,13 @@ public static class ShadowGeometry
         source.Validate(); sample.Validate();
         foreach (LightingOccluder blocker in blockers)
         {
-            if (Contains(blocker, source)) continue; // undefined inside hull: safe unshadowed fallback
-            if (Contains(blocker, sample)) return true;
+            // Light inside a solid: the first exit surface blocks every
+            // receiver outside that solid. Previously we ignored this blocker,
+            // which made a moving dash flash leak abruptly through a crate.
+            bool sourceInside = Contains(blocker, source);
+            bool sampleInside = Contains(blocker, sample);
+            if (sourceInside && !sampleInside) return true;
+            if (!sourceInside && sampleInside) return true;
             for (int i = 0; i < blocker.Vertices.Length; i++)
                 if (SegmentsIntersect(source, sample, blocker.Vertices[i],
                     blocker.Vertices[(i + 1) % blocker.Vertices.Length])) return true;

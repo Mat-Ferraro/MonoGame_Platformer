@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "defaultPreset": "Illustrated",
+  "presets": [
+    {
+      "id": "Illustrated",
+      "ambient": {
+        "r": 0.46,
+        "g": 0.53,
+        "b": 0.62
+      },
+      "lightMultiplier": 1.15,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0.2,
+      "posterize": false
+    },
+    {
+      "id": "Moonlit",
+      "ambient": {
+        "r": 0.24,
+        "g": 0.31,
+        "b": 0.46
+      },
+      "lightMultiplier": 1.4,
+      "atmosphericDarkness": 0.08,
+      "bloom": true,
+      "bloomStrength": 0.32,
+      "posterize": false
+    },
+    {
+      "id": "Graphic",
+      "ambient": {
+        "r": 0.42,
+        "g": 0.46,
+        "b": 0.51
+      },
+      "lightMultiplier": 1.25,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0,
+      "posterize": true
+    },
+    {
+      "id": "Readable",
+      "ambient": {
+        "r": 0.66,
+        "g": 0.71,
+        "b": 0.77
+      },
+      "lightMultiplier": 0.8,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0,
+      "posterize": false
+    },
+    {
+      "id": "FlatDramatic",
+      "ambient": {
+        "r": 0.09,
+        "g": 0.115,
+        "b": 0.16
+      },
+      "lightMultiplier": 2.65,
+      "lightRadiusScale": 0.78,
+      "heroMinimumBrightness": 0.34,
+      "atmosphericDarkness": 0.04,
+      "bloom": true,
+      "bloomStrength": 0.16,
+      "posterize": false,
+      "layerAmbientScales": {
+        "BG5": 0.56,
+        "BG4": 0.62,
+        "BG3": 0.7,
+        "BG2": 0.82,
+        "BG1": 1.0,
+        "PLAYER": 1.24,
+        "FG1": 0.3,
+        "FG2": 0.18,
+        "FG3": 0.09,
+        "FG4": 0.07,
+        "FG5": 0.04
+      },
+      "lightExposure": 2.3
+    },
+    {
+      "id": "FlatReadable",
+      "ambient": {
+        "r": 0.59,
+        "g": 0.66,
+        "b": 0.77
+      },
+      "lightMultiplier": 0.92,
+      "lightRadiusScale": 1.0,
+      "heroMinimumBrightness": 0.56,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0.0,
+      "posterize": false,
+      "layerAmbientScales": {
+        "BG5": 0.86,
+        "BG4": 0.88,
+        "BG3": 0.9,
+        "BG2": 0.92,
+        "BG1": 0.78,
+        "PLAYER": 0.84,
+        "FG1": 0.72,
+        "FG2": 0.48,
+        "FG3": 0.35,
+        "FG4": 0.28,
+        "FG5": 0.23
+      }
+    }
+  ],
+  "particleLights": [
+    {
+      "effectId": "fx.fire",
+      "color": {
+        "r": 1,
+        "g": 0.45,
+        "b": 0.13
+      },
+      "radius": 2.8,
+      "intensity": 1.1,
+      "priority": -2,
+      "castShadows": false
+    },
+    {
+      "effectId": "fx.zoneEmbers",
+      "color": {
+        "r": 1,
+        "g": 0.47,
+        "b": 0.2
+      },
+      "radius": 2.5,
+      "intensity": 0.6,
+      "priority": -3,
+      "castShadows": false
+    },
+    {
+      "effectId": "fx.spores",
+      "color": {
+        "r": 0.35,
+        "g": 0.9,
+        "b": 0.68
+      },
+      "radius": 2.7,
+      "intensity": 0.4,
+      "priority": -4,
+      "castShadows": false
+    },
+    {
+      "effectId": "fx.respawn",
+      "color": {
+        "r": 0.45,
+        "g": 1,
+        "b": 0.8
+      },
+      "radius": 2.0,
+      "intensity": 0.7,
+      "priority": -2,
+      "castShadows": false
+    }
+  ],
+  "globalPresetIds": [
+    "Illustrated",
+    "Moonlit",
+    "Graphic",
+    "Readable"
+  ],
+  "scenePresets": [
+    {
+      "sceneId": "LIGHTING_FLAT_TEST",
+      "defaultPreset": "FlatDramatic",
+      "presetIds": [
+        "FlatDramatic",
+        "FlatReadable"
+      ]
+    }
+  ]
+}

@@ -68,6 +68,13 @@ public class Builder : ContentBuilder
         //    }
         // );
 
+        // L03A: compile the GPU per-pixel material shader through the existing
+        // MonoGame code-first Content Builder, for the actual target backend.
+        content.Include("Effects/L03_SurfaceMaterial.fx");
+
+        // L-BASIC Stage 5: normal maps and directional rim lighting in the lab.
+        content.Include("Effects/L_BASIC_SurfaceLighting.fx");
+
         return content;
     }
 }

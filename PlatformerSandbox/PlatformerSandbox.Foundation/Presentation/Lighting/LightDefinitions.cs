@@ -45,9 +45,17 @@ public sealed record RadialLight
     public double Radius { get; init; } = 3.0;
     public double Intensity { get; init; } = 1.0;
     public bool CastShadows { get; init; }
+    /// <summary>Allows this light to reveal the front face of explicitly
+    /// silhouetted scenery. Ordinary lights leave silhouettes dark. This does
+    /// not change occluder geometry or an object's CastsShadows flag.</summary>
+    public bool RevealsSilhouettes { get; init; }
     public int Priority { get; init; } = 0;
     public LightChannel Channels { get; init; } = LightChannel.All;
     public string Owner { get; init; } = "scene";
+    /// <summary>Explicit scene-layer illumination targets. Null uses legacy channels.</summary>
+    public IReadOnlyList<string>? AffectsLayers { get; init; }
+    /// <summary>Independent list of depth planes whose blockers can shadow this light.</summary>
+    public IReadOnlyList<string>? OccluderLayers { get; init; }
 
     public void Validate()
     {
@@ -63,6 +71,11 @@ public sealed record RadialLight
             throw new ArgumentOutOfRangeException(nameof(Channels));
         if (Priority < -1000 || Priority > 1000)
             throw new ArgumentOutOfRangeException(nameof(Priority));
+        foreach (IReadOnlyList<string>? routing in new[] { AffectsLayers, OccluderLayers })
+            if (routing is not null && (routing.Count is < 1 or > 32 ||
+                routing.Any(id => !SceneLightingLayer.IsId(id)) ||
+                routing.Distinct(StringComparer.Ordinal).Count() != routing.Count))
+                throw new ArgumentException("Invalid light layer routing selection.");
     }
 }
 

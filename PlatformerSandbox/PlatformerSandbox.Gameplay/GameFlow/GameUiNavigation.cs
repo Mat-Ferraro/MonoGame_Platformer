@@ -49,6 +49,8 @@ public static class GameLevelMenuCatalog
                 new SceneDestination(GameLevelIds.AuthoredWorld)),
             new("GYM  /  MOTION LAB", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.MotionLab)),
+            new("LAB  /  LIGHTING BASICS", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.LightingBasics)),
         });
 
     public static IReadOnlyList<GameUiMenuItem> Items => _items;

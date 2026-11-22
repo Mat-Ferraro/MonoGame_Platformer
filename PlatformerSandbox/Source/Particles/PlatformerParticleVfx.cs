@@ -63,6 +63,20 @@ internal sealed class PlatformerParticleVfx : IDisposable
         _renderer = new MonoGameParticleRenderer(device);
     }
 
+    /// <summary>Only world-space effect instances may request cosmetic lights;
+    /// each effect contributes at most one candidate, not one light per particle.</summary>
+    public IEnumerable<(string EffectId, PlatformerSandbox.Foundation.Geometry.Vector2D Origin)> LightCandidates()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        foreach (ParticleCompositeInstance instance in Presenter.WorldInstances)
+            if (!instance.IsFinished)
+                yield return (instance.Definition.Id, instance.Origin);
+        if (_environment is not null)
+            foreach (ParticleCompositeInstance instance in _environment.Instances)
+                if (!instance.IsFinished)
+                    yield return (instance.Definition.Id, instance.Origin);
+    }
+
     public void BeginFrame()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

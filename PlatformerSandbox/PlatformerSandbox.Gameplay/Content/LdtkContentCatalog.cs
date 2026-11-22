@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using PlatformerSandbox.Gameplay.GameFlow;
+using PlatformerSandbox.Foundation.Presentation.Lighting;
 
 namespace PlatformerSandbox.Gameplay.Content;
 
@@ -23,7 +24,8 @@ public sealed record LdtkContentEntry(string LevelId, string Identifier,
 public sealed record LdtkPreparedContent(string FilePath, LdtkImportedLevel Imported,
     LdtkConnectedLevel Connected, LdtkVisualDefinition Visuals,
     LdtkSceneryDefinition Scenery, LdtkTerrainArtworkDefinition Terrain,
-    LdtkParticleSceneDefinition? ParticleZones = null);
+    LdtkParticleSceneDefinition? ParticleZones = null,
+    LdtkLightingScene? Lighting = null);
 
 /// <summary>
 /// Headless discovery and validation of every embedded level in Content/Levels.
@@ -36,10 +38,13 @@ public sealed class LdtkContentCatalog
     private readonly IReadOnlyDictionary<string, LdtkContentEntry> _entries;
     private readonly IReadOnlyDictionary<string, string> _rejected;
     private readonly LdtkEntityImportRegistry _entityHandlers;
+    private readonly SceneLightingLayerCatalog _layerSettings;
     private LdtkContentCatalog(Dictionary<string, LdtkContentEntry> entries,
-        Dictionary<string, string> rejected, LdtkEntityImportRegistry entityHandlers)
+        Dictionary<string, string> rejected, LdtkEntityImportRegistry entityHandlers,
+        SceneLightingLayerCatalog layerSettings)
     {
         _entityHandlers = entityHandlers;
+        _layerSettings = layerSettings;
         _entries = new ReadOnlyDictionary<string, LdtkContentEntry>(entries);
         _rejected = new ReadOnlyDictionary<string, string>(rejected);
     }
@@ -51,9 +56,11 @@ public sealed class LdtkContentCatalog
         entry.Entrances.Contains(destination.EntranceId, StringComparer.Ordinal);
 
     public static LdtkContentCatalog Discover(string contentLevelsDirectory,
-        LdtkEntityImportRegistry? entityHandlers = null)
+        LdtkEntityImportRegistry? entityHandlers = null,
+        SceneLightingLayerCatalog? layerSettings = null)
     {
         entityHandlers ??= LdtkEntityImportRegistry.CreateDefault();
+        layerSettings ??= SceneLightingLayerCatalog.Standard();
         if (string.IsNullOrWhiteSpace(contentLevelsDirectory))
             throw new ArgumentException("Content/Levels directory is required.", nameof(contentLevelsDirectory));
         string directory = Path.GetFullPath(contentLevelsDirectory);
@@ -84,6 +91,8 @@ public sealed class LdtkContentCatalog
                     LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, level.LevelId);
                     LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, level.LevelId);
                     LdtkParticleZoneImporter.FromJson(json, level.LevelId);
+                    LdtkLightingImporter.FromJson(json, level.LevelId,
+                        layerSettings.ForScene(level.LevelId));
                     if (visuals.LevelId != level.LevelId || scenery.LevelId != level.LevelId ||
                         terrain.LevelId != level.LevelId)
                         throw new ArgumentException("Authored presentation IDs differ from world: " + level.LevelId);
@@ -99,7 +108,7 @@ public sealed class LdtkContentCatalog
                 errors[Path.GetFileName(file)] = ex.Message;
             }
         }
-        return new LdtkContentCatalog(entries, errors, entityHandlers);
+        return new LdtkContentCatalog(entries, errors, entityHandlers, layerSettings);
     }
 
     /// <summary>Freshly reload and revalidate selected content at the safe scene-preparation boundary.</summary>
@@ -119,10 +128,12 @@ public sealed class LdtkContentCatalog
         LdtkSceneryDefinition scenery = LdtkSceneryImporter.FromJson(json, entry.Identifier);
         LdtkTerrainArtworkDefinition terrain = LdtkTerrainArtworkImporter.FromJson(json, entry.Identifier);
         LdtkParticleSceneDefinition particles = LdtkParticleZoneImporter.FromJson(json, entry.Identifier);
+        LdtkLightingScene lighting = LdtkLightingImporter.FromJson(json, entry.Identifier,
+            _layerSettings.ForScene(entry.Identifier));
         if (visual.LevelId != imported.World.LevelId || scenery.LevelId != imported.World.LevelId ||
             terrain.LevelId != imported.World.LevelId)
             throw new InvalidOperationException("LDtk gameplay and visual level identifiers differ.");
-        return new LdtkPreparedContent(entry.FilePath, imported, level, visual, scenery, terrain, particles);
+        return new LdtkPreparedContent(entry.FilePath, imported, level, visual, scenery, terrain, particles, lighting);
     }
 
     private static string AliasFor(string filename, string identifier) =>

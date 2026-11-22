@@ -58,6 +58,7 @@ internal sealed class LightingPlayground : IDisposable
     private RenderTarget2D? _sceneTarget;
     private RenderTarget2D? _lightTarget;
     private RenderTarget2D? _singleLightTarget;
+    private RenderTarget2D? _visibilityTarget;
     private LightWorld _lights = new(32);
     private LightingEnvironment _scene;
     private readonly List<MaterialPreview> _materials = new();
@@ -70,6 +71,7 @@ internal sealed class LightingPlayground : IDisposable
     private bool _lightingEnabled = true;
     private bool _materialsDirty = true;
     private bool _showHelp = true;
+    private bool _soloSelectedLight;
     private int _bufferMode;
     private bool _disposed;
     private readonly Stopwatch _stopwatch = new();
@@ -123,6 +125,7 @@ internal sealed class LightingPlayground : IDisposable
         _lights.Clear();
         foreach (RadialLight light in _scene.Lights) _lights.TryAdd(light);
         _selectedLight = 0;
+        _soloSelectedLight = false;
         _focus = new LightPoint(0, 0);
         _materialsDirty = true;
     }
@@ -214,7 +217,21 @@ internal sealed class LightingPlayground : IDisposable
         if (Pressed(keys, Keys.D4)) _bufferMode = (_bufferMode + 1) % 3;
         if (Pressed(keys, Keys.H)) _showHelp = !_showHelp;
         if (Pressed(keys, Keys.Tab) && _lights.Count > 0)
+        {
             _selectedLight = (_selectedLight + 1) % _lights.Count;
+            _materialsDirty = true;
+        }
+        if (Pressed(keys, Keys.D5) && _lights.Count > 0)
+        {
+            RadialLight selected = _lights.Lights[_selectedLight];
+            _lights.Replace(selected.Id, selected with { CastShadows = !selected.CastShadows });
+            _materialsDirty = true;
+        }
+        if (Pressed(keys, Keys.D6))
+        {
+            _soloSelectedLight = !_soloSelectedLight;
+            _materialsDirty = true;
+        }
         if (Pressed(keys, Keys.R)) ChangeScene(_scene.Id);
 
         double panX = (keys.IsKeyDown(Keys.D) ? 1 : 0) - (keys.IsKeyDown(Keys.A) ? 1 : 0);
@@ -242,9 +259,15 @@ internal sealed class LightingPlayground : IDisposable
         _sceneTarget?.Dispose();
         _lightTarget?.Dispose();
         _singleLightTarget?.Dispose();
+        _visibilityTarget?.Dispose();
         _sceneTarget = new RenderTarget2D(_device, width, height, false, SurfaceFormat.Color, DepthFormat.None);
-        _lightTarget = new RenderTarget2D(_device, width, height, false, SurfaceFormat.Color, DepthFormat.None);
-        _singleLightTarget = new RenderTarget2D(_device, width, height, false, SurfaceFormat.Color, DepthFormat.None);
+        _lightTarget = new RenderTarget2D(_device, width, height, false,
+            SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        // We leave this target to build the visibility mask, then come back to
+        // multiply it. Preserve the already-drawn falloff across that switch.
+        _singleLightTarget = new RenderTarget2D(_device, width, height, false,
+            SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        _visibilityTarget = new RenderTarget2D(_device, width, height, false, SurfaceFormat.Color, DepthFormat.None);
         _geometryEffect.Projection = Matrix.CreateOrthographicOffCenter(0, width, height, 0, 0, 1);
     }
 
@@ -261,6 +284,8 @@ internal sealed class LightingPlayground : IDisposable
         LightingViewport view = new(width, height, _focus, _pixelsPerUnit);
         IReadOnlyList<RadialLight> visible = _lightingEnabled
             ? _lights.Visible(view, 12) : Array.Empty<RadialLight>();
+        if (_soloSelectedLight && _lights.Count > 0)
+            visible = visible.Where(l => l.Id == _lights.Lights[_selectedLight].Id).ToArray();
         VisibleLights = visible.Count;
         ProjectedShadowQuads = 0;
         _stopwatch.Restart();
@@ -293,7 +318,7 @@ internal sealed class LightingPlayground : IDisposable
                     Math.Max(1, (int)Math.Round(r * 2))), tint);
                 batch.End();
                 if (_shadows && light.CastShadows)
-                    DrawProjectedShadows(light, view);
+                    ApplyVisibilityShadowMask(batch, light, view);
                 _device.SetRenderTarget(_lightTarget);
                 batch.Begin(blendState: _additive, samplerState: SamplerState.PointClamp);
                 batch.Draw(_singleLightTarget!, new Rectangle(0, 0, width, height), Color.White);
@@ -309,7 +334,10 @@ internal sealed class LightingPlayground : IDisposable
             // The material/light world positions have not changed when just
             // moving the camera. Avoid re-uploading CPU reference maps each frame.
             IReadOnlyList<RadialLight> materialLights = _lightingEnabled
-                ? _lights.Lights : Array.Empty<RadialLight>();
+                ? (_soloSelectedLight && _lights.Count > 0
+                    ? new[] { _lights.Lights[_selectedLight] }
+                    : _lights.Lights)
+                : Array.Empty<RadialLight>();
             foreach (MaterialPreview material in _materials)
                 UpdateMaterialTexture(material, _lightingEnabled, _normals, materialLights);
             matWatch.Stop();
@@ -382,52 +410,50 @@ internal sealed class LightingPlayground : IDisposable
             new Vector2(length, thickness), SpriteEffects.None, 0);
     }
 
-    private void DrawProjectedShadows(RadialLight light, LightingViewport view)
+    /// <summary>
+    /// Shadow only the light that is currently being accumulated. Rather than
+    /// drawing overlapping black wedges over the light (which created false
+    /// triangular cuts near concave corners), render the nearest-hit visibility
+    /// region as a white mask and multiply that mask into the light surface.
+    /// Other lights and scene ambient remain untouched.
+    /// </summary>
+    private void ApplyVisibilityShadowMask(SpriteBatch batch,
+        RadialLight light, LightingViewport view)
     {
-        var triangles = new List<VertexPositionColor>();
-        foreach (LightingOccluder blocker in _scene.Occluders)
+        IReadOnlyList<LightPoint> boundary =
+            ShadowVisibility.BuildPolygon(light, _scene.Occluders);
+        if (boundary.Count < 3) return;
+        var vertices = new VertexPositionColor[boundary.Count * 3];
+        LightPoint source = view.Project(light.Position);
+        Vector3 origin = new((float)source.X, (float)source.Y, 0);
+        for (int i = 0; i < boundary.Count; i++)
         {
-            // Skip blockers well outside the radial influence. No global
-            // partition yet: the bounded laboratory has <= 64 authored hulls.
-            if (!blocker.Vertices.Any(p =>
-                ShadowDistance(p, light.Position) <= light.Radius * 1.5)) continue;
-            // The opaque hull and extruded shadow wedges form ONE blocker mask.
-            // Without the hull fill, adjacent wedges leave pinholes and thin light
-            // leaks at sharp/concave corners as the light moves at subpixel offsets.
-            if (ShadowGeometry.Contains(blocker, light.Position)) continue;
-            foreach (LightTriangle triangle in ShadowGeometry.Triangulate(blocker))
-                AddTriangle(triangle.A, triangle.B, triangle.C);
-            foreach (ShadowQuad q in ShadowGeometry.Project(light, blocker))
-            {
-                ProjectedShadowQuads++;
-                AddTriangle(q.A, q.B, q.FarB);
-                AddTriangle(q.A, q.FarB, q.FarA);
-            }
+            LightPoint a = view.Project(boundary[i]);
+            LightPoint b = view.Project(boundary[(i + 1) % boundary.Count]);
+            int offset = i * 3;
+            vertices[offset] = new VertexPositionColor(origin, Color.White);
+            vertices[offset + 1] = new VertexPositionColor(
+                new Vector3((float)a.X, (float)a.Y, 0), Color.White);
+            vertices[offset + 2] = new VertexPositionColor(
+                new Vector3((float)b.X, (float)b.Y, 0), Color.White);
         }
-        if (triangles.Count == 0) return;
-        VertexPositionColor[] vertices = triangles.ToArray();
+        ProjectedShadowQuads += boundary.Count; // Legacy lab telemetry; now mask triangles.
+        _device.SetRenderTarget(_visibilityTarget);
+        _device.Clear(Color.Black);
         _device.BlendState = BlendState.Opaque;
         _device.DepthStencilState = DepthStencilState.None;
         _device.RasterizerState = RasterizerState.CullNone;
         foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            _device.DrawUserPrimitives(PrimitiveType.TriangleList, vertices,
-                0, vertices.Length / 3);
+            _device.DrawUserPrimitives(PrimitiveType.TriangleList,
+                vertices, 0, vertices.Length / 3);
         }
-        return;
 
-        void AddTriangle(LightPoint a, LightPoint b, LightPoint c)
-        {
-            triangles.Add(new VertexPositionColor(ToVector(a), Color.Black));
-            triangles.Add(new VertexPositionColor(ToVector(b), Color.Black));
-            triangles.Add(new VertexPositionColor(ToVector(c), Color.Black));
-        }
-        Vector3 ToVector(LightPoint pt)
-        {
-            LightPoint s = view.Project(pt);
-            return new Vector3((float)s.X, (float)s.Y, 0);
-        }
+        _device.SetRenderTarget(_singleLightTarget);
+        batch.Begin(blendState: _multiply, samplerState: SamplerState.PointClamp);
+        batch.Draw(_visibilityTarget!, new Rectangle(0, 0, view.Width, view.Height), Color.White);
+        batch.End();
     }
 
     /// <summary>
@@ -527,12 +553,6 @@ internal sealed class LightingPlayground : IDisposable
             (float)Math.Clamp(illumination.B * .62 * shade, 0, 1));
     }
 
-    private static double ShadowDistance(LightPoint a, LightPoint b)
-    {
-        double dx = a.X - b.X, dy = a.Y - b.Y;
-        return Math.Sqrt(dx * dx + dy * dy);
-    }
-
     private void UpdateMaterialTexture(MaterialPreview preview, bool lit, bool normals,
         IReadOnlyList<RadialLight> lights)
     {
@@ -620,13 +640,16 @@ internal sealed class LightingPlayground : IDisposable
             "  3 SHADOW " + (_shadows ? "ON" : "OFF") +
             "  4 BUFFER " + _bufferMode, Color.LightSkyBlue, 1);
         GymDebugText.Draw(batch, pixel, x, 69,
-            "R RESET  H HELP  ESC EXIT  WHITE BOX=SELECTED LIGHT", Color.LightSkyBlue, 1);
+            "5 TOGGLE SELECTED SHADOW  6 SOLO LIGHT  R RESET  H HELP  ESC EXIT", Color.LightSkyBlue, 1);
         GymDebugText.Draw(batch, pixel, x, 85,
-            "VISIBLE " + VisibleLights + "  SHADOW QUADS " + ProjectedShadowQuads +
+            "VISIBLE " + VisibleLights + "  MASK TRIS " + ProjectedShadowQuads +
             "  FRAME MS " + LastFrameMilliseconds.ToString("F2") +
             "  MATERIAL MS " + LastMaterialMilliseconds.ToString("F2"), Color.LightGreen, 1);
         GymDebugText.Draw(batch, pixel, x, 102,
-            "PANELS: NEUTRAL / NORMALS / ROTATED FLIPPED / EMISSION+MASK", Color.LightGray, 1);
+            _lights.Count == 0 ? "NO LIGHT SELECTED" :
+            "SELECTED " + _lights.Lights[_selectedLight].Id +
+            "  SHADOW " + (_lights.Lights[_selectedLight].CastShadows ? "YES" : "NO") +
+            "  SOLO " + (_soloSelectedLight ? "YES" : "NO"), Color.LightGray, 1);
     }
 
     public void Dispose()
@@ -639,6 +662,7 @@ internal sealed class LightingPlayground : IDisposable
         _sceneTarget?.Dispose();
         _lightTarget?.Dispose();
         _singleLightTarget?.Dispose();
+        _visibilityTarget?.Dispose();
         _falloff.Dispose();
         _shadowBlob.Dispose();
         _geometryEffect.Dispose();

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "materials": [
+    {
+      "id": "Unlit",
+      "response": "Unlit",
+      "ambient": 0.18,
+      "normalStrength": 0,
+      "rimStrength": 0,
+      "specularStrength": 0,
+      "specularPower": 16,
+      "emissionStrength": 0,
+      "lightMaskStrength": 1,
+      "albedo": "SlateAlbedo.png"
+    },
+    {
+      "id": "Flat",
+      "response": "Flat",
+      "ambient": 0.18,
+      "normalStrength": 0,
+      "rimStrength": 0,
+      "specularStrength": 0,
+      "specularPower": 16,
+      "emissionStrength": 0,
+      "lightMaskStrength": 1,
+      "albedo": "SlateAlbedo.png"
+    },
+    {
+      "id": "Normal",
+      "response": "NormalMapped",
+      "ambient": 0.18,
+      "normalStrength": 1.2,
+      "rimStrength": 0,
+      "specularStrength": 0.18,
+      "specularPower": 16,
+      "emissionStrength": 0,
+      "lightMaskStrength": 1,
+      "albedo": "SlateAlbedo.png",
+      "normal": "SlateNormal.png",
+      "mask": "SlateMask.png"
+    },
+    {
+      "id": "Rim",
+      "response": "Rim",
+      "ambient": 0.07,
+      "normalStrength": 1,
+      "rimStrength": 2.4,
+      "specularStrength": 0,
+      "specularPower": 16,
+      "emissionStrength": 0,
+      "lightMaskStrength": 1,
+      "albedo": "SlateAlbedo.png",
+      "edge": "L03_EdgeDirection.png"
+    },
+    {
+      "id": "Hybrid",
+      "response": "Hybrid",
+      "ambient": 0.12,
+      "normalStrength": 1.1,
+      "rimStrength": 0.85,
+      "specularStrength": 0.17,
+      "specularPower": 18,
+      "emissionStrength": 0.35,
+      "lightMaskStrength": 0.8,
+      "albedo": "SlateAlbedo.png",
+      "normal": "SlateNormal.png",
+      "mask": "SlateMask.png",
+      "emission": "SlateEmission.png",
+      "edge": "L03_EdgeDirection.png"
+    }
+  ]
+}

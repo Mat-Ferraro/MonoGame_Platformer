@@ -11,7 +11,7 @@
   "iid": "0800b4bc-13e9-41bf-9c62-5f4961741f5b",
   "jsonVersion": "1.5.3",
   "appBuildId": 473703,
-  "nextUid": 5113,
+  "nextUid": 9004,
   "identifierStyle": "Capitalize",
   "toc": [],
   "worldLayout": "Free",
@@ -373,7 +373,7 @@
         "tags": [],
         "exportToToc": false,
         "allowOutOfBounds": false,
-        "doc": "Presentation-only illustrated sprite; resize and position freely. Art Tile chooses an image. Plane selects the draw pass; Depth orders within that plane. Does not create collision.",
+        "doc": "Presentation-only illustrated sprite; resize and position freely. Art Tile chooses an image. Plane selects the draw pass; Depth orders within that plane. Does not create collision. Lighting: receive light/shadows, cast bounds shadows, and optional contact shadow.",
         "width": 128,
         "height": 128,
         "resizableX": true,
@@ -741,6 +741,228 @@
             "autoChainRef": false,
             "editorLinkStyle": "ZigZag",
             "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesLight",
+            "uid": 7030,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Lit by world lights; off = unlit decorative art.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesShadows",
+            "uid": 7031,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "World occluders can shadow this sprite.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "CastsShadows",
+            "uid": 7032,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Use this artwork rectangle (including rotation) to cast world shadows.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ContactShadow",
+            "uid": 7033,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional soft decorative grounding ellipse (not a projected shadow).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "RenderLayer",
+            "uid": 8131,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": 20,
+            "doc": "Optional target scene-layer ID; blank inherits Plane (BG1/PLAYER/FG1).",
+            "editorDisplayMode": "EntityTile",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "LightingMode",
+            "uid": 9001,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": 20,
+            "doc": "Optional per-object lighting mode: Inherit (layer defaults), Lit (light receiving), Unlit (full original colors), Silhouette (dark backlit shape). Shadow casting is controlled independently by CastsShadows.",
+            "editorDisplayMode": "EntityTile",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
           }
         ]
       },
@@ -750,7 +972,7 @@
         "tags": [],
         "exportToToc": false,
         "allowOutOfBounds": false,
-        "doc": "Presentation-only standalone PNG. Collision cells remain separate. Native bounds are resize handles.",
+        "doc": "Presentation-only standalone PNG. Collision cells remain separate. Native bounds are resize handles. Lighting: receive light/shadows, cast bounds shadows, and optional contact shadow.",
         "width": 256,
         "height": 160,
         "resizableX": true,
@@ -1149,6 +1371,230 @@
             "autoChainRef": false,
             "editorLinkStyle": "ZigZag",
             "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesLight",
+            "uid": 7081,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Lit by world lights; off = unlit decorative art.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesShadows",
+            "uid": 7082,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "World occluders can shadow this sprite.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "CastsShadows",
+            "uid": 7083,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Use this artwork rectangle (including rotation) to cast world shadows.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ContactShadow",
+            "uid": 7084,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional soft decorative grounding ellipse (not a projected shadow).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "RenderLayer",
+            "uid": 8182,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": [
+              ".png"
+            ],
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional target scene-layer ID; blank inherits Plane (BG1/PLAYER/FG1).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "LightingMode",
+            "uid": 9002,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional per-object lighting mode: Inherit (layer defaults), Lit (light receiving), Unlit (full original colors), Silhouette (dark backlit shape). Shadow casting is controlled independently by CastsShadows.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
           }
         ]
       },
@@ -1158,7 +1604,7 @@
         "tags": [],
         "exportToToc": false,
         "allowOutOfBounds": false,
-        "doc": "Editor-visible illustrated scenery: resize, move and select a tile from IllustratedTerrainPieces. Visual only.",
+        "doc": "Editor-visible illustrated scenery: resize, move and select a tile from IllustratedTerrainPieces. Visual only. Lighting: receive light/shadows, cast bounds shadows, and optional contact shadow.",
         "width": 256,
         "height": 256,
         "resizableX": true,
@@ -1507,6 +1953,228 @@
             "tilesetUid": null,
             "doc": "Mirror the sprite vertically.",
             "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesLight",
+            "uid": 7202,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Lit by world lights; off = unlit decorative art.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceivesShadows",
+            "uid": 7203,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "World occluders can shadow this sprite.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "CastsShadows",
+            "uid": 7204,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Use this artwork rectangle (including rotation) to cast world shadows.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ContactShadow",
+            "uid": 7205,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional soft decorative grounding ellipse (not a projected shadow).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "RenderLayer",
+            "uid": 8303,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": 201,
+            "doc": "Optional target scene-layer ID; blank inherits Plane (BG1/PLAYER/FG1).",
+            "editorDisplayMode": "EntityTile",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "LightingMode",
+            "uid": 9003,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": 201,
+            "doc": "Optional per-object lighting mode: Inherit (layer defaults), Lit (light receiving), Unlit (full original colors), Silhouette (dark backlit shape). Shadow casting is controlled independently by CastsShadows.",
+            "editorDisplayMode": "EntityTile",
             "editorDisplayPos": "Beneath",
             "editorDisplayScale": 1,
             "editorShowInWorld": false,
@@ -2299,6 +2967,374 @@
             "textLanguageMode": null
           }
         ]
+      },
+      {
+        "identifier": "LightSource",
+        "uid": 620,
+        "tags": [],
+        "exportToToc": false,
+        "allowOutOfBounds": false,
+        "doc": "Visual-only point light. Position, color, radius, intensity and shadow choice. Does not affect collision.",
+        "width": 24,
+        "height": 24,
+        "resizableX": true,
+        "resizableY": true,
+        "minWidth": 8,
+        "maxWidth": 4096,
+        "minHeight": 8,
+        "maxHeight": 4096,
+        "keepAspectRatio": false,
+        "tileOpacity": 1,
+        "fillOpacity": 0.35,
+        "lineOpacity": 1,
+        "hollow": false,
+        "color": "#FFB767",
+        "renderMode": "Rectangle",
+        "showName": true,
+        "tilesetId": null,
+        "tileRenderMode": "FitInside",
+        "tileRect": null,
+        "uiTileRect": null,
+        "nineSliceBorders": [],
+        "maxCount": 0,
+        "limitScope": "PerLevel",
+        "limitBehavior": "MoveLastOne",
+        "pivotX": 0,
+        "pivotY": 0,
+        "fieldDefs": [
+          {
+            "identifier": "Color",
+            "uid": 6210,
+            "type": "F_Color",
+            "__type": "Color",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Hex RGB color of the dynamic light.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "RadiusWorld",
+            "uid": 6211,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Light radius in world units (1 world unit = 32 LDtk pixels).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "Intensity",
+            "uid": 6212,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Light intensity multiplier, 0..4.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "Priority",
+            "uid": 6213,
+            "type": "F_Int",
+            "__type": "Int",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Priority in limited lighting quality budgets.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "CastShadows",
+            "uid": 6214,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 1,
+            "max": 200,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Shadows enabled for this light; per-frame shadow budget also applies.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "AffectsLayers",
+            "uid": 8102,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Comma-separated layer IDs illuminated by this light; blank uses legacy channels.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "OccluderLayers",
+            "uid": 8103,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Comma-separated layer IDs allowed to block this light; blank allows all authored shadow casters.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          }
+        ]
+      },
+      {
+        "identifier": "LightBlocker",
+        "uid": 630,
+        "tags": [],
+        "exportToToc": false,
+        "allowOutOfBounds": false,
+        "doc": "Optional invisible resizable shadow hull (box); use only to match visible walls or other artwork.",
+        "width": 128,
+        "height": 128,
+        "resizableX": true,
+        "resizableY": true,
+        "minWidth": 8,
+        "maxWidth": 4096,
+        "minHeight": 8,
+        "maxHeight": 4096,
+        "keepAspectRatio": false,
+        "tileOpacity": 1,
+        "fillOpacity": 0.35,
+        "lineOpacity": 1,
+        "hollow": false,
+        "color": "#556EAE",
+        "renderMode": "Rectangle",
+        "showName": true,
+        "tilesetId": null,
+        "tileRenderMode": "FitInside",
+        "tileRect": null,
+        "uiTileRect": null,
+        "nineSliceBorders": [],
+        "maxCount": 0,
+        "limitScope": "PerLevel",
+        "limitBehavior": "MoveLastOne",
+        "pivotX": 0,
+        "pivotY": 0,
+        "fieldDefs": [
+          {
+            "identifier": "RenderLayer",
+            "uid": 8731,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "Optional target scene-layer ID; blank inherits Plane (BG1/PLAYER/FG1).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          }
+        ]
       }
     ],
     "tilesets": [
@@ -2856,6 +3892,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 200,
@@ -2977,6 +4053,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -3100,6 +4216,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1710,
@@ -3221,6 +4377,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -3344,6 +4540,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1540,
@@ -3465,6 +4701,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -3588,6 +4864,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1190,
@@ -3710,6 +5026,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2020,
@@ -3815,6 +5171,46 @@
                   "__value": "#FFFFFF",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -3922,6 +5318,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1090,
@@ -4027,6 +5463,46 @@
                   "__value": "#FFFFFF",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -4134,6 +5610,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 610,
@@ -4239,6 +5755,46 @@
                   "__value": "#DAE9E3",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -4346,6 +5902,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 810,
@@ -4451,6 +6047,46 @@
                   "__value": "#88C9A0",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -4558,6 +6194,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 35,
@@ -4663,6 +6339,46 @@
                   "__value": "#C0E1C3",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -4778,6 +6494,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 140,
@@ -4891,6 +6647,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -5006,6 +6802,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1420,
@@ -5119,6 +6955,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -5534,6 +7410,138 @@
               ],
               "__worldX": 1230,
               "__worldY": 315
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                11,
+                13
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "6239e208-6288-52b6-aafe-99a31f6d9008",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                356,
+                422
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#FFD08A",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 6.8,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.6,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 356,
+              "__worldY": 422
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                56,
+                15
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "dd3c1ce7-9bdb-5d3f-b6fd-c9251087b2ec",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1820,
+                490
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#66BAFF",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 7.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.45,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1820,
+              "__worldY": 490
             }
           ]
         },
@@ -10413,6 +12421,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2760,
@@ -10534,6 +12582,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -10657,6 +12745,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 4270,
@@ -10778,6 +12906,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -10901,6 +13069,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 4100,
@@ -11022,6 +13230,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -11145,6 +13393,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 3750,
@@ -11267,6 +13555,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 4580,
@@ -11372,6 +13700,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -11479,6 +13847,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 3650,
@@ -11584,6 +13992,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -11691,6 +14139,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 3170,
@@ -11796,6 +14284,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -11903,6 +14431,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 3370,
@@ -12008,6 +14576,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -12115,6 +14723,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2595,
@@ -12220,6 +14868,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -12335,6 +15023,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2700,
@@ -12448,6 +15176,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -12563,6 +15331,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 3980,
@@ -12676,6 +15484,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -13141,6 +15989,138 @@
               ],
               "__worldX": 3820,
               "__worldY": 315
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                13,
+                15
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "da0b3a4b-ab40-5fdb-b060-976d00b3f30d",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                430,
+                500
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#9DC8FF",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 6.8,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.5,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 430,
+              "__worldY": 500
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                55,
+                21
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "047f0e0e-5bc6-56d8-be1e-f1a596fb6b55",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1760,
+                690
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#EFA06C",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 7.0,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.65,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1760,
+              "__worldY": 690
             }
           ]
         },
@@ -18020,6 +21000,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 5320,
@@ -18141,6 +21161,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -18264,6 +21324,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 6830,
@@ -18385,6 +21485,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -18508,6 +21648,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 6660,
@@ -18629,6 +21809,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 39,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
                   "realEditorValues": []
                 }
               ],
@@ -18752,6 +21972,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 6310,
@@ -18874,6 +22134,46 @@
                   "__tile": null,
                   "defUid": 39,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7030,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7031,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7032,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7033,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9001,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 7140,
@@ -18979,6 +22279,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -19086,6 +22426,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 6210,
@@ -19191,6 +22571,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -19298,6 +22718,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 5730,
@@ -19403,6 +22863,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -19510,6 +23010,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 5930,
@@ -19615,6 +23155,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -19722,6 +23302,46 @@
                   "__tile": null,
                   "defUid": 99,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 5155,
@@ -19827,6 +23447,46 @@
                   "__value": "#B9D5E8",
                   "__tile": null,
                   "defUid": 99,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7081,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7082,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7083,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7084,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9002,
                   "realEditorValues": []
                 }
               ],
@@ -19942,6 +23602,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 5320,
@@ -20055,6 +23755,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -20170,6 +23910,46 @@
                   "__tile": null,
                   "defUid": 218,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 6455,
@@ -20283,6 +24063,46 @@
                   "__value": false,
                   "__tile": null,
                   "defUid": 218,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesLight",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7202,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceivesShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 7203,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastsShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7204,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ContactShadow",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 7205,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightingMode",
+                  "__type": "String",
+                  "__value": "Inherit",
+                  "__tile": null,
+                  "defUid": 9003,
                   "realEditorValues": []
                 }
               ],
@@ -20698,6 +24518,138 @@
               ],
               "__worldX": 6340,
               "__worldY": 360
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                12,
+                14
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "f44e8a67-e099-5399-acbc-22e0627a31b7",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                412,
+                450
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#B5F6E0",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 7.0,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.5,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 412,
+              "__worldY": 450
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                56,
+                18
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB767",
+              "iid": "5368526f-2799-597b-91b5-fa0ce0a25013",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1810,
+                600
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#FFAA66",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 7.2,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 1.65,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1810,
+              "__worldY": 600
             }
           ]
         },

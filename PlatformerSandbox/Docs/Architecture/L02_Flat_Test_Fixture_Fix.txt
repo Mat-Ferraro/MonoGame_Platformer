@@ -1,0 +1,9 @@
+L02 flat lighting regression fixture correction
+=============================================
+Test file: PlatformerSandbox.Tests/Presentation/Lighting/LFlatLightingDiagnosticLevelTests.cs
+The L02 flat test intentionally makes Vines.png an FG3 Silhouette that receives
+lighting from the green light, so the original assertion ReceivesLight=false
+was stale. The corrected test verifies that the vines receive light, do not
+receive shadows, belong to FG3 Silhouette, and exactly one authored light
+targets FG3. The independent Unlit.png no-light/no-shadow checks are retained.
+No production source or LDtk content is changed.
