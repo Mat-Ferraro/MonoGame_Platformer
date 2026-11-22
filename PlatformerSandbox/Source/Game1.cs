@@ -539,7 +539,8 @@ public sealed class Game1 : Game
         {
             basicsLab.Update(Keyboard.GetState(), Mouse.GetState(),
                 GraphicsDevice.PresentationParameters.BackBufferWidth,
-                GraphicsDevice.PresentationParameters.BackBufferHeight);
+                GraphicsDevice.PresentationParameters.BackBufferHeight,
+                elapsedSeconds: gameTime.ElapsedGameTime.TotalSeconds);
             if (basicsLab.ExitRequested) Exit();
             base.Update(gameTime);
             return;
@@ -569,7 +570,8 @@ public sealed class Game1 : Game
                 _lightingBasicsLab.Update(labKeys, Mouse.GetState(),
                     GraphicsDevice.PresentationParameters.BackBufferWidth,
                     GraphicsDevice.PresentationParameters.BackBufferHeight,
-                    interactive: !_flow.IsGameplaySuspended, standalone: false);
+                    interactive: !_flow.IsGameplaySuspended, standalone: false,
+                    elapsedSeconds: gameTime.ElapsedGameTime.TotalSeconds);
             }
             if (_flow.ExitRequested) Exit();
             _previousKeyboard = labKeys;

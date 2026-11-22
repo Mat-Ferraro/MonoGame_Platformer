@@ -173,9 +173,14 @@ internal sealed class BasicLightingLab : IDisposable
         current.IsKeyDown(key) && _lastKeys.IsKeyUp(key);
 
     public void Update(KeyboardState keyboard, MouseState mouse,
-        int width, int height, bool interactive = true, bool standalone = true)
+        int width, int height, bool interactive = true, bool standalone = true,
+        double elapsedSeconds = 0)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0)
+            throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
+        if (width > 0 && height > 0)
+            _state.SetShadowViewportAspectRatio((double)width / height);
         bool down = mouse.LeftButton == ButtonState.Pressed;
         bool clicked = down && !_previousMouseDown;
         if (!interactive)
@@ -218,6 +223,11 @@ internal sealed class BasicLightingLab : IDisposable
             else if (!_draggingBlocker)
                 _state.SetLightPositionNormalized(nx, ny);
         }
+        // Render submission below reads current shapes, so moving shadows,
+        // per-light occlusion and depth-aware rims share one moving silhouette.
+        // Pause/menu never advances lab motion (early return above).
+        _state.AdvanceBlockerMotion(elapsedSeconds,
+            _draggingBlocker && down ? _state.SelectedShadowBlockerIndex : -1);
         _previousMouseDown = down;
         _lastKeys = keyboard;
     }
@@ -230,6 +240,7 @@ internal sealed class BasicLightingLab : IDisposable
         int width = _device.PresentationParameters.BackBufferWidth;
         int height = _device.PresentationParameters.BackBufferHeight;
         if (width < 1 || height < 1) return;
+        _state.SetShadowViewportAspectRatio((double)width / height);
 
         var view = new LightingViewport(width, height, new LightPoint(0, 0), 1);
         _renderer.BeginBasicMaterialFrameWithShapes(view, _state.AmbientRgb,
@@ -267,7 +278,7 @@ internal sealed class BasicLightingLab : IDisposable
                     { ReceivesShadows = false };
                 Texture2D face = BlockerFace(shape.Kind);
                 _renderer.DrawBasicMaterial(batch, blockerFace,
-                    b => b.Draw(face, blockerArea, Color.White),
+                    b => DrawBlockerFace(b, face, shape, width, height, blockerArea),
                     wallOverlap: _state.GetWallLightOverlap(shape,
                         _state.GetShadowBlockerDepthLayer(i)),
                     wallRimContext: _state.GetWallRimContext(shape),
@@ -359,6 +370,31 @@ internal sealed class BasicLightingLab : IDisposable
         }
         _inspector.Draw(batch, pixel, width, height, _state);
         batch.End();
+    }
+
+    /// <summary>
+    /// Rotating a GPU polygon without rotating its visible face creates false
+    /// shadows. SpriteBatch and BasicShadowShape.Vertices use the same center,
+    /// angle and pixel-space dimensions (independent of viewport aspect ratio).
+    /// The unrotated path remains bit-for-bit equivalent to Stage 13.
+    /// </summary>
+    private static void DrawBlockerFace(SpriteBatch batch, Texture2D face,
+        BasicShadowShape shape, int width, int height, Rectangle destination)
+    {
+        if (shape.RotationDegrees % 360 == 0)
+        {
+            batch.Draw(face, destination, Color.White);
+            return;
+        }
+        BasicShadowRectangle bounds = shape.Bounds;
+        var center = new Vector2((float)((bounds.X + bounds.Width * .5) * width),
+            (float)((bounds.Y + bounds.Height * .5) * height));
+        var scale = new Vector2((float)(bounds.Width * width / face.Width),
+            (float)(bounds.Height * height / face.Height));
+        batch.Draw(face, center, null, Color.White,
+            (float)(shape.RotationDegrees * Math.PI / 180.0),
+            new Vector2(face.Width * .5f, face.Height * .5f),
+            scale, SpriteEffects.None, 0);
     }
 
     private static Rectangle BlockerPixels(BasicShadowRectangle rect, int width, int height)

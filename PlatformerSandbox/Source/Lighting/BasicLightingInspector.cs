@@ -15,18 +15,23 @@ namespace PlatformerSandbox.Lighting;
 internal sealed class BasicLightingInspector
 {
     private enum Tab { Lights, Surfaces, Shadows }
-    private enum ShadowPage { Geometry, Routing }
+    private enum ShadowPage { Geometry, Motion, Rotation, Routing }
     private enum DropDown { None, Light, Color, View, Surface, Mode, Channel, Shading,
-        Blocker, BlockerShape, WallOverlap, LightDepth, BlockerDepth }
+        Blocker, BlockerShape, WallOverlap, LightDepth, BlockerDepth, MotionMode, RotationMode }
     private enum DragTarget
     {
         None, Ambient, Intensity, Radius, Opacity, NormalStrength, RimStrength,
-        ShadowX, ShadowY, ShadowWidth, ShadowHeight
+        ShadowX, ShadowY, ShadowWidth, ShadowHeight, MotionSpeed, MotionDistance,
+        RotationAngle, RotationSpeed, RotationSweep
     }
     private static readonly BasicLightWallOverlapMode[] WallOverlapModes =
         Enum.GetValues<BasicLightWallOverlapMode>();
     private static readonly BasicLightingDepthLayer[] DepthLayers =
         Enum.GetValues<BasicLightingDepthLayer>();
+    private static readonly BasicBlockerMotionMode[] MotionModes =
+        Enum.GetValues<BasicBlockerMotionMode>();
+    private static readonly BasicBlockerRotationMode[] RotationModes =
+        Enum.GetValues<BasicBlockerRotationMode>();
     private static readonly BasicShadowShapeKind[] ShadowShapes =
         Enum.GetValues<BasicShadowShapeKind>();
     private static readonly BasicLightColorPreset[] Colors = Enum.GetValues<BasicLightColorPreset>();
@@ -85,6 +90,8 @@ internal sealed class BasicLightingInspector
         DropDown.Shading => Row(panel, 261),
         DropDown.Blocker => Row(panel, 118),
         DropDown.BlockerShape => Row(panel, 174),
+        DropDown.MotionMode => Row(panel, 186),
+        DropDown.RotationMode => Row(panel, 186),
         DropDown.WallOverlap => Row(panel, 369),
         DropDown.LightDepth => Row(panel, 263),
         DropDown.BlockerDepth => Row(panel, 320),
@@ -102,6 +109,8 @@ internal sealed class BasicLightingInspector
         DropDown.Shading => Shadings.Length,
         DropDown.Blocker => BasicLightingPreviewState.ShadowBlockerCount,
         DropDown.BlockerShape => ShadowShapes.Length,
+        DropDown.MotionMode => MotionModes.Length,
+        DropDown.RotationMode => RotationModes.Length,
         DropDown.WallOverlap => WallOverlapModes.Length,
         DropDown.LightDepth or DropDown.BlockerDepth => DepthLayers.Length,
         _ => 0
@@ -120,6 +129,8 @@ internal sealed class BasicLightingInspector
             case DropDown.Shading: state.SetSelectedSurfaceShading(Shadings[index]); break;
             case DropDown.Blocker: state.SelectShadowBlocker(index); break;
             case DropDown.BlockerShape: state.SetSelectedShadowBlockerKind(ShadowShapes[index]); break;
+            case DropDown.MotionMode: state.SetSelectedBlockerMotionMode(MotionModes[index]); break;
+            case DropDown.RotationMode: state.SetSelectedBlockerRotationMode(RotationModes[index]); break;
             case DropDown.WallOverlap: state.SetSelectedLightWallOverlapMode(WallOverlapModes[index]); break;
             case DropDown.LightDepth: state.SetSelectedLightDepthLayer(DepthLayers[index]); break;
             case DropDown.BlockerDepth: state.SetSelectedShadowBlockerDepthLayer(DepthLayers[index]); break;
@@ -141,6 +152,11 @@ internal sealed class BasicLightingInspector
             DragTarget.ShadowY => Slider(panel, 375),
             DragTarget.ShadowWidth => Slider(panel, 413),
             DragTarget.ShadowHeight => Slider(panel, 451),
+            DragTarget.MotionSpeed => Slider(panel, 273),
+            DragTarget.MotionDistance => Slider(panel, 333),
+            DragTarget.RotationAngle => Slider(panel, 251),
+            DragTarget.RotationSpeed => Slider(panel, 312),
+            DragTarget.RotationSweep => Slider(panel, 374),
             _ => Rectangle.Empty
         };
         if (bar.Width <= 0) return;
@@ -165,6 +181,19 @@ internal sealed class BasicLightingInspector
                 .025 + fraction * .175, state.SelectedShadowBlocker.Height); break;
             case DragTarget.ShadowHeight: state.SetSelectedShadowBlockerSize(
                 state.SelectedShadowBlocker.Width, .08 + fraction * .47); break;
+            case DragTarget.MotionSpeed: state.SetSelectedBlockerMotionSpeed(
+                BasicLightingPreviewState.MinimumMotionSpeed + fraction *
+                (BasicLightingPreviewState.MaximumMotionSpeed - BasicLightingPreviewState.MinimumMotionSpeed)); break;
+            case DragTarget.MotionDistance: state.SetSelectedBlockerMotionDistance(
+                BasicLightingPreviewState.MinimumMotionDistance + fraction *
+                (BasicLightingPreviewState.MaximumMotionDistance - BasicLightingPreviewState.MinimumMotionDistance)); break;
+            case DragTarget.RotationAngle: state.SetSelectedBlockerRotationAngle(fraction * 359.9); break;
+            case DragTarget.RotationSpeed: state.SetSelectedBlockerAngularSpeed(
+                BasicLightingPreviewState.MinimumAngularSpeed + fraction *
+                (BasicLightingPreviewState.MaximumAngularSpeed - BasicLightingPreviewState.MinimumAngularSpeed)); break;
+            case DragTarget.RotationSweep: state.SetSelectedBlockerRotationSweep(
+                BasicLightingPreviewState.MinimumRotationSweep + fraction *
+                (BasicLightingPreviewState.MaximumRotationSweep - BasicLightingPreviewState.MinimumRotationSweep)); break;
         }
     }
 
@@ -266,6 +295,16 @@ internal sealed class BasicLightingInspector
                     _shadowPage = ShadowPage.Geometry;
                     _dropDown = DropDown.None;
                 }
+                else if (ShadowMotionButton(panel).Contains(at))
+                {
+                    _shadowPage = ShadowPage.Motion;
+                    _dropDown = DropDown.None;
+                }
+                else if (ShadowRotationButton(panel).Contains(at))
+                {
+                    _shadowPage = ShadowPage.Rotation;
+                    _dropDown = DropDown.None;
+                }
                 else if (ShadowRoutingButton(panel).Contains(at))
                 {
                     _shadowPage = ShadowPage.Routing;
@@ -288,6 +327,27 @@ internal sealed class BasicLightingInspector
                     else if (PresetButton(panel, 2).Contains(at)) state.LoadPolygonShadowComparison();
                     else if (PresetButton(panel, 3).Contains(at)) state.ResetShadows();
                 }
+                else if (_shadowPage == ShadowPage.Motion)
+                {
+                    if (Row(panel, 118).Contains(at)) _dropDown = DropDown.Blocker;
+                    else if (Row(panel, 186).Contains(at)) _dropDown = DropDown.MotionMode;
+                    else if (Row(panel, 267).Contains(at)) _dragTarget = DragTarget.MotionSpeed;
+                    else if (Row(panel, 328).Contains(at)) _dragTarget = DragTarget.MotionDistance;
+                    else if (Row(panel, 373).Contains(at)) state.ToggleBlockerMotionPlaying();
+                    else if (Row(panel, 414).Contains(at)) state.ResetSelectedBlockerMotion();
+                    else if (Row(panel, 465).Contains(at)) state.LoadMovingShadowComparison();
+                }
+                else if (_shadowPage == ShadowPage.Rotation)
+                {
+                    if (Row(panel, 118).Contains(at)) _dropDown = DropDown.Blocker;
+                    else if (Row(panel, 186).Contains(at)) _dropDown = DropDown.RotationMode;
+                    else if (Row(panel, 246).Contains(at)) _dragTarget = DragTarget.RotationAngle;
+                    else if (Row(panel, 307).Contains(at)) _dragTarget = DragTarget.RotationSpeed;
+                    else if (Row(panel, 369).Contains(at)) _dragTarget = DragTarget.RotationSweep;
+                    else if (Row(panel, 414).Contains(at)) state.ResetSelectedBlockerRotation();
+                    else if (Row(panel, 455).Contains(at)) state.LoadRotatingShadowComparison();
+                    else if (Row(panel, 497).Contains(at)) state.ToggleBlockerMotionPlaying();
+                }
                 else
                 {
                     if (Row(panel, 145).Contains(at))
@@ -307,12 +367,14 @@ internal sealed class BasicLightingInspector
         return panel.Contains(at);
     }
 
-    private static Rectangle ShadowGeometryButton(Rectangle panel) =>
-        new(panel.X + 12, panel.Y + 70, (panel.Width - 24) / 2, 24);
-
-    private static Rectangle ShadowRoutingButton(Rectangle panel) =>
-        new(panel.X + 12 + (panel.Width - 24) / 2, panel.Y + 70,
-            (panel.Width - 24) - (panel.Width - 24) / 2, 24);
+    private static Rectangle ShadowPageButton(Rectangle panel, int index) =>
+        new(panel.X + 12 + index * ((panel.Width - 24) / 4), panel.Y + 70,
+            index == 3 ? panel.Width - 24 - 3 * ((panel.Width - 24) / 4)
+                : (panel.Width - 24) / 4, 24);
+    private static Rectangle ShadowGeometryButton(Rectangle panel) => ShadowPageButton(panel, 0);
+    private static Rectangle ShadowMotionButton(Rectangle panel) => ShadowPageButton(panel, 1);
+    private static Rectangle ShadowRotationButton(Rectangle panel) => ShadowPageButton(panel, 2);
+    private static Rectangle ShadowRoutingButton(Rectangle panel) => ShadowPageButton(panel, 3);
 
     private static Rectangle AddBlockerButton(Rectangle panel) =>
         new(panel.X + 12, panel.Y + 253, (panel.Width - 32) / 2, 24);
@@ -469,11 +531,27 @@ internal sealed class BasicLightingInspector
     {
         int x = panel.X + 13, y = panel.Y;
         Rectangle geometry = ShadowGeometryButton(panel);
+        Rectangle motion = ShadowMotionButton(panel);
+        Rectangle rotation = ShadowRotationButton(panel);
         Rectangle routing = ShadowRoutingButton(panel);
         Fill(batch, pixel, geometry, _shadowPage == ShadowPage.Geometry ? new Color(47, 86, 81) : Control);
+        Fill(batch, pixel, motion, _shadowPage == ShadowPage.Motion ? new Color(47, 86, 81) : Control);
+        Fill(batch, pixel, rotation, _shadowPage == ShadowPage.Rotation ? new Color(47, 86, 81) : Control);
         Fill(batch, pixel, routing, _shadowPage == ShadowPage.Routing ? new Color(47, 86, 81) : Control);
-        Print(batch, pixel, geometry.X + 8, geometry.Y + 8, "BLOCKERS", White, 1);
-        Print(batch, pixel, routing.X + 8, routing.Y + 8, "LIGHT RULES", White, 1);
+        Print(batch, pixel, geometry.X + 5, geometry.Y + 8, "WALLS", White, 1);
+        Print(batch, pixel, motion.X + 5, motion.Y + 8, "MOVE", White, 1);
+        Print(batch, pixel, rotation.X + 3, rotation.Y + 8, "ROTATE", White, 1);
+        Print(batch, pixel, routing.X + 5, routing.Y + 8, "RULES", White, 1);
+        if (_shadowPage == ShadowPage.Motion)
+        {
+            DrawMotionControls(batch, pixel, panel, state);
+            return;
+        }
+        if (_shadowPage == ShadowPage.Rotation)
+        {
+            DrawRotationControls(batch, pixel, panel, state);
+            return;
+        }
         if (_shadowPage == ShadowPage.Routing)
         {
             Print(batch, pixel, x, y + 124,
@@ -543,6 +621,94 @@ internal sealed class BasicLightingInspector
         Print(batch, pixel, x, y + 530, "CLICK WALL TO SELECT + DRAG", Muted, 1);
     }
 
+    private void DrawMotionControls(SpriteBatch batch, Texture2D pixel,
+        Rectangle panel, BasicLightingPreviewState state)
+    {
+        int x = panel.X + 13, y = panel.Y;
+        Print(batch, pixel, x, y + 102, "SELECT BLOCKER", Muted);
+        Drop(batch, pixel, Row(panel, 118), "BLOCKER " + (state.SelectedShadowBlockerIndex + 1) +
+            (state.SelectedShadowBlockerEnabled ? " ON" : " OFF"), _dropDown == DropDown.Blocker);
+
+        Print(batch, pixel, x, y + 168, "MOTION PATTERN", Muted);
+        Drop(batch, pixel, Row(panel, 186), state.SelectedBlockerMotionMode switch
+        {
+            BasicBlockerMotionMode.Horizontal => "HORIZONTAL PING-PONG",
+            BasicBlockerMotionMode.Vertical => "VERTICAL PING-PONG",
+            _ => "STATIC"
+        }, _dropDown == DropDown.MotionMode);
+
+        Print(batch, pixel, x, y + 247, "SPEED (CYCLES/SECOND)", Muted, 1);
+        Print(batch, pixel, panel.Right - 60, y + 247,
+            state.SelectedBlockerMotionSpeed.ToString("0.00"), White);
+        DrawSlider(batch, pixel, Slider(panel, 273),
+            (state.SelectedBlockerMotionSpeed - BasicLightingPreviewState.MinimumMotionSpeed) /
+            (BasicLightingPreviewState.MaximumMotionSpeed - BasicLightingPreviewState.MinimumMotionSpeed));
+
+        Print(batch, pixel, x, y + 306, "TRAVEL (VIEWPORT FRACTION)", Muted, 1);
+        Print(batch, pixel, panel.Right - 60, y + 306,
+            state.SelectedBlockerMotionDistance.ToString("0.00"), White);
+        DrawSlider(batch, pixel, Slider(panel, 333),
+            (state.SelectedBlockerMotionDistance - BasicLightingPreviewState.MinimumMotionDistance) /
+            (BasicLightingPreviewState.MaximumMotionDistance - BasicLightingPreviewState.MinimumMotionDistance));
+
+        Fill(batch, pixel, Row(panel, 373), Control);
+        Print(batch, pixel, x + 8, y + 381,
+            state.BlockerMotionPlaying ? "PAUSE ALL BLOCKERS" : "RESUME ALL BLOCKERS", White, 1);
+        Fill(batch, pixel, Row(panel, 414), Control);
+        Print(batch, pixel, x + 8, y + 422, "STOP SELECTED BLOCKER", White, 1);
+        Fill(batch, pixel, Row(panel, 465), new Color(35, 78, 71));
+        Print(batch, pixel, x + 8, y + 473, "LOAD MOVING SHADOW DEMO", White, 1);
+        Print(batch, pixel, x, y + 510,
+            "DRAG WALL TO RE-ANCHOR ITS PATH", Muted, 1);
+        Print(batch, pixel, x, y + 525,
+            "MOTION FREEZES WHEN GAME IS PAUSED", Muted, 1);
+    }
+
+    private void DrawRotationControls(SpriteBatch batch, Texture2D pixel,
+        Rectangle panel, BasicLightingPreviewState state)
+    {
+        int x = panel.X + 13, y = panel.Y;
+        Print(batch, pixel, x, y + 102, "SELECT BLOCKER", Muted);
+        Drop(batch, pixel, Row(panel, 118), "BLOCKER " + (state.SelectedShadowBlockerIndex + 1) +
+            (state.SelectedShadowBlockerEnabled ? " ON" : " OFF"), _dropDown == DropDown.Blocker);
+        Print(batch, pixel, x, y + 168, "ROTATION MODE", Muted);
+        Drop(batch, pixel, Row(panel, 186), state.SelectedBlockerRotationMode switch
+        {
+            BasicBlockerRotationMode.Clockwise => "CLOCKWISE",
+            BasicBlockerRotationMode.CounterClockwise => "COUNTERCLOCKWISE",
+            BasicBlockerRotationMode.Oscillate => "SWING / OSCILLATE",
+            _ => "STATIC ANGLE"
+        }, _dropDown == DropDown.RotationMode);
+
+        Print(batch, pixel, x, y + 223, "ANGLE (DEGREES)", Muted);
+        Print(batch, pixel, panel.Right - 60, y + 223,
+            state.SelectedBlockerRotationAngle.ToString("0.0"), White);
+        DrawSlider(batch, pixel, Slider(panel, 251), state.SelectedBlockerRotationAngle / 359.9);
+
+        Print(batch, pixel, x, y + 284, "ROTATION SPEED (DEG/SEC)", Muted, 1);
+        Print(batch, pixel, panel.Right - 60, y + 284,
+            state.SelectedBlockerAngularSpeed.ToString("0"), White);
+        DrawSlider(batch, pixel, Slider(panel, 312),
+            (state.SelectedBlockerAngularSpeed - BasicLightingPreviewState.MinimumAngularSpeed) /
+            (BasicLightingPreviewState.MaximumAngularSpeed - BasicLightingPreviewState.MinimumAngularSpeed));
+
+        Print(batch, pixel, x, y + 346, "SWING RANGE (+/- DEGREES)", Muted, 1);
+        Print(batch, pixel, panel.Right - 60, y + 346,
+            state.SelectedBlockerRotationSweep.ToString("0"), White);
+        DrawSlider(batch, pixel, Slider(panel, 374),
+            (state.SelectedBlockerRotationSweep - BasicLightingPreviewState.MinimumRotationSweep) /
+            (BasicLightingPreviewState.MaximumRotationSweep - BasicLightingPreviewState.MinimumRotationSweep));
+
+        Fill(batch, pixel, Row(panel, 414), Control);
+        Print(batch, pixel, x + 8, y + 422, "RESET SELECTED ROTATION", White, 1);
+        Fill(batch, pixel, Row(panel, 455), new Color(35, 78, 71));
+        Print(batch, pixel, x + 8, y + 463, "LOAD ROTATING SHADOW DEMO", White, 1);
+        Fill(batch, pixel, Row(panel, 497), Control);
+        Print(batch, pixel, x + 8, y + 505,
+            state.BlockerMotionPlaying ? "PAUSE ALL MOTION" : "RESUME ALL MOTION", White, 1);
+        Print(batch, pixel, x, y + 532, "ROTATION + TRANSLATION CAN RUN TOGETHER", Muted, 1);
+    }
+
     private static void DrawShadowToggle(SpriteBatch batch, Texture2D pixel,
         Rectangle row, bool enabled)
     {
@@ -571,6 +737,19 @@ internal sealed class BasicLightingInspector
                 DropDown.Shading => Shadings[i].ToString().ToUpperInvariant(),
                 DropDown.Blocker => "BLOCKER " + (i + 1),
                 DropDown.BlockerShape => ShadowShapes[i].ToString().ToUpperInvariant(),
+                DropDown.RotationMode => RotationModes[i] switch
+                {
+                    BasicBlockerRotationMode.Clockwise => "CLOCKWISE",
+                    BasicBlockerRotationMode.CounterClockwise => "COUNTERCLOCKWISE",
+                    BasicBlockerRotationMode.Oscillate => "SWING / OSCILLATE",
+                    _ => "STATIC ANGLE"
+                },
+                DropDown.MotionMode => MotionModes[i] switch
+                {
+                    BasicBlockerMotionMode.Horizontal => "HORIZONTAL PING-PONG",
+                    BasicBlockerMotionMode.Vertical => "VERTICAL PING-PONG",
+                    _ => "STATIC"
+                },
                 DropDown.WallOverlap => WallOverlapText(WallOverlapModes[i]),
                 DropDown.LightDepth or DropDown.BlockerDepth => DepthText(DepthLayers[i]),
                 _ => ""

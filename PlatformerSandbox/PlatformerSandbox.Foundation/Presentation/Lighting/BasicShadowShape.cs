@@ -9,13 +9,21 @@ namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 /// </summary>
 public enum BasicShadowShapeKind { Rectangle, Triangle, Trapezoid }
 
-public readonly record struct BasicShadowShape(BasicShadowRectangle Bounds, BasicShadowShapeKind Kind)
+public readonly record struct BasicShadowShape(
+    BasicShadowRectangle Bounds,
+    BasicShadowShapeKind Kind,
+    double RotationDegrees = 0,
+    double ViewportAspectRatio = 1)
 {
     public void Validate()
     {
         Bounds.Validate();
         if (!Enum.IsDefined(Kind))
             throw new ArgumentOutOfRangeException(nameof(Kind));
+        if (!double.IsFinite(RotationDegrees) || !double.IsFinite(ViewportAspectRatio) ||
+            ViewportAspectRatio <= 0)
+            throw new ArgumentOutOfRangeException(nameof(RotationDegrees),
+                "Rotation must be finite and the viewport aspect ratio positive.");
     }
 
     /// <summary>
@@ -26,7 +34,7 @@ public readonly record struct BasicShadowShape(BasicShadowRectangle Bounds, Basi
     {
         Validate();
         double x = Bounds.X, y = Bounds.Y, w = Bounds.Width, h = Bounds.Height;
-        return Kind switch
+        LightPoint[] vertices = Kind switch
         {
             BasicShadowShapeKind.Triangle =>
             [new(x + w / 2, y), new(x + w, y + h), new(x, y + h)],
@@ -36,6 +44,22 @@ public readonly record struct BasicShadowShape(BasicShadowRectangle Bounds, Basi
             _ =>
             [new(x, y), new(x + w, y), new(x + w, y + h), new(x, y + h)]
         };
+        // Preserve the exact historical axis-aligned vertices. When rotated,
+        // transform in SCREEN space, not normalized X/Y: 90 degrees must be a
+        // true right angle even when the window is 16:9 or 21:9.
+        if (RotationDegrees % 360 == 0) return vertices;
+        double radians = RotationDegrees * Math.PI / 180.0;
+        double cos = Math.Cos(radians), sin = Math.Sin(radians);
+        double cx = x + w * .5, cy = y + h * .5;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            double dx = (vertices[i].X - cx) * ViewportAspectRatio;
+            double dy = vertices[i].Y - cy;
+            vertices[i] = new LightPoint(
+                cx + (dx * cos - dy * sin) / ViewportAspectRatio,
+                cy + dx * sin + dy * cos);
+        }
+        return vertices;
     }
 
     private static double Cross(LightPoint edgeStart, LightPoint edgeEnd, LightPoint point) =>
@@ -65,7 +89,8 @@ public readonly record struct BasicShadowShape(BasicShadowRectangle Bounds, Basi
             !double.IsFinite(receiver.X) || !double.IsFinite(receiver.Y))
             throw new ArgumentOutOfRangeException(nameof(light));
         // Retain exact prior rectangle semantics for all Stage-6/7 fixtures.
-        if (Kind == BasicShadowShapeKind.Rectangle) return Bounds.Blocks(light, receiver);
+        if (Kind == BasicShadowShapeKind.Rectangle && RotationDegrees % 360 == 0)
+            return Bounds.Blocks(light, receiver);
         if (Contains(light) || Contains(receiver)) return false;
         LightPoint[] vertices = Vertices();
         double enter = 0, exit = 1;

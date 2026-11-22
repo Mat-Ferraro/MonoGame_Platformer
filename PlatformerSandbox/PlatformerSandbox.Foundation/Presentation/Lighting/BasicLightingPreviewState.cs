@@ -16,6 +16,12 @@ public enum BasicLightWallOverlapMode { FrontOfWall, BehindWallWithRim }
 /// <summary>Virtual draw depth, not screen Y: lower numbered layers are farther from the camera.</summary>
 public enum BasicLightingDepthLayer { Back = 0, World = 1, Front = 2 }
 
+/// <summary>Presentation-only translation, independent of gameplay motion.</summary>
+public enum BasicBlockerMotionMode { Static, Horizontal, Vertical }
+
+/// <summary>Clockwise is positive in screen-space coordinates (Y down).</summary>
+public enum BasicBlockerRotationMode { Static, Clockwise, CounterClockwise, Oscillate }
+
 /// <summary>
 /// Per-draw receiver override, used ONLY for the wall face being intersected.
 /// Other surfaces and blockers continue to receive/shadow both lights normally.
@@ -28,6 +34,15 @@ public readonly record struct BasicWallRimContext(bool Light1Inside, bool Light2
 
 public sealed class BasicLightingPreviewState
 {
+    public BasicLightingPreviewState()
+    {
+        for (int i = 0; i < ShadowBlockerCount; i++)
+        {
+            ResetMotionSlot(i);
+            ResetRotationSlot(i);
+        }
+    }
+
     private sealed class EditableLight
     {
         public bool Enabled;
@@ -69,6 +84,220 @@ public sealed class BasicLightingPreviewState
     private readonly BasicShadowRectangle[] _shadowBlockers =
         [DefaultBlocker, DefaultBlocker2, DefaultBlocker3];
     private readonly bool[] _shadowBlockerEnabled = new bool[ShadowBlockerCount];
+    // Stage 13: every authoring slot owns its own motion. The Home rectangle
+    // is immutable during time advancement (no integration/drift). Its current
+    // position is derived from an elapsed-time triangle wave each frame.
+    private readonly BasicBlockerMotionMode[] _blockerMotionModes = new BasicBlockerMotionMode[ShadowBlockerCount];
+    private readonly double[] _blockerMotionSpeeds = new double[ShadowBlockerCount];
+    private readonly double[] _blockerMotionDistances = new double[ShadowBlockerCount];
+    private readonly double[] _blockerMotionPhases = new double[ShadowBlockerCount];
+    private readonly BasicShadowRectangle[] _blockerMotionHomes = new BasicShadowRectangle[ShadowBlockerCount];
+    // Rotation is independent of translation, but both are evaluated on the
+    // same frame before submitting wall faces and shadow vertices to the GPU.
+    private readonly double[] _blockerAngles = new double[ShadowBlockerCount];
+    private readonly double[] _blockerRotationAnchors = new double[ShadowBlockerCount];
+    private readonly double[] _blockerRotationPhases = new double[ShadowBlockerCount];
+    private readonly double[] _blockerAngularSpeeds = new double[ShadowBlockerCount];
+    private readonly double[] _blockerRotationSweeps = new double[ShadowBlockerCount];
+    private readonly BasicBlockerRotationMode[] _blockerRotationModes = new BasicBlockerRotationMode[ShadowBlockerCount];
+    private double _shadowViewportAspectRatio = 1;
+    public double ShadowViewportAspectRatio => _shadowViewportAspectRatio;
+    public void SetShadowViewportAspectRatio(double ratio)
+    {
+        if (!double.IsFinite(ratio) || ratio <= 0)
+            throw new ArgumentOutOfRangeException(nameof(ratio));
+        _shadowViewportAspectRatio = ratio;
+    }
+    public const double MinimumAngularSpeed = 15; // degrees/second
+    public const double MaximumAngularSpeed = 180;
+    public const double MinimumRotationSweep = 5; // degrees from anchor
+    public const double MaximumRotationSweep = 90;
+    public BasicBlockerRotationMode SelectedBlockerRotationMode =>
+        _blockerRotationModes[SelectedShadowBlockerIndex];
+    public double SelectedBlockerRotationAngle => _blockerAngles[SelectedShadowBlockerIndex];
+    public double SelectedBlockerAngularSpeed => _blockerAngularSpeeds[SelectedShadowBlockerIndex];
+    public double SelectedBlockerRotationSweep => _blockerRotationSweeps[SelectedShadowBlockerIndex];
+    public BasicBlockerRotationMode GetBlockerRotationMode(int index)
+    {
+        CheckShadowBlockerIndex(index);
+        return _blockerRotationModes[index];
+    }
+    public double GetBlockerRotationAngle(int index)
+    {
+        CheckShadowBlockerIndex(index);
+        return _blockerAngles[index];
+    }
+    private static double WrapDegrees(double angle) => ((angle % 360) + 360) % 360;
+    private void AnchorRotationAtCurrentAngle(int index)
+    {
+        _blockerRotationAnchors[index] = _blockerAngles[index];
+        _blockerRotationPhases[index] = 0;
+    }
+    private void ResetRotationSlot(int index)
+    {
+        _blockerAngles[index] = 0;
+        _blockerRotationModes[index] = BasicBlockerRotationMode.Static;
+        _blockerAngularSpeeds[index] = 60;
+        _blockerRotationSweeps[index] = 45;
+        AnchorRotationAtCurrentAngle(index);
+    }
+    public void SetSelectedBlockerRotationMode(BasicBlockerRotationMode mode)
+    {
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        int index = SelectedShadowBlockerIndex;
+        if (_blockerRotationModes[index] == mode) return;
+        AnchorRotationAtCurrentAngle(index);
+        _blockerRotationModes[index] = mode;
+    }
+    public void SetSelectedBlockerRotationAngle(double degrees)
+    {
+        if (!double.IsFinite(degrees)) throw new ArgumentOutOfRangeException(nameof(degrees));
+        int index = SelectedShadowBlockerIndex;
+        _blockerAngles[index] = WrapDegrees(degrees);
+        AnchorRotationAtCurrentAngle(index);
+    }
+    public void SetSelectedBlockerAngularSpeed(double degreesPerSecond)
+    {
+        if (!double.IsFinite(degreesPerSecond)) throw new ArgumentOutOfRangeException(nameof(degreesPerSecond));
+        _blockerAngularSpeeds[SelectedShadowBlockerIndex] = Math.Clamp(degreesPerSecond,
+            MinimumAngularSpeed, MaximumAngularSpeed);
+    }
+    public void SetSelectedBlockerRotationSweep(double degrees)
+    {
+        if (!double.IsFinite(degrees)) throw new ArgumentOutOfRangeException(nameof(degrees));
+        int index = SelectedShadowBlockerIndex;
+        AnchorRotationAtCurrentAngle(index);
+        _blockerRotationSweeps[index] = Math.Clamp(degrees, MinimumRotationSweep, MaximumRotationSweep);
+    }
+    public void ResetSelectedBlockerRotation() => ResetRotationSlot(SelectedShadowBlockerIndex);
+
+    public const double MinimumMotionSpeed = .10; // complete round trips per second
+    public const double MaximumMotionSpeed = 1.50;
+    public const double MinimumMotionDistance = .02; // normalized viewport units
+    public const double MaximumMotionDistance = .30;
+    public bool BlockerMotionPlaying { get; private set; } = true;
+    public void SetBlockerMotionPlaying(bool playing) => BlockerMotionPlaying = playing;
+    public void ToggleBlockerMotionPlaying() => BlockerMotionPlaying = !BlockerMotionPlaying;
+    public BasicBlockerMotionMode SelectedBlockerMotionMode =>
+        _blockerMotionModes[SelectedShadowBlockerIndex];
+    public double SelectedBlockerMotionSpeed => _blockerMotionSpeeds[SelectedShadowBlockerIndex];
+    public double SelectedBlockerMotionDistance => _blockerMotionDistances[SelectedShadowBlockerIndex];
+
+    public BasicBlockerMotionMode GetBlockerMotionMode(int index)
+    {
+        CheckShadowBlockerIndex(index);
+        return _blockerMotionModes[index];
+    }
+
+    private void AnchorMotionAtCurrentPosition(int index)
+    {
+        _blockerMotionHomes[index] = _shadowBlockers[index];
+        _blockerMotionPhases[index] = 0;
+    }
+
+    private void ResetMotionSlot(int index)
+    {
+        _blockerMotionModes[index] = BasicBlockerMotionMode.Static;
+        _blockerMotionSpeeds[index] = .40;
+        _blockerMotionDistances[index] = .16;
+        AnchorMotionAtCurrentPosition(index);
+    }
+
+    public void SetSelectedBlockerMotionMode(BasicBlockerMotionMode mode)
+    {
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        int i = SelectedShadowBlockerIndex;
+        if (_blockerMotionModes[i] == mode) return;
+        AnchorMotionAtCurrentPosition(i);
+        _blockerMotionModes[i] = mode;
+    }
+
+    public void SetSelectedBlockerMotionSpeed(double cyclesPerSecond)
+    {
+        if (!double.IsFinite(cyclesPerSecond)) throw new ArgumentOutOfRangeException(nameof(cyclesPerSecond));
+        _blockerMotionSpeeds[SelectedShadowBlockerIndex] = Math.Clamp(cyclesPerSecond,
+            MinimumMotionSpeed, MaximumMotionSpeed);
+    }
+
+    public void SetSelectedBlockerMotionDistance(double normalizedDistance)
+    {
+        if (!double.IsFinite(normalizedDistance)) throw new ArgumentOutOfRangeException(nameof(normalizedDistance));
+        int i = SelectedShadowBlockerIndex;
+        AnchorMotionAtCurrentPosition(i); // distance edits cannot teleport the wall
+        _blockerMotionDistances[i] = Math.Clamp(normalizedDistance,
+            MinimumMotionDistance, MaximumMotionDistance);
+    }
+
+    public void ResetSelectedBlockerMotion()
+    {
+        int i = SelectedShadowBlockerIndex;
+        ResetMotionSlot(i); // freeze at its current position, no jump
+    }
+
+    /// <summary>
+    /// Step all enabled moving blockers using elapsed presentation time.
+    /// A slot starts at its authored anchor, travels up to Distance in the
+    /// positive direction, then returns. Near a viewport boundary it uses the
+    /// negative direction instead. The full range is clamped to the viewport.
+    /// Calls are deterministic and invariant to timestep splitting within
+    /// floating-point tolerance. Pausing does not advance phase.
+    /// </summary>
+    public void AdvanceBlockerMotion(double elapsedSeconds, int skipBlockerIndex = -1)
+    {
+        if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0)
+            throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
+        if (!BlockerMotionPlaying || elapsedSeconds == 0) return;
+        for (int i = 0; i < ShadowBlockerCount; i++)
+        {
+            if (i == skipBlockerIndex) continue; // Mouse ownership prevents drag jitter.
+            BasicBlockerMotionMode mode = _blockerMotionModes[i];
+            if (!_shadowBlockerEnabled[i]) continue;
+            // Evaluate rotation before translation. Each transform is derived
+            // from an immutable anchor plus phase: no cumulative vertex drift.
+            BasicBlockerRotationMode rotationMode = _blockerRotationModes[i];
+            if (rotationMode != BasicBlockerRotationMode.Static)
+            {
+                double speed = _blockerAngularSpeeds[i];
+                if (rotationMode == BasicBlockerRotationMode.Oscillate)
+                {
+                    double sweep = _blockerRotationSweeps[i];
+                    double rotationPhase = (_blockerRotationPhases[i] + elapsedSeconds * speed / (4 * sweep)) % 1.0;
+                    _blockerRotationPhases[i] = rotationPhase;
+                    // Triangle wave: 0 -> +sweep -> 0 -> -sweep -> 0.
+                    double signed = rotationPhase < .25 ? rotationPhase * 4 :
+                        rotationPhase < .75 ? 2 - rotationPhase * 4 : rotationPhase * 4 - 4;
+                    _blockerAngles[i] = WrapDegrees(_blockerRotationAnchors[i] + signed * sweep);
+                }
+                else
+                {
+                    double rotationPhase = (_blockerRotationPhases[i] + elapsedSeconds * speed) % 360;
+                    _blockerRotationPhases[i] = rotationPhase;
+                    _blockerAngles[i] = WrapDegrees(_blockerRotationAnchors[i] +
+                        (rotationMode == BasicBlockerRotationMode.Clockwise ? rotationPhase : -rotationPhase));
+                }
+            }
+            if (mode == BasicBlockerMotionMode.Static) continue;
+            BasicShadowRectangle home = _blockerMotionHomes[i];
+            double phase = (_blockerMotionPhases[i] + elapsedSeconds * _blockerMotionSpeeds[i]) % 1.0;
+            _blockerMotionPhases[i] = phase;
+            double t = phase <= .5 ? phase * 2 : (1 - phase) * 2;
+            bool horizontal = mode == BasicBlockerMotionMode.Horizontal;
+            double start = horizontal ? home.X : home.Y;
+            double limit = 1 - (horizontal ? home.Width : home.Height);
+            double span = _blockerMotionDistances[i];
+            // Prefer positive travel; if there is insufficient positive room,
+            // use negative travel. Always choose one endpoint consistently.
+            double positive = Math.Min(span, limit - start);
+            double negative = Math.Min(span, start);
+            double signedTravel = positive >= span * .50 || positive >= negative
+                ? positive : -negative;
+            double position = Math.Clamp(start + signedTravel * t, 0, limit);
+            _shadowBlockers[i] = horizontal
+                ? home with { X = position }
+                : home with { Y = position };
+        }
+    }
+
     private readonly BasicShadowShapeKind[] _shadowBlockerKinds = new BasicShadowShapeKind[ShadowBlockerCount];
     private readonly BasicLightingDepthLayer[] _shadowBlockerLayers =
         [BasicLightingDepthLayer.World, BasicLightingDepthLayer.World, BasicLightingDepthLayer.World];
@@ -104,7 +333,8 @@ public sealed class BasicLightingPreviewState
     public BasicShadowShape GetShadowShape(int index)
     {
         CheckShadowBlockerIndex(index);
-        return new BasicShadowShape(_shadowBlockers[index], _shadowBlockerKinds[index]);
+        return new BasicShadowShape(_shadowBlockers[index], _shadowBlockerKinds[index],
+            _blockerAngles[index], _shadowViewportAspectRatio);
     }
 
     public IReadOnlyList<BasicShadowShape> ActiveShadowShapes
@@ -137,6 +367,8 @@ public sealed class BasicLightingPreviewState
             };
             _shadowBlockerKinds[i] = kind;
             _shadowBlockerLayers[i] = BasicLightingDepthLayer.World;
+            ResetMotionSlot(i);
+            ResetRotationSlot(i);
             bool firstBlocker = ActiveShadowBlockerCount == 0;
             _shadowBlockerEnabled[i] = true;
             if (firstBlocker) _lights[SelectedLightIndex].CastShadows = true;
@@ -150,6 +382,8 @@ public sealed class BasicLightingPreviewState
     {
         if (!SelectedShadowBlockerEnabled) return false;
         _shadowBlockerEnabled[SelectedShadowBlockerIndex] = false;
+        ResetMotionSlot(SelectedShadowBlockerIndex);
+        ResetRotationSlot(SelectedShadowBlockerIndex);
         for (int i = 0; i < ShadowBlockerCount; i++)
             if (_shadowBlockerEnabled[i])
             {
@@ -235,6 +469,9 @@ public sealed class BasicLightingPreviewState
             X = Math.Clamp(x, 0, 1 - blocker.Width),
             Y = Math.Clamp(y, 0, 1 - blocker.Height)
         };
+        // Manual drags/inspector edits re-anchor motion so the next frame does
+        // not snap back to an old automatic position.
+        AnchorMotionAtCurrentPosition(index);
     }
 
     public void SetShadowBlockerSize(double width, double height) => SetBlockerSize(0, width, height);
@@ -250,6 +487,7 @@ public sealed class BasicLightingPreviewState
         BasicShadowRectangle old = _shadowBlockers[index];
         _shadowBlockers[index] = new BasicShadowRectangle(
             Math.Min(old.X, 1 - width), Math.Min(old.Y, 1 - height), width, height);
+        AnchorMotionAtCurrentPosition(index);
     }
 
     private void ResetShadowSlots()
@@ -260,7 +498,12 @@ public sealed class BasicLightingPreviewState
         Array.Clear(_shadowBlockerEnabled, 0, _shadowBlockerEnabled.Length);
         Array.Clear(_shadowBlockerKinds, 0, _shadowBlockerKinds.Length);
         for (int i = 0; i < ShadowBlockerCount; i++)
+        {
             _shadowBlockerLayers[i] = BasicLightingDepthLayer.World;
+            ResetMotionSlot(i);
+            ResetRotationSlot(i);
+        }
+        BlockerMotionPlaying = true;
         ShowBlockerOutlines = false;
         SelectedShadowBlockerIndex = 0;
     }
@@ -328,6 +571,69 @@ public sealed class BasicLightingPreviewState
         _lights[0].Radius = .9;
         _lights[1].Radius = .9;
         SelectedShadowBlockerIndex = 1;
+    }
+
+    /// <summary>Reproducible Stage-13 fixture with moving convex silhouettes.</summary>
+    public void LoadMovingShadowComparison()
+    {
+        LoadPolygonShadowComparison();
+        _lights[0].CastShadows = true;
+        _lights[1].CastShadows = true;
+        _lights[1].DepthLayer = BasicLightingDepthLayer.Back;
+        _shadowBlockerLayers[2] = BasicLightingDepthLayer.Front;
+        _blockerMotionModes[0] = BasicBlockerMotionMode.Vertical;
+        _blockerMotionModes[1] = BasicBlockerMotionMode.Horizontal;
+        _blockerMotionModes[2] = BasicBlockerMotionMode.Horizontal;
+        _blockerMotionSpeeds[0] = .33;
+        _blockerMotionSpeeds[1] = .40;
+        _blockerMotionSpeeds[2] = .55;
+        _blockerMotionDistances[0] = .16;
+        _blockerMotionDistances[1] = .15;
+        _blockerMotionDistances[2] = .10;
+        for (int i = 0; i < ShadowBlockerCount; i++) AnchorMotionAtCurrentPosition(i);
+        BlockerMotionPlaying = true;
+        SelectedLightIndex = 1;
+        SelectedShadowBlockerIndex = 2;
+        DebugView = BasicLightingDebugView.Final;
+    }
+
+    /// <summary>Stage-14 fixture: two rotating shapes and moving/rotating combinations.</summary>
+    public void LoadRotatingShadowComparison()
+    {
+        LoadPolygonShadowComparison();
+        _lights[0].CastShadows = true;
+        _lights[1].CastShadows = true;
+        _lights[0].DepthLayer = BasicLightingDepthLayer.World;
+        _lights[1].DepthLayer = BasicLightingDepthLayer.Back;
+        _shadowBlockerLayers[2] = BasicLightingDepthLayer.Front;
+        // Wide silhouettes have legible changing edges and rim direction.
+        _shadowBlockerKinds[0] = BasicShadowShapeKind.Rectangle;
+        _shadowBlockerKinds[1] = BasicShadowShapeKind.Triangle;
+        _shadowBlockerKinds[2] = BasicShadowShapeKind.Trapezoid;
+        _blockerAngles[0] = 25;
+        _blockerAngles[1] = 0;
+        _blockerAngles[2] = 330;
+        _blockerRotationModes[0] = BasicBlockerRotationMode.Static;
+        _blockerRotationModes[1] = BasicBlockerRotationMode.Clockwise;
+        _blockerRotationModes[2] = BasicBlockerRotationMode.Oscillate;
+        _blockerAngularSpeeds[1] = 55;
+        _blockerAngularSpeeds[2] = 60;
+        _blockerRotationSweeps[2] = 55;
+        _blockerMotionModes[0] = BasicBlockerMotionMode.Vertical;
+        _blockerMotionModes[2] = BasicBlockerMotionMode.Horizontal;
+        _blockerMotionSpeeds[0] = .22;
+        _blockerMotionSpeeds[2] = .32;
+        _blockerMotionDistances[0] = .09;
+        _blockerMotionDistances[2] = .07;
+        for (int i = 0; i < ShadowBlockerCount; i++)
+        {
+            AnchorMotionAtCurrentPosition(i);
+            AnchorRotationAtCurrentAngle(i);
+        }
+        BlockerMotionPlaying = true;
+        SelectedShadowBlockerIndex = 2;
+        SelectedLightIndex = 1;
+        DebugView = BasicLightingDebugView.Final;
     }
 
     public int SelectedSurfaceIndex { get; private set; }
