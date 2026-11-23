@@ -11,6 +11,7 @@ public static class GameLevelIds
     public const string AuthoredWorld = "AUTHORED_WORLD";
     public const string MotionLab = "MOTION_LAB";
     public const string LightingBasics = "LIGHTING_BASICS";
+    public const string LightingIntegrationTest = "LIGHTING_INTEGRATION_TEST";
     public const string RouteA = "ROUTE_A";
     public const string RouteB = "ROUTE_B";
     public const string LdtkTest = "LDTK_TEST";
@@ -26,7 +27,7 @@ public static class GameLevelIds
     public static bool IsStandalonePlayableLevel(string levelId) => levelId is
         (MovementGym or SharedWorld or AuthoredWorld or MotionLab or LdtkTest or
          LdtkParallaxDemo or LdtkSceneryDemo or LdtkTerrainDemo or
-         LdtkConnectedA or LdtkConnectedB or LightingBasics);
+         LdtkConnectedA or LdtkConnectedB or LightingBasics or LightingIntegrationTest);
 }
 
 public sealed record SceneDestination

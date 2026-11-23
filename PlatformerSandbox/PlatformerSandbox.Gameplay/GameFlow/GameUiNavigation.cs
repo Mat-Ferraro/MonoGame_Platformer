@@ -22,56 +22,75 @@ public readonly record struct GameUiMenuItem(string Label, GameUiCommand Command
 /// </summary>
 public static class GameLevelMenuCatalog
 {
+    // Only maintained gameplay/lighting destinations are shown. Older scenes,
+    // fixtures, and LDtk files remain loadable by --dev-level and by world routes.
+    public const string LightingIntegrationTest = GameLevelIds.LightingIntegrationTest;
     private static readonly IReadOnlyList<GameUiMenuItem> _items = Array.AsReadOnly(
         new GameUiMenuItem[]
         {
-            new("LDTK  /  FIRST ATTEMPT", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LdtkTest)),
-            new("LDTK  /  PARALLAX DEMO", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LdtkParallaxDemo)),
-            new("LDTK  /  SCENERY DEMO", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LdtkSceneryDemo)),
-            new("LDTK  /  TERRAIN DEMO", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LdtkTerrainDemo)),
-            new("LDTK  /  CONNECTED CAVERN A", GameUiCommand.PlaySelectedLevel,
+            new("PLAY / CONNECTED CAVERN", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LdtkConnectedA)),
-            new("LDTK  /  CONNECTED CAVERN B", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LdtkConnectedB)),
-            new("ROUTES  /  LEVEL A", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.RouteA)),
-            new("ROUTES  /  LEVEL B EAST", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.RouteB, "EAST")),
-            new("GYM  /  MOVEMENT", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.MovementGym)),
-            new("GYM  /  SHARED WORLD", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.SharedWorld)),
-            new("GYM  /  AUTHORED WORLD", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.AuthoredWorld)),
-            new("GYM  /  MOTION LAB", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.MotionLab)),
-            new("LAB  /  LIGHTING BASICS", GameUiCommand.PlaySelectedLevel,
+            new("LIGHTING / INTEGRATION TEST", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(LightingIntegrationTest)),
+            new("LAB / LIGHTING BASICS", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LightingBasics)),
+            new("GYM / MOVEMENT", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.MovementGym))
         });
 
     public static IReadOnlyList<GameUiMenuItem> Items => _items;
 
-    /// <summary>Retain familiar demo shortcuts, discover all other LDtk levels,
-    /// and keep non-LDtk gyms at the end of the menu.</summary>
+    /// <summary>Only display currently maintained LDtk scenes that actually exist.
+    /// Debug fixtures remain available via direct --dev-level or linked exits.</summary>
     public static IReadOnlyList<GameUiMenuItem> WithDiscoveredLevels(IEnumerable<string> levelIds)
     {
         ArgumentNullException.ThrowIfNull(levelIds);
-        var ids = levelIds.ToHashSet(StringComparer.Ordinal);
-        var list = new List<GameUiMenuItem>();
-        // The first six are the historical LDtk menu entries. Their scene IDs
-        // remain compatibility aliases for previously authored single-level files.
-        foreach (GameUiMenuItem item in _items.Take(6))
-            if (item.Destination is SceneDestination destination && ids.Remove(destination.LevelId))
-                list.Add(item);
-        foreach (string id in ids.OrderBy(x => x, StringComparer.Ordinal))
-            list.Add(new GameUiMenuItem("LDTK  /  " + id.Replace('_', ' '),
-                GameUiCommand.PlaySelectedLevel, new SceneDestination(id)));
-        list.AddRange(_items.Skip(6));
-        return list.AsReadOnly();
+        var available = levelIds.ToHashSet(StringComparer.Ordinal);
+        var menu = _items.Where(x => x.Destination is SceneDestination destination &&
+            (destination.LevelId is GameLevelIds.LightingBasics or GameLevelIds.MovementGym ||
+             available.Contains(destination.LevelId))).ToArray();
+        return Array.AsReadOnly(menu);
+    }
+}
+
+
+/// <summary>Shared mouse and draw geometry for visible menus. No MonoGame types.</summary>
+public static class GameMenuLayout
+{
+    public static (int Left, int Top, int Width, int Height, int First, int Rows)
+        Get(int viewportWidth, int viewportHeight, GameUiScreen screen,
+            int entryCount, int selectionIndex)
+    {
+        int width = Math.Min(660, Math.Max(200, viewportWidth - 36));
+        int left = Math.Max(8, (viewportWidth - width) / 2);
+        int height = screen switch
+        {
+            GameUiScreen.Controls => 260,
+            GameUiScreen.Title => 242,
+            GameUiScreen.LevelSelect => 110 + entryCount * 30,
+            _ => 242
+        };
+        height = Math.Min(height, Math.Max(140, viewportHeight - 32));
+        int top = Math.Max(8, (viewportHeight - height) / 2);
+        int rows = Math.Max(1, (height - 106) / 30);
+        int first = Math.Clamp(selectionIndex - rows / 2, 0,
+            Math.Max(0, entryCount - rows));
+        return (left, top, width, height, first, rows);
+    }
+
+    /// <summary>Returns a hovered entry, never an entry hidden by scrolling.</summary>
+    public static int Hit(int viewportWidth, int viewportHeight,
+        GameUiScreen screen, int entryCount, int selectionIndex,
+        int mouseX, int mouseY)
+    {
+        var b = Get(viewportWidth, viewportHeight, screen, entryCount, selectionIndex);
+        if (mouseX < b.Left + 18 || mouseX >= b.Left + b.Width - 18 ||
+            mouseY < b.Top + 58) return -1;
+        int row = (mouseY - (b.Top + 58)) / 30;
+        if (row < 0 || row >= b.Rows) return -1;
+        int index = b.First + row;
+        return index < entryCount && mouseY < b.Top + 58 + b.Rows * 30
+            ? index : -1;
     }
 }
 

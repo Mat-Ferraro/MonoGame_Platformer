@@ -25,7 +25,8 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
 
     public LdtkVisualSceneAssets(GraphicsDevice graphics, string ldtkFile,
         LdtkVisualDefinition definition, LdtkSceneryDefinition scenery,
-        LdtkTerrainArtworkDefinition? terrain = null)
+        LdtkTerrainArtworkDefinition? terrain = null,
+        LdtkLightingScene? lighting = null)
     {
         ArgumentNullException.ThrowIfNull(graphics);
         ArgumentNullException.ThrowIfNull(definition);
@@ -73,6 +74,33 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
             if (Terrain is not null)
                 foreach (LdtkTerrainArtwork art in Terrain.Artworks)
                     LoadImage(art.ImagePath);
+            // Scene preparation loads every authored map before committing the
+            // world, so a missing/bad PNG cannot fail mid-frame.
+            if (lighting is not null)
+                foreach (var (iid, surface) in lighting.Surfaces)
+                    if (surface.MaterialShading != ProductionSurfaceShading.Legacy)
+                    {
+                        // The initial production GPU bridge intentionally does
+                        // not rotate/flip tangent-space vectors. Reject that
+                        // authoring combination rather than shade with a wrong
+                        // edge direction (the lab retains rotation support).
+                        bool found = false;
+                        if (Terrain is not null)
+                            foreach (LdtkTerrainArtwork art in Terrain.Artworks)
+                                if (art.InstanceId == iid)
+                                {
+                                    found = true;
+                                    if (surface.MaterialShading != ProductionSurfaceShading.Flat &&
+                                        (Math.Abs(art.RotationDegrees) > 1e-6 || art.FlipX || art.FlipY))
+                                        throw new NotSupportedException(
+                                            "Stage 15B advanced maps require unrotated, unflipped artwork.");
+                                }
+                        if (!found)
+                            throw new NotSupportedException(
+                                "Stage 15B GPU surface has no corresponding TerrainArtwork asset.");
+                        if (!string.IsNullOrEmpty(surface.NormalMap)) LoadImage(surface.NormalMap);
+                        if (!string.IsNullOrEmpty(surface.EdgeMap)) LoadImage(surface.EdgeMap);
+                    }
         }
         catch
         {
@@ -90,7 +118,10 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
         double cameraLeftPx, double cameraTopPx, Viewport view,
         LdtkLightingScene? lighting = null, bool? onlyPostLighting = null,
         Func<string, Color>? lightTint = null, Texture2D? contactShadow = null,
-        string? renderLayer = null, double parallaxMultiplier = 1)
+        string? renderLayer = null, double parallaxMultiplier = 1,
+        Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
+            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterial = null,
+        LdtkLightingScene? animationScene = null)
     {
         // Ordinary drawing (null) preserves the legacy renderer. During lighting,
         // split light receiving surfaces from unlit and casting foreground props.
@@ -159,16 +190,66 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
             else
             {
                 LdtkTerrainArtwork art = artwork[j++];
+                LdtkLightingScene? activeMotionScene = animationScene ?? lighting;
+                if (activeMotionScene is not null &&
+                    activeMotionScene.OccluderMotions.TryGetValue(art.InstanceId, out var motion))
+                {
+                    PresentationOccluderPose pose = motion.At(activeMotionScene.AnimationSeconds);
+                    double pxScale = LdtkLevelImporter.PixelsPerWorldUnit;
+                    art = art with
+                    {
+                        PixelX = art.PixelX + pose.DeltaX * pxScale,
+                        PixelY = art.PixelY - pose.DeltaY * pxScale,
+                        RotationDegrees = (float)(art.RotationDegrees + pose.RotationDegrees)
+                    };
+                }
                 LightingSurfaceOptions settings = lighting?.GetSurface(art.InstanceId) ?? new();
                 if (renderLayer is not null && settings.LayerId != renderLayer) continue;
                 bool layerUnlit = lighting is not null &&
                     lighting.Layers.Get(settings.LayerId).Mode == RenderLayerLightingMode.Unlit;
                 bool post = settings.NeedsIndependentPass || layerUnlit;
                 if (onlyPostLighting is null || onlyPostLighting.Value == post)
-                    DrawArtwork(batch, art, cameraLeftPx * parallaxMultiplier,
-                        cameraTopPx * parallaxMultiplier, view,
+                {
+                    double cameraX = cameraLeftPx * parallaxMultiplier;
+                    double cameraY = cameraTopPx * parallaxMultiplier;
+                    if (post && drawMaterial is not null &&
+                        settings.MaterialShading != ProductionSurfaceShading.Legacy &&
+                        !layerUnlit)
+                    {
+                        ProductionSurfaceSubmission submission =
+                            ProductionSurfaceSubmission.From(art.InstanceId, settings);
+                        if (lighting is not null &&
+                            lighting.SurfaceCenters.TryGetValue(art.InstanceId, out LightPoint center))
+                            submission = submission with { Center = center };
+                        submission.Validate();
+                        Action<SpriteBatch> albedo = sb => DrawArtwork(sb, art,
+                            cameraX, cameraY, view, Color.White, null);
+                        Action<SpriteBatch>? normals =
+                            string.IsNullOrEmpty(submission.NormalMap) ? null :
+                            sb => DrawArtwork(sb, art, cameraX, cameraY, view,
+                                Color.White, null, _images[submission.NormalMap!]);
+                        Action<SpriteBatch>? edges =
+                            string.IsNullOrEmpty(submission.EdgeMap) ? null :
+                            sb => DrawArtwork(sb, art, cameraX, cameraY, view,
+                                Color.White, null, _images[submission.EdgeMap!]);
+                        // Use exactly the projection/pivot/rotation that
+                        // DrawArtwork uses, so the cropped shader and final
+                        // composite cannot disagree with the painted sprite.
+                        var (spriteX, spriteY, spriteW, spriteH) =
+                            LdtkTerrainArtworkTransform.Project(art, cameraX, cameraY);
+                        ProductionMaterialRegion region =
+                            ProductionMaterialRegionPlanner.ForSprite(
+                                spriteX, spriteY, spriteW, spriteH,
+                                art.PivotX, art.PivotY, art.RotationDegrees,
+                                view.Width, view.Height);
+                        batch.End();
+                        drawMaterial(submission, region, albedo, normals, edges);
+                        batch.Begin(samplerState: SamplerState.PointClamp);
+                    }
+                    else DrawArtwork(batch, art, cameraX, cameraY, view,
                         lightTint?.Invoke(art.InstanceId) ?? Color.White,
                         post && settings.ContactShadow ? contactShadow : null);
+                }
             }
         }
     }
@@ -217,7 +298,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
 
     private void DrawArtwork(SpriteBatch batch, LdtkTerrainArtwork art,
         double cameraLeftPx, double cameraTopPx, Viewport view, Color lightTint,
-        Texture2D? contactShadow)
+        Texture2D? contactShadow, Texture2D? mapOverride = null)
     {
         var (x, y, w, h) = LdtkTerrainArtworkTransform.Project(art,
             cameraLeftPx, cameraTopPx);
@@ -231,7 +312,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
             batch.Draw(contactShadow, new Rectangle(cx - (int)(w * .43), cy - 3,
                 Math.Max(1, (int)(w * .86)), Math.Max(2, (int)(h * .12))), Color.White);
         }
-        Texture2D image = _images[art.ImagePath];
+        Texture2D image = mapOverride ?? _images[art.ImagePath];
         SpriteEffects effects = SpriteEffects.None;
         if (art.FlipX) effects |= SpriteEffects.FlipHorizontally;
         if (art.FlipY) effects |= SpriteEffects.FlipVertically;
@@ -240,10 +321,12 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
             Convert.ToByte(art.TintHex.Substring(3, 2), 16),
             Convert.ToByte(art.TintHex.Substring(5, 2), 16));
         batch.Draw(image, new Vector2((float)x, (float)y),
-            new Rectangle(0, 0, image.Width, image.Height), Tint(new Color(
-                (byte)(tint.R * (lightTint.R / 255.0)),
-                (byte)(tint.G * (lightTint.G / 255.0)),
-                (byte)(tint.B * (lightTint.B / 255.0))), art.Opacity),
+            new Rectangle(0, 0, image.Width, image.Height), mapOverride is not null
+                ? Color.White
+                : Tint(new Color(
+                    (byte)(tint.R * (lightTint.R / 255.0)),
+                    (byte)(tint.G * (lightTint.G / 255.0)),
+                    (byte)(tint.B * (lightTint.B / 255.0))), art.Opacity),
             MathHelper.ToRadians(art.RotationDegrees),
             new Vector2(image.Width * art.PivotX, image.Height * art.PivotY),
             new Vector2((float)(w / image.Width), (float)(h / image.Height)),

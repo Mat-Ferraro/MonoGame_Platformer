@@ -45,6 +45,9 @@ public sealed record RadialLight
     public double Radius { get; init; } = 3.0;
     public double Intensity { get; init; } = 1.0;
     public bool CastShadows { get; init; }
+    /// <summary>Optional authored virtual depth for GPU wall lighting. 0 is the legacy plane.
+    /// This is NOT LDtk draw-order or the name of a render layer.</summary>
+    public double VirtualZ { get; init; }
     /// <summary>Allows this light to reveal the front face of explicitly
     /// silhouetted scenery. Ordinary lights leave silhouettes dark. This does
     /// not change occluder geometry or an object's CastsShadows flag.</summary>
@@ -63,6 +66,8 @@ public sealed record RadialLight
             string.IsNullOrWhiteSpace(Owner) || Owner.Length > 80)
             throw new ArgumentException("Light ID and owner must be nonempty (at most 80 characters).");
         Position.Validate();
+        if (!double.IsFinite(VirtualZ) || VirtualZ is < -100 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(VirtualZ));
         Color.Validate(nameof(Color));
         if (!double.IsFinite(Radius) || Radius <= 0 || Radius > 10000 ||
             !double.IsFinite(Intensity) || Intensity < 0 || Intensity > 4)

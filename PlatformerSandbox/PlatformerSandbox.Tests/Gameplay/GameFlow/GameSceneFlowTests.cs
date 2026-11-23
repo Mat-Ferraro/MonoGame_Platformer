@@ -288,17 +288,16 @@ public sealed class GameSceneFlowTests
     }
 
     [Fact]
-    public void TitleMenuOffersVisibleLevelSelectionAndKeepsAllGymsAccessible()
+    public void TitleMenuOffersMaintainedScenesWithoutLegacyGymClutter()
     {
         using var flow = new GameFlowController(new TestFactory());
-        Assert.Contains(flow.MenuItems, i => i.Command == GameUiCommand.OpenLevelSelect);
+        Assert.Contains(flow.MenuItems, x => x.Command == GameUiCommand.OpenLevelSelect);
         flow.Execute(GameUiCommand.OpenLevelSelect);
         Assert.Equal(GameUiScreen.LevelSelect, flow.CurrentMenu);
-        string[] supported =
-        [GameLevelIds.MovementGym, GameLevelIds.SharedWorld,
-            GameLevelIds.AuthoredWorld, GameLevelIds.MotionLab];
-        foreach (string levelId in supported)
-            Assert.Contains(flow.MenuItems, i => i.Destination?.LevelId == levelId);
+        Assert.Contains(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.MovementGym);
+        Assert.Contains(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.LightingBasics);
+        Assert.DoesNotContain(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.SharedWorld);
+        Assert.DoesNotContain(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.MotionLab);
     }
 
     [Fact]

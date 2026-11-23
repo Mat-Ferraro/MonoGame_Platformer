@@ -249,6 +249,132 @@
           "castsShadowsByDefault": false
         }
       ]
+    },
+    {
+      "sceneId": "LIGHTING_INTEGRATION_TEST",
+      "layers": [
+        {
+          "id": "BG5",
+          "order": -5,
+          "group": "Background",
+          "mode": "Lit",
+          "ambientScale": 1.12,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "BG4",
+          "order": -4,
+          "group": "Background",
+          "mode": "Lit",
+          "ambientScale": 1.12,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "BG3",
+          "order": -3,
+          "group": "Background",
+          "mode": "Lit",
+          "ambientScale": 1.0,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "BG2",
+          "order": -2,
+          "group": "Background",
+          "mode": "Lit",
+          "ambientScale": 1.0,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "BG1",
+          "order": -1,
+          "group": "Background",
+          "mode": "Lit",
+          "ambientScale": 1.25,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "PLAYER",
+          "order": 0,
+          "group": "Gameplay",
+          "mode": "Lit",
+          "ambientScale": 1.2,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "FG1",
+          "order": 1,
+          "group": "Foreground",
+          "mode": "Lit",
+          "ambientScale": 1.0,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "FG2",
+          "order": 2,
+          "group": "Foreground",
+          "mode": "Lit",
+          "ambientScale": 1.0,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": true,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "FG3",
+          "order": 3,
+          "group": "Foreground",
+          "mode": "Silhouette",
+          "ambientScale": 0.04,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": false,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "FG4",
+          "order": 4,
+          "group": "Foreground",
+          "mode": "Silhouette",
+          "ambientScale": 0.06,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": false,
+          "castsShadowsByDefault": false
+        },
+        {
+          "id": "FG5",
+          "order": 5,
+          "group": "Foreground",
+          "mode": "Silhouette",
+          "ambientScale": 0.06,
+          "parallaxMultiplier": 1.0,
+          "visible": true,
+          "receivesShadows": false,
+          "castsShadowsByDefault": false
+        }
+      ]
     }
   ]
 }

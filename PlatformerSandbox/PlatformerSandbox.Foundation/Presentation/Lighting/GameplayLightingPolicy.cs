@@ -20,16 +20,51 @@ public sealed record LightingSurfaceOptions
     public LightingSurfaceMode LightingMode { get; init; } = LightingSurfaceMode.Inherit;
     public LightChannel Channel { get; init; } = LightChannel.Terrain;
     public string LayerId { get; init; } = "PLAYER";
+    /// <summary>Legacy by default. Explicit GPU material opt-in for non-shadow receivers.</summary>
+    public ProductionSurfaceShading MaterialShading { get; init; } = ProductionSurfaceShading.Legacy;
+    public string? NormalMap { get; init; }
+    public string? EdgeMap { get; init; }
+    public double MaterialNormalStrength { get; init; } = 1;
+    public double MaterialRimStrength { get; init; } = 1;
+    /// <summary>Depth coordinate of this artwork (not the LDtk layer order).</summary>
+    public double MaterialDepthZ { get; init; }
+    /// <summary>At equal depth, a light whose origin overlaps this polygon may be
+    /// treated as behind it. Explicit opt-in; default is Front.</summary>
+    public bool BackRimOnOverlap { get; init; }
+    public double BackRimWidthPx { get; init; } = 4.5;
+    public double BackRimIntensity { get; init; } = 1.25;
     /// <summary>Do not multiply receiver pixels by backdrop shadow masks when this
     /// surface is unlit, a shadow caster, explicitly refuses cast shadows,
     /// or has an authored contact-shadow decoration drawn beneath it.</summary>
     public bool NeedsIndependentPass => CastsShadows || !ReceivesLight || !ReceivesShadows ||
-        ContactShadow || LightingMode != LightingSurfaceMode.Inherit;
+        ContactShadow || LightingMode != LightingSurfaceMode.Inherit ||
+        MaterialShading != ProductionSurfaceShading.Legacy;
     public void Validate()
     {
         if (!Enum.IsDefined(LightingMode) || !SceneLightingLayer.IsId(LayerId) || Channel == LightChannel.None ||
             (Channel & ~LightChannel.All) != 0)
             throw new ArgumentOutOfRangeException(nameof(Channel));
+        if (!Enum.IsDefined(MaterialShading) ||
+            !double.IsFinite(MaterialNormalStrength) || MaterialNormalStrength is < 0 or > 1 ||
+            !double.IsFinite(MaterialRimStrength) || MaterialRimStrength is < 0 or > 2)
+            throw new ArgumentOutOfRangeException(nameof(MaterialShading));
+        if (!double.IsFinite(MaterialDepthZ) || MaterialDepthZ is < -100 or > 100 ||
+            !double.IsFinite(BackRimWidthPx) || BackRimWidthPx is < 0.5 or > 24 ||
+            !double.IsFinite(BackRimIntensity) || BackRimIntensity is < 0 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(MaterialDepthZ));
+        ProductionSurfaceSubmission.ValidateMap(NormalMap);
+        ProductionSurfaceSubmission.ValidateMap(EdgeMap);
+        if (MaterialShading != ProductionSurfaceShading.Legacy)
+        {
+            if (!ReceivesLight ||
+                LightingMode is LightingSurfaceMode.Unlit or LightingSurfaceMode.Silhouette ||
+                ContactShadow)
+                throw new NotSupportedException(
+                    "GPU materials require lit artwork without contact-shadow decorations.");
+            if (BackRimOnOverlap && !CastsShadows)
+                throw new NotSupportedException(
+                    "Overlap back-rim requires a shadow-casting artwork silhouette.");
+        }
     }
 }
 

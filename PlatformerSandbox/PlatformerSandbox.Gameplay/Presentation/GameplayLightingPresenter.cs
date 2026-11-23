@@ -24,6 +24,13 @@ public sealed class GameplayLightingPresenter
     private LdtkLightingScene? _scene;
     private long _worldId;
     private int _flashSequence;
+    private double _presentationLightClock;
+    private double _occluderAnimationClock;
+    public bool WallMotionEnabled { get; set; } = true;
+    private LdtkLightingScene? _cachedOccluderScene;
+    private double _cachedOccluderSeconds = -1;
+    public int LastDynamicHullsUpdated { get; private set; }
+    public int LastStaticHullsReused { get; private set; }
     public LightingQuality Quality { get; set; } = LightingQuality.Balanced;
     public bool Enabled { get; set; } = true;
     public bool ReducedFlashes { get; set; }
@@ -49,6 +56,13 @@ public sealed class GameplayLightingPresenter
         _seen.Clear();
         _history.Clear();
         _flashSequence = 0;
+        _presentationLightClock = 0;
+        _occluderAnimationClock = 0;
+        WallMotionEnabled = true;
+        _cachedOccluderScene = null;
+        _cachedOccluderSeconds = -1;
+        LastDynamicHullsUpdated = 0;
+        LastStaticHullsReused = 0;
     }
 
     public void Present(WorldGameplayEvent e)
@@ -160,6 +174,10 @@ public sealed class GameplayLightingPresenter
             throw new ArgumentOutOfRangeException(nameof(seconds));
         if (worldPaused) return;
         double dt = Math.Min(.1, seconds);
+        // Authored lights animate on the presentation clock, never in WorldSession.
+        // Clamp long frames consistently with the existing flash presentation clock.
+        _presentationLightClock += dt;
+        if (WallMotionEnabled) _occluderAnimationClock += dt;
         for (int i = _flashes.Count - 1; i >= 0; i--)
         {
             Flash flash = _flashes[i] with { Remaining = _flashes[i].Remaining - dt };
@@ -168,7 +186,57 @@ public sealed class GameplayLightingPresenter
         }
     }
 
+    /// <summary>
+    /// A frame-consistent scene snapshot for both wall artwork and shadow rendering.
+    /// Imported static hulls are reused by reference. Only animated hulls are rebuilt.
+    /// Cached during pause and within the same presentation frame.
+    /// </summary>
+    public LdtkLightingScene? CurrentScene()
+    {
+        if (_scene is null) return null;
+        if (_scene.OccluderMotions.Count == 0) return _scene;
+        if (_cachedOccluderScene is not null &&
+            _cachedOccluderSeconds == _occluderAnimationClock)
+            return _cachedOccluderScene;
+        var current = new List<LightingOccluder>(_scene.Occluders.Count);
+        var centers = new Dictionary<string, LightPoint>(StringComparer.Ordinal);
+        foreach (var entry in _scene.SurfaceCenters)
+            centers.Add(entry.Key, entry.Value);
+        int dynamic = 0;
+        foreach (LightingOccluder hull in _scene.Occluders)
+        {
+            if (_scene.OccluderMotions.TryGetValue(hull.Id, out var motion))
+            {
+                current.Add(motion.Apply(hull, _occluderAnimationClock));
+                if (centers.TryGetValue(hull.Id, out LightPoint center))
+                    centers[hull.Id] = motion.At(_occluderAnimationClock).Transform(center, motion.Anchor);
+                dynamic++;
+            }
+            else current.Add(hull);
+        }
+        LastDynamicHullsUpdated = dynamic;
+        LastStaticHullsReused = current.Count - dynamic;
+        _cachedOccluderSeconds = _occluderAnimationClock;
+        return _cachedOccluderScene = new LdtkLightingScene(_scene.LevelId,
+            _scene.Lights, current.AsReadOnly(), _scene.Surfaces, centers,
+            _scene.Layers, _scene.LightMotions, _scene.OccluderMotions,
+            _occluderAnimationClock);
+    }
+
     /// <summary>Additional lights are bounded particle/emitter proxies, not individual particles.</summary>
+    /// <summary>The current authored light positions for the developer UI.
+    /// Uses presentation time, not world/simulation time.</summary>
+    public IReadOnlyList<RadialLight> CurrentAuthoredLights()
+    {
+        if (_scene is null) return Array.Empty<RadialLight>();
+        var result = new List<RadialLight>(_scene.Lights.Count);
+        foreach (RadialLight light in _scene.Lights)
+            result.Add(_scene.LightMotions.TryGetValue(light.Id, out PresentationLightMotion motion)
+                ? light with { Position = motion.At(light.Position, _presentationLightClock) }
+                : light);
+        return result;
+    }
+
     public IReadOnlyList<RadialLight> BuildVisible(LightingViewport viewport,
         IEnumerable<RadialLight>? particleLights = null,
         IEnumerable<RadialLight>? debugLights = null)
@@ -176,7 +244,13 @@ public sealed class GameplayLightingPresenter
         if (!Enabled || _scene is null) return Array.Empty<RadialLight>();
         LightingFrameBudget budget = LightingFrameBudget.For(Quality);
         var all = new List<RadialLight>(_scene.Lights.Count + _flashes.Count + 6);
-        all.AddRange(_scene.Lights);
+        foreach (RadialLight light in _scene.Lights)
+        {
+            if (_scene.LightMotions.TryGetValue(light.Id, out PresentationLightMotion motion))
+                all.Add(light with { Position = motion.At(light.Position, _presentationLightClock) });
+            else
+                all.Add(light);
+        }
         foreach (Flash flash in _flashes)
             all.Add(flash.Light);
         if (particleLights is not null)

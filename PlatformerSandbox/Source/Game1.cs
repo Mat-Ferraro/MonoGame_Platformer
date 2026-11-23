@@ -72,11 +72,21 @@ public sealed class Game1 : Game
     private string _lightingPresetId = "Illustrated";
     private double _lightingPresetNoticeSeconds;
     private LightingQuality _lightingQuality = LightingQuality.Balanced;
+    private ShadowEdgePreset _shadowEdgePreset = ShadowEdgePreset.Hard;
+    private ShadowFilterMode _shadowFilterMode = ShadowFilterMode.UniformGaussian;
+    private ShadowQualityPolicy _shadowQualityPolicy = ShadowQualityPolicy.Manual;
+    private int _shadowSelectedLightIndex;
+    private readonly Dictionary<string, float> _shadowEmitterOverrides =
+        new(StringComparer.Ordinal);
     private bool _reducedLightingFlashes;
     // Debug-only movable inspection light for the dedicated LDtk flat test.
     private bool _lightingInspectionLight;
     private bool _lightingEnabled = true;
     private bool _lightingStress;
+    private readonly LightingToolsPanel _lightingTools = new();
+    private bool _previousUiMouseLeftDown;
+    private LightingViewport? _lastLightingView;
+    private IReadOnlyList<RadialLight> _lastSelectedLights = Array.Empty<RadialLight>();
     private readonly bool _noLighting = Array.Exists(
         Environment.GetCommandLineArgs(), arg =>
         string.Equals(arg, "--no-lighting", StringComparison.OrdinalIgnoreCase));
@@ -199,6 +209,7 @@ public sealed class Game1 : Game
 
     protected override void Initialize()
     {
+        _previousUiMouseLeftDown = Mouse.GetState().LeftButton == ButtonState.Pressed;
         _previousKeyboard = Keyboard.GetState();
         _previousGamepad = GamePad.GetState(PlayerIndex.One);
         _inputRouter.SelectSource(LocalInputSource.Keyboard,
@@ -344,7 +355,10 @@ public sealed class Game1 : Game
                     "Content", "Lighting", "L456_GameplayLighting.json");
                 _lightingCatalog = LightingGameCatalog.FromJson(File.ReadAllText(path));
                 _lightingPresetId = _lightingCatalog.DefaultPreset;
-                _gameLighting = new GameplayLightingRenderer(GraphicsDevice);
+                // Stage 15B: production and lab use the same material GPU shader.
+                // The effect remains owned by the host ContentManager.
+                _gameLighting = new GameplayLightingRenderer(GraphicsDevice,
+                    Content.Load<Effect>("Effects/L_BASIC_SurfaceLighting"));
                 _lightingEvents = new GameplayLightingPresenter();
                 ActivateLightingWorld();
             }
@@ -435,9 +449,9 @@ public sealed class Game1 : Game
     }
 
     private Color ShadeGameplaySurface(string iid, IReadOnlyList<RadialLight> lights,
-        LightingArtPreset art)
+        LightingArtPreset art, LdtkLightingScene? scene)
     {
-        if (_ldtkLighting is not LdtkLightingScene scene ||
+        if (scene is null ||
             !scene.SurfaceCenters.TryGetValue(iid, out LightPoint point))
             return Color.White;
         LightingSurfaceOptions options = scene.GetSurface(iid);
@@ -461,9 +475,9 @@ public sealed class Game1 : Game
     }
 
     private Color ShadeGameplayHero(LightPoint point, IReadOnlyList<RadialLight> lights,
-        LightingArtPreset art)
+        LightingArtPreset art, LdtkLightingScene? scene)
     {
-        if (_ldtkLighting is not LdtkLightingScene scene) return Color.White;
+        if (scene is null) return Color.White;
         SceneLightingLayer playerLayer = scene.Layers.Gameplay;
         if (playerLayer.Mode == RenderLayerLightingMode.Unlit) return Color.White;
         LightRgb rgb = LightingWorldSampler.Sample(point, LightChannel.Hero,
@@ -535,6 +549,10 @@ public sealed class Game1 : Game
     protected override void Update(GameTime gameTime)
     {
         using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
+        MouseState uiMouse = Mouse.GetState();
+        bool uiClicked = uiMouse.LeftButton == ButtonState.Pressed && !_previousUiMouseLeftDown;
+        _previousUiMouseLeftDown = uiMouse.LeftButton == ButtonState.Pressed;
+        Point uiPoint = new(uiMouse.X, uiMouse.Y);
         if (_lightingBasicsMode && _lightingBasicsLab is BasicLightingLab basicsLab)
         {
             basicsLab.Update(Keyboard.GetState(), Mouse.GetState(),
@@ -552,7 +570,7 @@ public sealed class Game1 : Game
             _lightingBasicsLab ??= new BasicLightingLab(GraphicsDevice, Content);
             KeyboardState labKeys = Keyboard.GetState();
             GamePadState labPad = GamePad.GetState(PlayerIndex.One);
-            HandleSceneNavigation(labKeys, labPad);
+            HandleSceneNavigation(labKeys, labPad, uiClicked, uiPoint);
             bool sceneChanged = _flow.AdvanceTransition(
                 gameTime.ElapsedGameTime.TotalSeconds);
             if (sceneChanged)
@@ -624,100 +642,24 @@ public sealed class Game1 : Game
             _lightingPresetNoticeSeconds = Math.Max(0,
                 _lightingPresetNoticeSeconds - gameTime.ElapsedGameTime.TotalSeconds);
         KeyboardState keys = Keyboard.GetState();
-        // Dedicated modifier chord. Does not consume the existing F-keys,
-        // movement, sound, pause, or diagnostic shortcuts.
-        bool lightingChord = _ldtkLevelMode &&
-            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
-            (keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt));
-        if (lightingChord)
-        {
-            if (JustPressed(keys, Keys.D1))
-                _lightingEnabled = !_lightingEnabled;
-            if (JustPressed(keys, Keys.D2) && _lightingCatalog is not null)
-            {
-                string[] presets = new List<string>(_lightingCatalog.GetPresetIdsForScene(
-                    _ldtkLighting?.LevelId)).ToArray();
-                int i = Array.IndexOf(presets, _lightingPresetId);
-                _lightingPresetId = presets[(i + 1) % presets.Length];
-                _lightingPresetNoticeSeconds = 4;
-            }
-            if (JustPressed(keys, Keys.D3))
-                _lightingQuality = _lightingQuality switch
-                {
-                    LightingQuality.Low => LightingQuality.Balanced,
-                    LightingQuality.Balanced => LightingQuality.High,
-                    _ => LightingQuality.Low
-                };
-            if (JustPressed(keys, Keys.D4))
-                _reducedLightingFlashes = !_reducedLightingFlashes;
-            if (JustPressed(keys, Keys.D5))
-                _lightingStress = !_lightingStress;
-            if (JustPressed(keys, Keys.D6) &&
-                _ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
-                _lightingInspectionLight = !_lightingInspectionLight;
-        }
+        // Dev lighting controls are visible, clickable UI buttons; no hidden chords.
         if (_lightingEvents is not null)
         {
             _lightingEvents.Enabled = _lightingEnabled;
             _lightingEvents.Quality = _lightingQuality;
             _lightingEvents.ReducedFlashes = _reducedLightingFlashes;
         }
-        // Presentation-only quick mute, leaving existing F12/F6 gym and menu
-        // shortcuts untouched. Ctrl+Shift+M toggles all SFX and ambience.
-        bool audioMuteChord = JustPressed(keys, Keys.M) &&
-            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
-            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
-        if (audioMuteChord && _audio is not null)
-        {
-            _audio.SetMute(!_audio.IsMuted);
-            RefreshMusicVolume();
-            ShowAudioMessage(_audio.IsMuted ? "A02 AUDIO MUTED" : "A02 AUDIO UNMUTED");
-        }
-        // Ctrl+Shift+Plus/Minus adjusts only Master. All category gains are
-        // persisted in editable JSON, independent of input, menus and physics.
-        bool audioVolumeModifiers =
-            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
-            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
-        if (audioVolumeModifiers && _audio is not null)
-        {
-            int delta = (JustPressed(keys, Keys.OemPlus) || JustPressed(keys, Keys.Add) ? 1 : 0) -
-                (JustPressed(keys, Keys.OemMinus) || JustPressed(keys, Keys.Subtract) ? 1 : 0);
-            if (delta != 0)
-            {
-                float master = Math.Clamp(
-                    _audio.Mixer.MasterVolume + delta * .1f, 0f, 1f);
-                _audio.SetMasterVolume(master);
-                RefreshMusicVolume();
-                try
-                {
-                    AudioSettingsStore.Save(_audioSettingsPath,
-                        AudioUserSettings.FromMixer(_audio.Mixer));
-                    ShowAudioMessage("A02 MASTER VOLUME " + (int)Math.Round(master * 100) + "%");
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    System.Diagnostics.Debug.WriteLine("A02 volume save failed: " + ex);
-                    ShowAudioMessage("A02 VOLUME UPDATED - SAVE FAILED");
-                }
-            }
-        }
-        // Ctrl+Shift+F12 is reserved for manual report export. Plain F12 remains
-        // available to the request-order gym below.
-        bool reportChord = JustPressed(keys, Keys.F12) &&
-            (keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl)) &&
-            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
-        if (reportChord) _diagnostics?.ExportReport();
+        // Sound, diagnostics and volume adjustments are also available in the
+        // visible development panel; ordinary gameplay input is unaffected.
         GamePadState gamepadState = GamePad.GetState(PlayerIndex.One);
         LocalDeviceInput keyboard = _inputBindings.CaptureKeyboard(keys);
         LocalDeviceInput gamepad = _inputBindings.CaptureGamepad(gamepadState);
         _gamepadOneConnected = gamepad.IsConnected;
         // Presentation-only debug overlay cycle. Available in every gameplay
         // scene without consuming movement, ability or menu input.
-        // F11 is an extra convenience shortcut only in LDtk scenes; the
-        // request-resolver gym retains its original F11 scenario control.
+        // LDtk uses the visible tool panel instead of undocumented key chords.
         if (_flow.ActiveScene == MajorSceneKind.Gameplay && !_flow.IsMenuOpen &&
-            (JustPressed(keys, Keys.OemTilde) ||
-             (_ldtkLevelMode && JustPressed(keys, Keys.F11))))
+            !_ldtkLevelMode && JustPressed(keys, Keys.OemTilde))
         {
             _debugHudMode = GameDebugHudModes.Next(_debugHudMode);
             _debugHudUserSelected = true;
@@ -729,8 +671,22 @@ public sealed class Game1 : Game
             JustPressed(keys, Keys.Escape);
         if (cancelledSmoke)
             _sceneFlowSmoke.Abort("USER CANCELLED");
+        bool toolClicked = false;
+        if (_ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
+            !_flow.IsMenuOpen && !_flow.IsTransitionActive)
+        {
+            LightingToolAction action = _lightingTools.Hit(GraphicsDevice.Viewport.Width,
+                GraphicsDevice.Viewport.Height, uiPoint.X, uiPoint.Y, uiClicked);
+            if (action != LightingToolAction.None)
+            {
+                ApplyLightingToolAction(action);
+                toolClicked = true;
+            }
+        }
         if (!cancelledSmoke && !_sceneFlowSmoke.IsRunning)
-            HandleSceneNavigation(keys, gamepadState);
+            HandleSceneNavigation(keys, gamepadState, uiClicked && !toolClicked, uiPoint);
+        if (_flow.IsMenuOpen || _flow.ActiveScene != MajorSceneKind.Gameplay)
+            _lightingTools.Close();
         // Curtain timing uses presentation time, never world time. Scene
         // preparation runs only after the covered phase on a safe Update.
         bool changedScene = _flow.AdvanceTransition(
@@ -809,6 +765,9 @@ public sealed class Game1 : Game
         }
         if (changedScene)
         {
+            _lightingTools.Close();
+            _lastLightingView = null;
+            _lastSelectedLights = Array.Empty<RadialLight>();
             ActivateParticleWorld();
             ActivateLightingWorld();
             // Construct after the scene has committed. The lab shares the
@@ -980,12 +939,7 @@ public sealed class Game1 : Game
         }
         // The world-clock demo uses a fixed assistance policy for its entire
         // lifetime; F9 remains the ordinary movement-gym test switch.
-        if (_ldtkLevelMode && JustPressed(keys, Keys.F9))
-            _ldtkShowCollisionDebug = !_ldtkShowCollisionDebug;
-        // Authoring A/B: gray collision rectangles are purely visual backing,
-        // not the authoritative colliders. F9 outlines remain independent.
-        if (_ldtkLevelMode && JustPressed(keys, Keys.F10))
-            _ldtkDrawCollisionBackdrop = !_ldtkDrawCollisionBackdrop;
+        // Collision/backdrop toggles for LDtk are now mouse-operated tools.
         if (_worldClockTest is null && JustPressed(keys, Keys.F9))
             _gym.SetAssistancePolicy(_gym.AssistancePolicy.AnyEnabled
                 ? CollisionAssistancePolicy.Disabled
@@ -1003,7 +957,7 @@ public sealed class Game1 : Game
             _requestScenario = MovementRequestGymHarness.Next(_requestScenario);
             ResetRequestTestBaseline();
         }
-        if (_requestTestEnabled && JustPressed(keys, Keys.F12) && !reportChord)
+        if (_requestTestEnabled && JustPressed(keys, Keys.F12))
         {
             _reverseRequestOrder = !_reverseRequestOrder;
             ResetRequestTestBaseline();
@@ -1052,7 +1006,7 @@ public sealed class Game1 : Game
         {
             if (JustPressed(keys, Keys.N) && !authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
                 AuthoredWorldGym.JoinGuest(authoredWorld);
-            if (JustPressed(keys, Keys.M) && !audioMuteChord &&
+            if (JustPressed(keys, Keys.M) &&
                 authoredWorld.HasPlayer(AuthoredWorldGym.ThirdPlayerId))
                 authoredWorld.RemovePlayer(AuthoredWorldGym.ThirdPlayerId);
             if (JustPressed(keys, Keys.V))
@@ -1394,8 +1348,25 @@ public sealed class Game1 : Game
                                 LightingStressCandidates(camera))
                             : Array.Empty<RadialLight>();
                         if (lightingWorldActive)
-                            _gameLighting!.BeginLayeredFrame(lights,
-                                LightingFrameBudget.For(_lightingQuality));
+                        {
+                            _lastLightingView = GameplayLightingRenderer.View(camera);
+                            _lastSelectedLights = lights;
+                        }
+                        // Artwork keeps animating when lighting is disabled through DEV TOOLS.
+                        LdtkLightingScene? frameLighting = _lightingEvents?.CurrentScene();
+                        if (lightingWorldActive)
+                        {
+                            LightingFrameBudget shadowBudget = LightingFrameBudget.For(_lightingQuality);
+                            ShadowEdgePreset effectiveShadowPreset =
+                                _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality
+                                    ? ShadowContactControls.QualityPreset(_lightingQuality)
+                                    : _shadowEdgePreset;
+                            _gameLighting!.ShadowSoftnessPixels =
+                                ShadowEdgeSettings.EffectiveWidth(effectiveShadowPreset, shadowBudget);
+                            _gameLighting.FilterMode = _shadowFilterMode;
+                            _gameLighting.ShadowEmitterOverrides = _shadowEmitterOverrides;
+                            _gameLighting.BeginLayeredFrame(lights, shadowBudget);
+                        }
                         LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
@@ -1403,15 +1374,22 @@ public sealed class Game1 : Game
                             camera, _ldtkCharacterAnimations, _ldtkCharacterSprites,
                             layerHook,
                             null,
-                            lightingWorldActive ? _ldtkLighting : null,
-                            lightingWorldActive ? id => ShadeGameplaySurface(id, lights, art!) : null,
-                            lightingWorldActive ? point => ShadeGameplayHero(point, lights, art!) : null,
+                            lightingWorldActive ? frameLighting : null,
+                            lightingWorldActive ? id => ShadeGameplaySurface(id, lights, art!, frameLighting) : null,
+                            lightingWorldActive ? point => ShadeGameplayHero(point, lights, art!, frameLighting) : null,
                             lightingWorldActive ? _gameLighting!.ContactShadowTexture : null,
                             lightingWorldActive ? () => _gameLighting!.BeginLayer() : null,
                             lightingWorldActive ? (view, layer) => _gameLighting!.ComposeLayer(
-                                _spriteBatch, view, lights, _ldtkLighting!.Occluders,
+                                _spriteBatch, view, lights, frameLighting!.Occluders,
                                 art!, LightingFrameBudget.For(_lightingQuality), layer) : null,
-                            lightingWorldActive ? () => _gameLighting!.EndLayeredFrame(_spriteBatch) : null);
+                            lightingWorldActive ? () => _gameLighting!.EndLayeredFrame(_spriteBatch) : null,
+                            lightingWorldActive ? (submission, region, albedo, normals, edges) =>
+                                _gameLighting!.DrawProductionMaterialSurface(_spriteBatch,
+                                    GameplayLightingRenderer.View(camera), submission, region, lights,
+                                    frameLighting!.Occluders, art!,
+                                    frameLighting.Layers.Get(submission.LayerId),
+                                    albedo, normals, edges) : null,
+                            frameLighting);
                     }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
                         MovementGymRenderer.DrawAuthoredWorld(
@@ -1447,6 +1425,34 @@ public sealed class Game1 : Game
                 }
                 else if (_debugHudMode == GameDebugHudMode.Compact)
                     DrawCompactDebugHud(_spriteBatch, _pixel);
+            }
+            if (_ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
+                !_flow.IsMenuOpen)
+            {
+                IReadOnlyList<string> lightStatuses = GetAuthoredLightStatuses();
+                RadialLight? shadowEditedLight = SelectedShadowLight();
+                string editLightName = shadowEditedLight?.Id ?? "NONE";
+                if (editLightName.Length > 24)
+                    editLightName = editLightName[..24];
+                float emitterPx = shadowEditedLight is not null &&
+                    _shadowEmitterOverrides.TryGetValue(shadowEditedLight.Id, out float configured)
+                        ? configured : 8f;
+                ShadowEdgePreset effectiveEdge =
+                    _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality
+                        ? ShadowContactControls.QualityPreset(_lightingQuality) : _shadowEdgePreset;
+                _lightingTools.Draw(_spriteBatch, _pixel,
+                    GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
+                    _lightingEnabled, _lightingPresetId, _lightingQuality.ToString(),
+                    ShadowEdgeSettings.Label(effectiveEdge),
+                    _shadowFilterMode == ShadowFilterMode.ContactHardening ? "CONTACT" : "UNIFORM",
+                    _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality ? "AUTO" : "MANUAL",
+                    editLightName.ToUpperInvariant(), emitterPx.ToString("F0") + "PX",
+                    _reducedLightingFlashes, _lightingStress,
+                    _lightingEvents?.WallMotionEnabled ?? false, _lightingInspectionLight,
+                    _debugHudMode.ToString(), _ldtkShowCollisionDebug,
+                    _ldtkDrawCollisionBackdrop, _audio?.IsMuted ?? false,
+                    _audio is null ? 0 : (int)Math.Round(_audio.Mixer.MasterVolume * 100),
+                    lightStatuses);
             }
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
@@ -1505,25 +1511,92 @@ public sealed class Game1 : Game
                     new Color(255, 189, 112), 1);
             if (_gameLighting is not null && _lightingEvents is not null &&
                 _ldtkLevelMode && _debugHudMode == GameDebugHudMode.Full)
+            {
+                // Stage 15C diagnostic lines intentionally separated so the
+                // material-mask counters remain visible at 1280px and below.
+                var cpu = _gameLighting.CpuSubmitWindow;
                 GymDebugText.Draw(_spriteBatch, _pixel, 12,
                     Math.Max(4, GraphicsDevice.Viewport.Height - 170),
                     "L456 LIGHTS " + _gameLighting.LastLights +
                     " SHADOWS " + _gameLighting.LastShadowLights +
                     " TRI " + _gameLighting.LastShadowTriangles +
-                    " CPU AVG/PEAK " + _gameLighting.AverageSubmitMilliseconds.ToString("F2") +
-                    "/" + _gameLighting.PeakSubmitMilliseconds.ToString("F2") +
-                    "  PRESET " + _lightingPresetId +
-                    "  QUALITY " + _lightingQuality +
-                    "  STRESS " + (_lightingStress ? "ON" : "OFF"),
+                    " MAT " + _gameLighting.LastMaterialSurfaces +
+                    " MAT-LIMIT " + _gameLighting.LastMaterialLightsDropped +
+                    " MAT-VIS " + _gameLighting.LastMaterialVisibilityMasks +
+                    " MAT-BACK " + _gameLighting.LastMaterialBackRimSurfaces,
                     new Color(184, 208, 255), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 188),
+                    "L15C CPU-MS LAST " + cpu.Latest.ToString("F2") +
+                    " AVG " + cpu.Mean.ToString("F2") +
+                    " P95 " + cpu.P95.ToString("F2") +
+                    " N " + cpu.Count +
+                    " LAYER " + _gameLighting.LastLayerCpuMilliseconds.ToString("F2") +
+                    " MAT " + _gameLighting.LastMaterialCpuMilliseconds.ToString("F2") +
+                    " MAT-GEO " + _gameLighting.LastMaterialMaskGeometryCpuMilliseconds.ToString("F2") +
+                    " LEG-GEO " + _gameLighting.LastLayerMaskGeometryCpuMilliseconds.ToString("F2"),
+                    new Color(175, 232, 195), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 206),
+                    "L15C MASK WORK MAT/LEG " + _gameLighting.LastMaterialVisibilityMasks +
+                    "/" + _gameLighting.LastLegacyVisibilityMasks +
+                    " OCC " + _gameLighting.LastMaterialMaskOccludersSubmitted +
+                    " RAYS " + _gameLighting.LastMaterialMaskRadialSamples +
+                    " RT-MB " + _gameLighting.EstimatedTargetsMegabytes.ToString("F1") +
+                    " RT-RESIZE " + _gameLighting.TargetRebuilds +
+                    " QUALITY " + _lightingQuality +
+                    " STRESS " + (_lightingStress ? "ON" : "OFF"),
+                    new Color(179, 199, 249), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 224),
+                    "L16A SHADOW BROADPHASE: PRUNED " +
+                    _gameLighting.LastShadowCastersPrunedByRange +
+                    " MASKS SKIPPED " + _gameLighting.LastShadowMasksSkippedByRange,
+                    new Color(177, 232, 212), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 242),
+                    "L16B MATERIAL FALLBACK: NEUTRAL MAPS " +
+                    _gameLighting.LastMaterialNeutralMapsReused +
+                    " WHITE MASKS " + _gameLighting.LastMaterialWhiteMasksReused,
+                    new Color(182, 212, 245), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 296),
+                    "L17 SHADOW " + _shadowFilterMode +
+                    " EDGE " + ShadowEdgeSettings.Label(
+                        _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality
+                            ? ShadowContactControls.QualityPreset(_lightingQuality) : _shadowEdgePreset) +
+                    " LAYER " + _gameLighting.LastSoftLayerMasks +
+                    " MAT " + _gameLighting.LastSoftMaterialMasks,
+                    new Color(213, 185, 241), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 314),
+                    "L17D CONTACT PROFILES " + _gameLighting.LastContactProfilesBuilt +
+                    " PROFILE CPU " + _gameLighting.LastContactProfileCpuMilliseconds.ToString("F2") +
+                    " UPLOAD BYTES " + _gameLighting.LastContactProfileBytesUploaded +
+                    " FILTER PASSES " + _gameLighting.LastSoftFilterPasses +
+                    " FILTER PX " + _gameLighting.LastSoftFilterPixels,
+                    new Color(193, 220, 239), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 278),
+                    "L16D DYNAMIC HULLS " + _lightingEvents.LastDynamicHullsUpdated +
+                    " STATIC REUSED " + _lightingEvents.LastStaticHullsReused,
+                    new Color(174, 227, 245), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 260),
+                    "L16C MATERIAL REGION: DRAW " + _gameLighting.LastMaterialRegionsDrawn +
+                    " OFFSCREEN " + _gameLighting.LastMaterialRegionsOffscreen +
+                    " SHADED PX " + _gameLighting.LastMaterialShadePixels +
+                    " AVOIDED PX " + _gameLighting.LastMaterialShadePixelsAvoided,
+                    new Color(196, 232, 190), 1);
+            }
             if (_lightingPresetNoticeSeconds > 0 &&
                 _ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
                 GymDebugText.Draw(_spriteBatch, _pixel, 14, 120,
                     "FLAT LIGHTING: " + _lightingPresetId.ToUpperInvariant() +
-                    "  (CTRL ALT 2: SWITCH)", new Color(255, 221, 159), 1);
+                    "  OPEN DEV TOOLS TO SWITCH", new Color(255, 221, 159), 1);
             if (_lightingWarning is not null)
                 GymDebugText.Draw(_spriteBatch, _pixel, 12,
-                    Math.Max(4, GraphicsDevice.Viewport.Height - 189),
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 242),
                     "L456 LIGHTING UNAVAILABLE - " +
                         (_lightingWarning.Length > 55 ? _lightingWarning[..55] : _lightingWarning),
                     new Color(255, 189, 112), 1);
@@ -1781,7 +1854,8 @@ public sealed class Game1 : Game
                         content.Terrain.ArtworkCount > 0)
                         preparedVisuals = new LdtkVisualSceneAssets(
                             host.GraphicsDevice, content.FilePath,
-                            content.Visuals, content.Scenery, content.Terrain);
+                            content.Visuals, content.Scenery, content.Terrain,
+                            content.Lighting);
                     preparedLdtkWorld = LdtkLevelGym.Create(importedLdtk,
                         preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
                         host._inputRouter.SourceId,
@@ -1848,7 +1922,156 @@ public sealed class Game1 : Game
         }
     }
 
-    private void HandleSceneNavigation(KeyboardState keys, GamePadState gamepad)
+    private RadialLight? SelectedShadowLight()
+    {
+        if (_lightingEvents is null) return null;
+        IReadOnlyList<RadialLight> lights = _lightingEvents.CurrentAuthoredLights();
+        if (lights.Count == 0) return null;
+        int index = _shadowSelectedLightIndex % lights.Count;
+        return lights[index];
+    }
+
+    private IReadOnlyList<string> GetAuthoredLightStatuses()
+    {
+        if (_lightingEvents is null || _lastLightingView is not LightingViewport viewport ||
+            !_lightingTools.Open) return Array.Empty<string>();
+        var result = new List<string>(4);
+        var lights = _lightingEvents.CurrentAuthoredLights();
+        for (int i = 0; i < Math.Min(lights.Count, 4); i++)
+        {
+            RadialLight light = lights[i];
+            string name = light.Color.R > .95 && light.Color.G < .5 ? "RED" :
+                light.Color.B > .9 && light.Color.R < .7 ? "BLUE" :
+                light.Color.R > .9 && light.Color.B > .65 ? "PINK" :
+                light.Color.G > .8 && light.Color.R < .8 ? "GREEN" : "LIGHT " + (i + 1);
+            AuthoredLightVisibility visibility = LightingVisibilityDiagnostics.Classify(
+                light, viewport, _lastSelectedLights, _lightingEnabled);
+            result.Add(name + ": " + visibility.ToString().ToUpperInvariant());
+        }
+        return result;
+    }
+
+    private void ApplyLightingToolAction(LightingToolAction action)
+    {
+        switch (action)
+        {
+            case LightingToolAction.ToggleLights:
+                _lightingEnabled = !_lightingEnabled;
+                break;
+            case LightingToolAction.NextPreset:
+                if (_lightingCatalog is not null)
+                {
+                    string[] presets = new List<string>(_lightingCatalog.GetPresetIdsForScene(
+                        _ldtkLighting?.LevelId)).ToArray();
+                    if (presets.Length > 0)
+                    {
+                        int current = Array.IndexOf(presets, _lightingPresetId);
+                        _lightingPresetId = presets[(current + 1) % presets.Length];
+                        _lightingPresetNoticeSeconds = 4;
+                    }
+                }
+                break;
+            case LightingToolAction.NextQuality:
+                _lightingQuality = _lightingQuality switch
+                {
+                    LightingQuality.Low => LightingQuality.Balanced,
+                    LightingQuality.Balanced => LightingQuality.High,
+                    _ => LightingQuality.Low
+                };
+                break;
+            case LightingToolAction.CycleShadowEdges:
+                _shadowEdgePreset = ShadowEdgeSettings.Next(_shadowEdgePreset);
+                // A direct width choice should be immediately visible.
+                _shadowQualityPolicy = ShadowQualityPolicy.Manual;
+                break;
+            case LightingToolAction.ToggleShadowFilter:
+                _shadowFilterMode = ShadowContactControls.Next(_shadowFilterMode);
+                break;
+            case LightingToolAction.ToggleShadowQualityPolicy:
+                _shadowQualityPolicy = ShadowContactControls.Next(_shadowQualityPolicy);
+                break;
+            case LightingToolAction.SelectShadowLight:
+                _shadowSelectedLightIndex++;
+                break;
+            case LightingToolAction.CycleShadowEmitter:
+                if (SelectedShadowLight() is RadialLight selected)
+                {
+                    float current = _shadowEmitterOverrides.TryGetValue(selected.Id,
+                        out float sourceRadius) ? sourceRadius : 8f;
+                    _shadowEmitterOverrides[selected.Id] = ShadowContactControls.NextEmitter(current);
+                }
+                break;
+            case LightingToolAction.ToggleReducedFlashes:
+                _reducedLightingFlashes = !_reducedLightingFlashes;
+                break;
+            case LightingToolAction.ToggleStress:
+                _lightingStress = !_lightingStress;
+                break;
+            case LightingToolAction.ToggleWallMotion:
+                if (_lightingEvents is not null)
+                    _lightingEvents.WallMotionEnabled = !_lightingEvents.WallMotionEnabled;
+                break;
+            case LightingToolAction.ToggleInspectionLight:
+                if (_ldtkLighting?.LevelId == "LIGHTING_FLAT_TEST")
+                    _lightingInspectionLight = !_lightingInspectionLight;
+                break;
+            case LightingToolAction.CycleHud:
+                _debugHudMode = GameDebugHudModes.Next(_debugHudMode);
+                _debugHudUserSelected = true;
+                break;
+            case LightingToolAction.ToggleCollision:
+                _ldtkShowCollisionDebug = !_ldtkShowCollisionDebug;
+                break;
+            case LightingToolAction.ToggleBackdrop:
+                _ldtkDrawCollisionBackdrop = !_ldtkDrawCollisionBackdrop;
+                break;
+            case LightingToolAction.ToggleAudioMute:
+                if (_audio is not null)
+                {
+                    _audio.SetMute(!_audio.IsMuted);
+                    RefreshMusicVolume();
+                    ShowAudioMessage(_audio.IsMuted ? "AUDIO MUTED" : "AUDIO UNMUTED");
+                }
+                break;
+            case LightingToolAction.VolumeDown:
+                SetDeveloperMasterVolume(-.1f);
+                break;
+            case LightingToolAction.VolumeUp:
+                SetDeveloperMasterVolume(.1f);
+                break;
+            case LightingToolAction.ExportReport:
+                _diagnostics?.ExportReport();
+                break;
+        }
+        if (_lightingEvents is not null)
+        {
+            _lightingEvents.Enabled = _lightingEnabled;
+            _lightingEvents.Quality = _lightingQuality;
+            _lightingEvents.ReducedFlashes = _reducedLightingFlashes;
+        }
+    }
+
+    private void SetDeveloperMasterVolume(float step)
+    {
+        if (_audio is null) return;
+        float next = Math.Clamp(_audio.Mixer.MasterVolume + step, 0f, 1f);
+        _audio.SetMasterVolume(next);
+        RefreshMusicVolume();
+        try
+        {
+            AudioSettingsStore.Save(_audioSettingsPath,
+                AudioUserSettings.FromMixer(_audio.Mixer));
+            ShowAudioMessage("MASTER VOLUME " + (int)Math.Round(next * 100) + "%");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine("Audio settings save failed: " + ex);
+            ShowAudioMessage("VOLUME UPDATED - SAVE FAILED");
+        }
+    }
+
+    private void HandleSceneNavigation(KeyboardState keys, GamePadState gamepad,
+        bool uiClicked, Point mousePosition)
     {
         // Prevent a key press from acting on both a transition and the
         // arriving scene. Also reject modal navigation during covered loads.
@@ -1864,21 +2087,33 @@ public sealed class Game1 : Game
         bool newDown = JustPressed(keys, Keys.Down) || JustPressed(keys, Keys.S) ||
             JustPressed(gamepad, Buttons.DPadDown);
 
-        if (_flow.ActiveScene == MajorSceneKind.Title && !_flow.Ui.HasOverlay)
+        if (_flow.ActiveScene == MajorSceneKind.Title && !_flow.Ui.HasOverlay &&
+            JustPressed(keys, Keys.Q))
+            _flow.Execute(GameUiCommand.Quit);
+        if (uiClicked && _flow.CurrentMenu is GameUiScreen openMenu)
         {
-            // Fast direct-to-fixture developer entry, without title-menu steps.
-            if (JustPressed(keys, Keys.F1)) _flow.RequestPlay(GameLevelIds.MovementGym);
-            else if (JustPressed(keys, Keys.F2)) _flow.RequestPlay(GameLevelIds.AuthoredWorld);
-            else if (JustPressed(keys, Keys.F3)) _flow.RequestPlay(GameLevelIds.MotionLab);
-            else if (JustPressed(keys, Keys.F4)) _flow.RequestPlay(GameLevelIds.SharedWorld);
-            else if (JustPressed(keys, Keys.F5)) _flow.RequestPlay(GameLevelIds.RouteA);
-            else if (JustPressed(keys, Keys.F6)) _flow.RequestPlay(
-                GameLevelIds.RouteB, RouteLevelGym.EastEntrance);
-            else if (JustPressed(keys, Keys.F7)) _flow.RequestPlay(GameLevelIds.LdtkTest);
-            else if (JustPressed(keys, Keys.F8)) _flow.RequestPlay(GameLevelIds.LdtkParallaxDemo);
-            else if (JustPressed(keys, Keys.F9)) _flow.RequestPlay(GameLevelIds.LdtkSceneryDemo);
-            else if (JustPressed(keys, Keys.F10)) _flow.RequestPlay(GameLevelIds.LdtkTerrainDemo);
-            if (JustPressed(keys, Keys.Q)) _flow.Execute(GameUiCommand.Quit);
+            int index = GameMenuLayout.Hit(GraphicsDevice.Viewport.Width,
+                GraphicsDevice.Viewport.Height, openMenu, _flow.MenuItems.Count,
+                _flow.SelectionIndex, mousePosition.X, mousePosition.Y);
+            if (index >= 0)
+            {
+                while (_flow.SelectionIndex != index) _flow.Navigate(1);
+                _flow.ConfirmSelection();
+                return;
+            }
+            // Controls and other overlays also support the Escape/Back action.
+            if (openMenu == GameUiScreen.Controls)
+            {
+                var bounds = GameMenuLayout.Get(GraphicsDevice.Viewport.Width,
+                    GraphicsDevice.Viewport.Height, openMenu, _flow.MenuItems.Count,
+                    _flow.SelectionIndex);
+                if (new Rectangle(bounds.Left + 18, bounds.Top + 187,
+                    bounds.Width - 36, 23).Contains(mousePosition))
+                {
+                    _flow.Back();
+                    return;
+                }
+            }
         }
         if (newStart || JustPressed(keys, Keys.P))
         {
@@ -1943,17 +2178,9 @@ public sealed class Game1 : Game
         if (screen != GameUiScreen.Title)
             batch.Draw(pixel, new Rectangle(0, 0, viewWidth, viewHeight),
                 new Color(6, 11, 20) * 0.78f);
-        int width = Math.Min(660, Math.Max(200, viewWidth - 36));
-        int x = Math.Max(8, (viewWidth - width) / 2);
-        int height = screen switch
-        {
-            GameUiScreen.Controls => 260,
-            GameUiScreen.Title => 242,
-            GameUiScreen.LevelSelect => 110 + _flow.MenuItems.Count * 30,
-            _ => 242
-        };
-        height = Math.Min(height, Math.Max(140, viewHeight - 32));
-        int y = Math.Max(8, (viewHeight - height) / 2);
+        var bounds = GameMenuLayout.Get(viewWidth, viewHeight, screen.Value,
+            _flow.MenuItems.Count, _flow.SelectionIndex);
+        int width = bounds.Width, x = bounds.Left, height = bounds.Height, y = bounds.Top;
         batch.Draw(pixel, new Rectangle(x, y, width, height),
             new Color(20, 30, 44) * 0.98f);
         batch.Draw(pixel, new Rectangle(x, y, 5, height), new Color(82, 202, 169));
@@ -1971,13 +2198,13 @@ public sealed class Game1 : Game
         {
             string[] help =
             [
-                "UP DOWN OR DPAD: SELECT",
+                "CLICK BUTTONS OR UP DOWN: SELECT",
                 "ENTER OR PAD A: CONFIRM",
                 "ESC OR PAD B: BACK",
                 "P OR PAD START: PAUSE RESUME",
                 "TITLE: SELECT LEVEL, THEN CHOOSE SCENE",
                 "IN GAME: P PAUSE  T RESTART  R RESPAWN",
-                "LDTK: F9 COLLISIONS F10 BACKDROP F11 HUD"
+                "LDTK: CLICK DEV TOOLS FOR LIGHT AND HUD"
             ];
             for (int i = 0; i < help.Length; i++)
                 GymDebugText.Draw(batch, pixel, x + 24, y + 57 + 18 * i,
@@ -1992,10 +2219,9 @@ public sealed class Game1 : Game
             IReadOnlyList<GameUiMenuItem> entries = _flow.MenuItems;
             int itemY = y + 62;
             const int rowHeight = 30;
-            int visibleRows = Math.Max(1, (height - 106) / rowHeight);
+            int visibleRows = bounds.Rows;
             int selection = _flow.SelectionIndex;
-            int first = Math.Clamp(selection - visibleRows / 2,
-                0, Math.Max(0, entries.Count - visibleRows));
+            int first = bounds.First;
             for (int i = first; i < Math.Min(entries.Count, first + visibleRows); i++)
             {
                 int rowY = itemY + (i - first) * rowHeight;
@@ -2074,7 +2300,7 @@ public sealed class Game1 : Game
             new Color(17, 25, 37) * 0.85f);
         GymDebugText.Draw(batch, pixel, x, y,
             _routeLabMode ? "P PAUSE  R/U RESPAWN  T RESTART  1/2 EXITS  F9 SMOKE" :
-                "P OR START: PAUSE  ESC: MENU  F4: TEST WORLD",
+                "P PAUSE  ESC MENU  CLICK DEV TOOLS",
             new Color(124, 221, 180), 1);
     }
 
@@ -2089,7 +2315,7 @@ public sealed class Game1 : Game
         string state = _worldClockTest is WorldSession world
             ? "TICK " + world.WorldTick + "  P:" + world.PlayerCount
             : "CRUSH:" + _gym.CrushRespawns;
-        string toggle = _ldtkLevelMode ? "F11 OR TILDE HUD" : "TILDE HUD";
+        string toggle = _ldtkLevelMode ? "CLICK DEV TOOLS" : "TILDE HUD";
         string summary = scene + "  -  " + state + "  -  " + toggle;
         int width = Math.Max(1, Math.Min(GraphicsDevice.Viewport.Width - 24, 590));
         batch.Draw(pixel, new Rectangle(12, 12, width, 25),
@@ -2422,7 +2648,7 @@ public sealed class Game1 : Game
         if (_flow.ActiveScene == MajorSceneKind.Title)
         {
             Window.Title = "PlatformerSandbox | TITLE | Select Level (Enter) | " +
-                "Up/Down or D-Pad Navigate | Esc Back | F1-F10 Dev Shortcuts";
+                "Click menu buttons or use Up/Down | Esc Back";
             return;
         }
         if (_flow.IsMenuOpen)
@@ -2448,7 +2674,7 @@ public sealed class Game1 : Game
                     $"tick={world.WorldTick} players={world.PlayerCount} " +
                     $"colliders={_ldtkLevel?.ColliderCount} " +
                     $"visualTiles={_ldtkVisuals?.Definition.TileCount ?? 0} | " +
-                    "A/D Space  R Respawn T Reload P Pause F9 Outlines F10 Backdrop";
+                    "A/D Space  R Respawn T Reload P Pause | Click DEV TOOLS";
                 return;
             }
             if (_routeLabMode)

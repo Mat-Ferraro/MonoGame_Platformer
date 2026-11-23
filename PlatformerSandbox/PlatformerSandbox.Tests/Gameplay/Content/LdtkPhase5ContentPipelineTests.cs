@@ -46,11 +46,10 @@ public sealed class LdtkPhase5ContentPipelineTests
         Assert.False(catalog.Supports(new SceneDestination("CAVERN_C", "NO_ENTRANCE")));
 
         var menu = GameLevelMenuCatalog.WithDiscoveredLevels(catalog.Levels.Keys);
-        Assert.Contains(menu, item => item.Destination?.LevelId == "CAVERN_C");
-        Assert.Equal(1, menu.Count(item => item.Destination?.LevelId == "CAVERN_C"));
-        Assert.Equal(GameLevelIds.LdtkTest, menu[0].Destination?.LevelId);
-        Assert.Equal(GameLevelIds.MovementGym,
-            menu.First(item => item.Destination?.LevelId == GameLevelIds.MovementGym).Destination?.LevelId);
+        Assert.DoesNotContain(menu, x => x.Destination?.LevelId == "CAVERN_C");
+        Assert.Contains(menu, x => x.Destination?.LevelId == GameLevelIds.LdtkConnectedA);
+        Assert.Equal(GameLevelIds.LdtkConnectedA, menu[0].Destination?.LevelId);
+        Assert.Contains(menu, x => x.Destination?.LevelId == GameLevelIds.MovementGym);
     }
 
     [Fact]

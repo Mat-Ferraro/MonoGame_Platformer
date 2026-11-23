@@ -15,8 +15,16 @@ public sealed class LdtkLightingScene
         IReadOnlyList<LightingOccluder> blockers,
         IReadOnlyDictionary<string, LightingSurfaceOptions> surfaces,
         IReadOnlyDictionary<string, LightPoint> surfaceCenters,
-        SceneLightingLayerSet? layers = null)
+        SceneLightingLayerSet? layers = null,
+        IReadOnlyDictionary<string, PresentationLightMotion>? lightMotions = null,
+        IReadOnlyDictionary<string, PresentationOccluderMotion>? occluderMotions = null,
+        double animationSeconds = 0)
     {
+        LightMotions = lightMotions ?? new ReadOnlyDictionary<string, PresentationLightMotion>(
+            new Dictionary<string, PresentationLightMotion>(StringComparer.Ordinal));
+        OccluderMotions = occluderMotions ?? new ReadOnlyDictionary<string, PresentationOccluderMotion>(
+            new Dictionary<string, PresentationOccluderMotion>(StringComparer.Ordinal));
+        AnimationSeconds = animationSeconds;
         LevelId = levelId;
         Lights = lights;
         Occluders = blockers;
@@ -27,6 +35,10 @@ public sealed class LdtkLightingScene
     public SceneLightingLayerSet Layers { get; }
     public string LevelId { get; }
     public IReadOnlyList<RadialLight> Lights { get; }
+    /// <summary>Optional, presentation-only animation keyed by authored light IID.</summary>
+    public IReadOnlyDictionary<string, PresentationLightMotion> LightMotions { get; }
+    public IReadOnlyDictionary<string, PresentationOccluderMotion> OccluderMotions { get; }
+    public double AnimationSeconds { get; }
     public IReadOnlyList<LightingOccluder> Occluders { get; }
     public IReadOnlyDictionary<string, LightingSurfaceOptions> Surfaces { get; }
     public IReadOnlyDictionary<string, LightPoint> SurfaceCenters { get; }
@@ -68,7 +80,9 @@ public static class LdtkLightingImporter
         int width = level.GetProperty("pxWid").GetInt32();
         int height = level.GetProperty("pxHei").GetInt32();
         var lights = new List<RadialLight>();
+        var lightMotions = new Dictionary<string, PresentationLightMotion>(StringComparer.Ordinal);
         var occluders = new List<LightingOccluder>();
+        var occluderMotions = new Dictionary<string, PresentationOccluderMotion>(StringComparer.Ordinal);
         var surfaces = new Dictionary<string, LightingSurfaceOptions>(StringComparer.Ordinal);
         var centers = new Dictionary<string, LightPoint>(StringComparer.Ordinal);
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -101,6 +115,7 @@ public static class LdtkLightingImporter
                         Intensity = Number(fields, "Intensity", 1.4, 0, 4),
                         Priority = (int)Number(fields, "Priority", 1, -100, 100),
                         CastShadows = Bool(fields, "CastShadows", true),
+                        VirtualZ = Number(fields, "LightDepthZ", 0, -100, 100),
                         Channels = LightChannel.All,
                         AffectsLayers = CsvLayers(fields, "AffectsLayers", sceneLayers),
                         OccluderLayers = CsvLayers(fields, "OccluderLayers", sceneLayers)
@@ -108,6 +123,9 @@ public static class LdtkLightingImporter
                     light.Validate();
                     LightLayerRouting.ValidateRouting(light, sceneLayers);
                     lights.Add(light);
+                    PresentationLightMotion motion = ReadLightMotion(fields);
+                    if (motion.Axis != PresentationLightMotionAxis.Static)
+                        lightMotions.Add(iid, motion);
                 }
                 else if (kind == BlockerEntity)
                 {
@@ -117,6 +135,9 @@ public static class LdtkLightingImporter
                         RenderLayerGroup.Gameplay);
                     occluders.Add(FromBounds(iid, e.Bounds.Left, e.Bounds.Bottom,
                         e.Bounds.Right, e.Bounds.Top, blockerLayer));
+                    var motion = ReadOccluderMotion(fields,
+                        new LightPoint(e.Bounds.Center.X, e.Bounds.Center.Y));
+                    if (motion.IsAnimated) occluderMotions.Add(iid, motion);
                 }
                 else
                 {
@@ -137,9 +158,46 @@ public static class LdtkLightingImporter
                         ContactShadow = Bool(fields, "ContactShadow", false),
                         LightingMode = SurfaceMode(fields),
                         Channel = plane,
-                        LayerId = surfaceLayerId
+                        LayerId = surfaceLayerId,
+                        MaterialShading = MaterialMode(fields),
+                        NormalMap = OptionalMap(fields, "NormalMap"),
+                        EdgeMap = OptionalMap(fields, "EdgeMap"),
+                        MaterialNormalStrength = Number(fields, "MaterialNormalStrength", 1, 0, 1),
+                        MaterialRimStrength = Number(fields, "MaterialRimStrength", 1, 0, 2),
+                        MaterialDepthZ = Number(fields, "MaterialDepthZ", 0, -100, 100),
+                        BackRimOnOverlap = Bool(fields, "BackRimOnOverlap", false),
+                        BackRimWidthPx = Number(fields, "BackRimWidthPx", 4.5, .5, 24),
+                        BackRimIntensity = Number(fields, "BackRimIntensity", 1.25, 0, 4)
                     };
                     options.Validate();
+                    if (options.MaterialShading != ProductionSurfaceShading.Legacy &&
+                        sceneLayers.Get(options.LayerId).Mode == RenderLayerLightingMode.Unlit)
+                        throw new NotSupportedException(
+                            "Stage 15B GPU material opt-in requires a lit scene layer.");
+                    if (options.MaterialShading != ProductionSurfaceShading.Legacy &&
+                        kind != "TerrainArtwork")
+                        throw new NotSupportedException(
+                            "Stage 15B GPU material opt-in currently supports TerrainArtwork only.");
+                    var blockerMotion = ReadOccluderMotion(fields,
+                        ArtworkPivot(entity, height));
+                    if (blockerMotion.IsAnimated)
+                    {
+                        if (kind != "TerrainArtwork")
+                            throw new NotSupportedException(
+                                "Animated artwork is supported for TerrainArtwork only.");
+                        if (Number(fields, "ParallaxX", 0, -100, 200) != 0 ||
+                            Number(fields, "ParallaxY", 0, -100, 200) != 0)
+                            throw new NotSupportedException(
+                                "Animated shadow casters must use world parallax (0% authoring offset).");
+                        if (!options.CastsShadows)
+                            throw new ArgumentException("Animated TerrainArtwork must cast shadows.");
+                        // The current production tangent-space maps are not rotated with the sprite.
+                        if (options.MaterialShading is ProductionSurfaceShading.Normal or
+                            ProductionSurfaceShading.Rim or ProductionSurfaceShading.Hybrid)
+                            throw new NotSupportedException(
+                                "Animated mapped artwork requires transformed tangent maps; use Legacy or Flat.");
+                        occluderMotions.Add(iid, blockerMotion);
+                    }
                     surfaces.Add(iid, options);
                     JsonElement px = entity.GetProperty("px");
                     JsonElement pivot = entity.GetProperty("__pivot");
@@ -162,7 +220,32 @@ public static class LdtkLightingImporter
         foreach (LightingOccluder blocker in occluders) blocker.Validate();
         return new LdtkLightingScene(levelId, lights.AsReadOnly(), occluders.AsReadOnly(),
             new ReadOnlyDictionary<string, LightingSurfaceOptions>(surfaces),
-            new ReadOnlyDictionary<string, LightPoint>(centers), sceneLayers);
+            new ReadOnlyDictionary<string, LightPoint>(centers), sceneLayers,
+            new ReadOnlyDictionary<string, PresentationLightMotion>(lightMotions),
+            new ReadOnlyDictionary<string, PresentationOccluderMotion>(occluderMotions));
+    }
+
+    private static ProductionSurfaceShading MaterialMode(Dictionary<string, JsonElement> fields)
+    {
+        if (!fields.TryGetValue("MaterialShading", out var raw) || raw.ValueKind == JsonValueKind.Null)
+            return ProductionSurfaceShading.Legacy;
+        if (raw.ValueKind != JsonValueKind.String ||
+            !Enum.TryParse<ProductionSurfaceShading>(raw.GetString(), false, out var parsed) ||
+            !Enum.IsDefined(parsed))
+            throw new ArgumentException("MaterialShading must be Legacy, Flat, Normal, Rim or Hybrid.");
+        return parsed;
+    }
+
+    private static string? OptionalMap(Dictionary<string, JsonElement> fields, string name)
+    {
+        if (!fields.TryGetValue(name, out var raw) || raw.ValueKind == JsonValueKind.Null)
+            return null;
+        if (raw.ValueKind != JsonValueKind.String)
+            throw new ArgumentException(name + " must be a relative PNG path.");
+        string? path = raw.GetString();
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        ProductionSurfaceSubmission.ValidateMap(path);
+        return path;
     }
 
     private static string LayerId(Dictionary<string, JsonElement> fields,
@@ -208,6 +291,61 @@ public static class LdtkLightingImporter
         }
         return fields;
     }
+    private static LightPoint ArtworkPivot(JsonElement entity, int levelHeight)
+    {
+        JsonElement xy = entity.GetProperty("px");
+        return new LightPoint(xy[0].GetDouble() * UnitsPerPixel,
+            (levelHeight - xy[1].GetDouble()) * UnitsPerPixel);
+    }
+
+    private static PresentationOccluderMotion ReadOccluderMotion(
+        Dictionary<string, JsonElement> fields, LightPoint anchor)
+    {
+        string axisText = Text(fields, "BlockerMotionAxis", "Static");
+        string rotationText = Text(fields, "BlockerRotationMode", "Static");
+        if (!Enum.TryParse(axisText, false, out PresentationOccluderMotionAxis axis) ||
+            !Enum.IsDefined(axis))
+            throw new ArgumentException("BlockerMotionAxis must be Static/Horizontal/Vertical.");
+        if (!Enum.TryParse(rotationText, false, out PresentationOccluderRotationMode rotation) ||
+            !Enum.IsDefined(rotation))
+            throw new ArgumentException("Invalid BlockerRotationMode.");
+        // Explicit defaults keep old LDtk scenes completely static.
+        var motion = new PresentationOccluderMotion(anchor, axis,
+            Number(fields, "BlockerTravelWorld", 0, 0, 10),
+            Number(fields, "BlockerCyclesPerSecond", 0, 0, 2), rotation,
+            Number(fields, "BlockerAngularSpeedDegPerSecond", 0, 0, 360),
+            Number(fields, "BlockerSwingDegrees", 0, 0, 180));
+        motion.Validate();
+        return motion;
+    }
+
+    private static string Text(Dictionary<string, JsonElement> fields, string key, string fallback)
+    {
+        if (!fields.TryGetValue(key, out JsonElement value) ||
+            value.ValueKind == JsonValueKind.Null) return fallback;
+        if (value.ValueKind != JsonValueKind.String)
+            throw new ArgumentException(key + " must be a string.");
+        return value.GetString() ?? fallback;
+    }
+
+    private static PresentationLightMotion ReadLightMotion(Dictionary<string, JsonElement> fields)
+    {
+        if (!fields.TryGetValue("MotionAxis", out JsonElement axisValue) ||
+            axisValue.ValueKind == JsonValueKind.Null)
+            return new PresentationLightMotion(PresentationLightMotionAxis.Static, 0, 0);
+        if (axisValue.ValueKind != JsonValueKind.String ||
+            !Enum.TryParse(axisValue.GetString(), ignoreCase: false,
+                out PresentationLightMotionAxis axis) || !Enum.IsDefined(axis))
+            throw new ArgumentException("MotionAxis must be Static, Horizontal, or Vertical.");
+        if (axis == PresentationLightMotionAxis.Static)
+            return new PresentationLightMotion(axis, 0, 0);
+        var motion = new PresentationLightMotion(axis,
+            Number(fields, "MotionDistanceWorld", 2, .01, 10),
+            Number(fields, "MotionCyclesPerSecond", .2, .01, 2));
+        motion.Validate();
+        return motion;
+    }
+
     private static LightingSurfaceMode SurfaceMode(Dictionary<string, JsonElement> fields)
     {
         if (!fields.TryGetValue("LightingMode", out JsonElement raw) ||
@@ -283,9 +421,14 @@ public static class LdtkLightingImporter
         JsonElement pivot = raw.GetProperty("__pivot");
         double px = pivot[0].GetDouble(), py = pivot[1].GetDouble();
         double degrees = Number(fields, "RotationDeg", 0, -360, 360);
-        if (w <= 0 || h <= 0 || !double.IsFinite(x) || !double.IsFinite(y) ||
+        // An art PNG may contain transparent margin around its visible pixels.
+        // Opt-in inset keeps the caster hull and back-rim contour aligned with
+        // that visible silhouette. Zero preserves every existing level.
+        double shadowInset = Number(fields, "ShadowHullInsetPx", 0, 0, 24);
+        if (w <= 0 || h <= 0 || shadowInset * 2 >= w || shadowInset * 2 >= h ||
+            !double.IsFinite(x) || !double.IsFinite(y) ||
             !double.IsFinite(px) || !double.IsFinite(py) || px < 0 || px > 1 || py < 0 || py > 1)
-            throw new ArgumentException("Invalid authored shadow caster sprite dimensions.");
+            throw new ArgumentException("Invalid authored shadow caster sprite dimensions or inset.");
         double a = degrees * Math.PI / 180;
         double co = Math.Cos(a), si = Math.Sin(a);
         LightPoint Transform(double ux, double uy)
@@ -295,10 +438,22 @@ public static class LdtkLightingImporter
             double sy = y + dx * si + dy * co;
             return new LightPoint(sx * UnitsPerPixel, (levelHeight - sy) * UnitsPerPixel);
         }
-        return new LightingOccluder
+        string shape = Text(fields, "ShadowShape", "Rectangle");
+        LightPoint[] vertices = shape switch
         {
-            Id = id, LayerId = layerId,
-            Vertices = [Transform(0, 0), Transform(0, h), Transform(w, h), Transform(w, 0)]
+            "Rectangle" => [Transform(shadowInset, shadowInset),
+                Transform(shadowInset, h - shadowInset),
+                Transform(w - shadowInset, h - shadowInset),
+                Transform(w - shadowInset, shadowInset)],
+            "Triangle" => [Transform(w * .5, shadowInset),
+                Transform(shadowInset, h - shadowInset),
+                Transform(w - shadowInset, h - shadowInset)],
+            "Trapezoid" => [Transform(w * .22, shadowInset),
+                Transform(shadowInset, h - shadowInset),
+                Transform(w - shadowInset, h - shadowInset),
+                Transform(w * .78, shadowInset)],
+            _ => throw new ArgumentException("ShadowShape must be Rectangle, Triangle, or Trapezoid.")
         };
+        return new LightingOccluder { Id = id, LayerId = layerId, Vertices = vertices };
     }
 }

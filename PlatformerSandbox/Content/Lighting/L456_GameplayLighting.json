@@ -176,6 +176,14 @@
         "FlatDramatic",
         "FlatReadable"
       ]
+    },
+    {
+      "sceneId": "LIGHTING_INTEGRATION_TEST",
+      "defaultPreset": "FlatDramatic",
+      "presetIds": [
+        "FlatDramatic",
+        "FlatReadable"
+      ]
     }
   ]
 }

@@ -24,7 +24,11 @@ public sealed class GameLevelSelectionTests
         public bool Supports(MajorSceneKind kind, SceneDestination? destination) =>
             kind == MajorSceneKind.Title && destination is null ||
             kind == MajorSceneKind.Gameplay && destination is not null &&
-            GameLevelMenuCatalog.Items.Any(item => item.Destination == destination);
+            destination.EntranceId == GameLevelIds.DefaultEntrance &&
+            GameLevelIds.IsStandalonePlayableLevel(destination.LevelId);
+
+        // The UI catalog is intentionally only a shortlist. Valid standalone
+        // fixtures must remain loadable without being displayed in that menu.
 
         public bool TryPrepare(MajorSceneKind kind, SceneDestination? destination,
             out IGameFlowScene? scene, out string? error)
@@ -64,24 +68,36 @@ public sealed class GameLevelSelectionTests
     }
 
     [Fact]
-    public void LevelMenuContainsAllFourLdtkScenesAndAllKnownGyms()
+    public void LevelMenuShowsMaintainedDestinationsOnly()
     {
         using var flow = new GameFlowController(new TestFactory());
         flow.Execute(GameUiCommand.OpenLevelSelect);
         string[] required =
         [
-            GameLevelIds.LdtkTest, GameLevelIds.LdtkParallaxDemo,
-            GameLevelIds.LdtkSceneryDemo, GameLevelIds.LdtkTerrainDemo,
-            GameLevelIds.LdtkConnectedA, GameLevelIds.LdtkConnectedB,
-            GameLevelIds.MovementGym, GameLevelIds.SharedWorld,
-            GameLevelIds.AuthoredWorld, GameLevelIds.MotionLab,
-            GameLevelIds.RouteA, GameLevelIds.RouteB, GameLevelIds.LightingBasics
+            GameLevelIds.LdtkConnectedA,
+            GameLevelMenuCatalog.LightingIntegrationTest,
+            GameLevelIds.LightingBasics,
+            GameLevelIds.MovementGym
         ];
-        Assert.Equal(required.Length, flow.MenuItems.Count);
-        foreach (string level in required)
-            Assert.Single(flow.MenuItems, i => i.Destination?.LevelId == level);
-        Assert.All(flow.MenuItems, i =>
-            Assert.Equal(GameUiCommand.PlaySelectedLevel, i.Command));
+        Assert.Equal(required, flow.MenuItems.Select(x => x.Destination!.LevelId));
+        Assert.DoesNotContain(flow.MenuItems,
+            x => x.Destination?.LevelId == GameLevelIds.LdtkParallaxDemo);
+        Assert.All(flow.MenuItems, x =>
+            Assert.Equal(GameUiCommand.PlaySelectedLevel, x.Command));
+    }
+
+    [Fact]
+    public void DiscoveredLevelsAreWhitelistedAndMissingProjectsAreHidden()
+    {
+        var menu = GameLevelMenuCatalog.WithDiscoveredLevels(
+        [
+            GameLevelMenuCatalog.LightingIntegrationTest,
+            "EXPERIMENT_THAT_MUST_STAY_HIDDEN"
+        ]);
+        Assert.DoesNotContain(menu, x => x.Destination?.LevelId == "EXPERIMENT_THAT_MUST_STAY_HIDDEN");
+        Assert.DoesNotContain(menu, x => x.Destination?.LevelId == GameLevelIds.LdtkConnectedA);
+        Assert.Contains(menu, x => x.Destination?.LevelId == GameLevelMenuCatalog.LightingIntegrationTest);
+        Assert.Contains(menu, x => x.Destination?.LevelId == GameLevelIds.LightingBasics);
     }
 
     [Fact]
@@ -100,37 +116,57 @@ public sealed class GameLevelSelectionTests
     }
 
     [Fact]
-    public void SelectingTerrainDemoQueuesItAndEntersGameplayOnlyAtCommit()
+    public void HiddenRegressionLevelCanLaunchWithoutAppearingInTheLevelMenu()
     {
+        Assert.DoesNotContain(GameLevelMenuCatalog.Items,
+            item => item.Destination?.LevelId == GameLevelIds.LdtkTest);
+
         using var flow = new GameFlowController(new TestFactory());
-        flow.Execute(GameUiCommand.OpenLevelSelect);
-        int index = GameLevelMenuCatalog.Items.ToList().FindIndex(i =>
-            i.Destination?.LevelId == GameLevelIds.LdtkTerrainDemo);
-        Assert.True(index >= 0);
-        for (int n = 0; n < index; n++) flow.Navigate(1);
-        Assert.Equal(index, flow.SelectionIndex);
-        flow.ConfirmSelection();
-        Assert.Equal(MajorSceneKind.Title, flow.ActiveScene);
-        Assert.Equal(GameLevelIds.LdtkTerrainDemo, flow.Scenes.Pending?.Destination?.LevelId);
+        Assert.Equal(SceneQueueResult.Queued, flow.RequestPlay(GameLevelIds.LdtkTest));
         Assert.True(flow.CommitPending());
         Assert.Equal(MajorSceneKind.Gameplay, flow.ActiveScene);
-        Assert.Equal(GameLevelIds.LdtkTerrainDemo, flow.Scenes.ActiveDestination?.LevelId);
-        Assert.False(flow.Ui.HasOverlay);
+        Assert.Equal(GameLevelIds.LdtkTest, flow.Scenes.ActiveDestination?.LevelId);
     }
 
     [Fact]
-    public void SelectingRouteBRetainsEastEntrance()
+    public void HiddenRegressionLevelDoesNotAllowUnknownEntrances()
+    {
+        using var flow = new GameFlowController(new TestFactory());
+        Assert.Equal(SceneQueueResult.Invalid,
+            flow.RequestPlay(GameLevelIds.LdtkTest, "UNKNOWN_ENTRANCE"));
+        Assert.Null(flow.Scenes.Pending);
+    }
+
+    [Fact]
+    public void SelectingLightingIntegrationQueuesItAndEntersGameplayOnlyAtCommit()
     {
         using var flow = new GameFlowController(new TestFactory());
         flow.Execute(GameUiCommand.OpenLevelSelect);
-        int index = GameLevelMenuCatalog.Items.ToList().FindIndex(i =>
-            i.Destination?.LevelId == GameLevelIds.RouteB);
+        int index = GameLevelMenuCatalog.Items.ToList().FindIndex(x =>
+            x.Destination?.LevelId == GameLevelMenuCatalog.LightingIntegrationTest);
         Assert.True(index >= 0);
         for (int n = 0; n < index; n++) flow.Navigate(1);
         flow.ConfirmSelection();
-        Assert.Equal("EAST", flow.Scenes.Pending?.Destination?.EntranceId);
+        Assert.Equal(MajorSceneKind.Title, flow.ActiveScene);
+        Assert.Equal(GameLevelMenuCatalog.LightingIntegrationTest,
+            flow.Scenes.Pending?.Destination?.LevelId);
         Assert.True(flow.CommitPending());
-        Assert.Equal(GameLevelIds.RouteB, flow.Scenes.ActiveDestination?.LevelId);
+        Assert.Equal(GameLevelMenuCatalog.LightingIntegrationTest,
+            flow.Scenes.ActiveDestination?.LevelId);
+    }
+
+    [Fact]
+    public void LevelMenuHitTestingTracksVisibleRows()
+    {
+        const int width = 1280, height = 720;
+        var b = GameMenuLayout.Get(width, height, GameUiScreen.LevelSelect,
+            4, 0);
+        Assert.Equal(0, GameMenuLayout.Hit(width, height,
+            GameUiScreen.LevelSelect, 4, 0, b.Left + 25, b.Top + 68));
+        Assert.Equal(1, GameMenuLayout.Hit(width, height,
+            GameUiScreen.LevelSelect, 4, 0, b.Left + 25, b.Top + 98));
+        Assert.Equal(-1, GameMenuLayout.Hit(width, height,
+            GameUiScreen.LevelSelect, 4, 0, 0, 0));
     }
 
     [Fact]
@@ -174,12 +210,12 @@ public sealed class GameLevelSelectionTests
         Assert.True(flow.CommitPending());
         flow.PauseOrResume();
         flow.Execute(GameUiCommand.OpenLevelSelect);
-        flow.Navigate(1); // LDTK_PARALLAX_DEMO
+        flow.Navigate(1); // LIGHTING_INTEGRATION_TEST
         flow.ConfirmSelection();
         Assert.Equal(GameLevelIds.LdtkTest, flow.Scenes.ActiveDestination?.LevelId);
         Assert.True(flow.IsGameplaySuspended);
         Assert.True(flow.CommitPending());
-        Assert.Equal(GameLevelIds.LdtkParallaxDemo, flow.Scenes.ActiveDestination?.LevelId);
+        Assert.Equal(GameLevelMenuCatalog.LightingIntegrationTest, flow.Scenes.ActiveDestination?.LevelId);
         Assert.Null(flow.CurrentMenu);
         Assert.False(flow.IsGameplaySuspended);
     }

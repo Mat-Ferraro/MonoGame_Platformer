@@ -40,7 +40,95 @@ sampler2D EdgeSampler = sampler_state
     AddressV = CLAMP;
 };
 
+Texture2D ProductionVisibility0;
+sampler2D ProductionVisibility0Sampler = sampler_state
+{
+    Texture = <ProductionVisibility0>;
+    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+Texture2D ProductionVisibility1;
+sampler2D ProductionVisibility1Sampler = sampler_state
+{
+    Texture = <ProductionVisibility1>;
+    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float ProductionMaskMode; // lab=0 (analytic 3 polygons); gameplay=1 (LDtk visibility fans)
+
+// Phase 17B: separable Gaussian visibility filter. The source is an existing
+// hard-visibility mask; source and destination are always DIFFERENT RTs.
+// Bilinear tap pairing reconstructs all integer offsets up to radius 8 using
+// only 9 texture fetches per axis, avoiding the visible 17A sparse-tap bands.
+Texture2D SoftMaskSource;
+sampler2D SoftMaskSampler = sampler_state
+{
+    Texture = <SoftMaskSource>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float2 SoftBlurTexelStep;     // (1 / viewport width, 0) OR (0, 1 / height)
+float4 SoftBlurOffsets;      // subpixel-accurate Gaussian tap-pair centers
+float4 SoftBlurWeights;      // normalized weights for EACH positive/negative tap
+float SoftBlurCenterWeight;
+
+// Phase 17C: per-light, per-mask first-hit ray profile. The CPU derives it
+// from the SAME polygon fan as the hard mask. R/G encode a 16-bit normalized
+// radial distance; point sampling avoids mixing adjacent shadow edges.
+Texture2D SoftContactProfile;
+sampler2D SoftContactProfileSampler = sampler_state
+{
+    Texture = <SoftContactProfile>;
+    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float SoftContactEnabled;
+float2 SoftContactLightCenter;
+float SoftContactFanReachPixels;
+float SoftContactEmitterRadiusPixels;
+float SoftContactMaxBlurPixels;
 float2 ViewportPixels;
+
+float ContactTapScale(float2 uv)
+{
+    if (SoftContactEnabled < 0.5) return 1.0;
+    float2 position = uv * ViewportPixels;
+    float2 d = position - SoftContactLightCenter;
+    // Screen Y is inverted relative to world-space ShadowVisibility angles.
+    float angle = atan2(-d.y, d.x);
+    float u = frac(angle * 0.15915494309189535 + 1.0);
+    float profileU = (floor(u * 1024.0) + 0.5) / 1024.0;
+    float2 packed = tex2D(SoftContactProfileSampler, float2(profileU, 0.5)).rg;
+    float normalizedHit = (floor(packed.r * 255.0 + 0.5) * 256.0 +
+        floor(packed.g * 255.0 + 0.5)) / 65535.0;
+    float hit = normalizedHit * SoftContactFanReachPixels;
+    float receiver = length(d);
+    float pastBlocker = max(0.0, receiver - hit);
+    // Project the emitter's apparent radius from the blocker towards the
+    // receiver. Max 8px for our bounded Gaussian kernel; 0.75px at contact
+    // prevents a sharp visibility discontinuity at polygon silhouette edges.
+    float width = min(SoftContactMaxBlurPixels,
+        max(0.75, SoftContactEmitterRadiusPixels * pastBlocker / max(2.0, hit)));
+    return saturate(width / 8.0);
+}
+
+float4 GaussianVisibilityPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float v = SoftBlurCenterWeight * tex2D(SoftMaskSampler, uv).r;
+    float tapScale = ContactTapScale(uv);
+    float2 d0 = SoftBlurTexelStep * SoftBlurOffsets.x * tapScale;
+    float2 d1 = SoftBlurTexelStep * SoftBlurOffsets.y * tapScale;
+    float2 d2 = SoftBlurTexelStep * SoftBlurOffsets.z * tapScale;
+    float2 d3 = SoftBlurTexelStep * SoftBlurOffsets.w * tapScale;
+    v += SoftBlurWeights.x * (tex2D(SoftMaskSampler, uv + d0).r + tex2D(SoftMaskSampler, uv - d0).r);
+    v += SoftBlurWeights.y * (tex2D(SoftMaskSampler, uv + d1).r + tex2D(SoftMaskSampler, uv - d1).r);
+    v += SoftBlurWeights.z * (tex2D(SoftMaskSampler, uv + d2).r + tex2D(SoftMaskSampler, uv - d2).r);
+    v += SoftBlurWeights.w * (tex2D(SoftMaskSampler, uv + d3).r + tex2D(SoftMaskSampler, uv - d3).r);
+    v = saturate(v);
+    return float4(v, v, v, 1.0);
+}
+
+
 float3 AmbientRgb;
 float ShadingMode;             // Flat=0, Normal=1, Rim=2, Hybrid=3
 float NormalStrength;
@@ -264,6 +352,13 @@ float4 MainPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
         ShadowSettings.x, WallOverlapSettings.x);
     float visibility1 = VisibilityForLight(Light1PositionRadius.xy, pixelPos,
         ShadowSettings.y, WallOverlapSettings.y);
+    // Production visibility is rasterized by the same unbounded ray fan as
+    // ComposeLayer. The two masks exclude only the current surface's own ID.
+    if (ProductionMaskMode > 0.5)
+    {
+        visibility0 = tex2D(ProductionVisibility0Sampler, uv).r;
+        visibility1 = tex2D(ProductionVisibility1Sampler, uv).r;
+    }
 
     // Debug views share EXACTLY the same per-light visibility calculation as
     // final shading. They do not apply per-surface normal/rim modifiers.
@@ -326,5 +421,16 @@ technique SpriteDrawing
     pass P0
     {
         PixelShader = compile PS_SHADERMODEL MainPS();
+    }
+}
+
+// Reusable two-pass, full-resolution visibility filter. Production layers
+// multiply the SECOND pass directly into their illuminated layer; material
+// masks write the second pass back to a separate mask render target.
+technique GaussianVisibility
+{
+    pass P0
+    {
+        PixelShader = compile PS_SHADERMODEL GaussianVisibilityPS();
     }
 }

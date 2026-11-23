@@ -42,8 +42,8 @@ public sealed class GameDiagnosticBridge
     public IDisposable? MonitorOperation(string operation) => _watchdog?.BeginOperation(operation);
 
     public string StatusMessage => _reportStatus ?? (_previousUncleanExit
-        ? "PREVIOUS SESSION ENDED UNEXPECTEDLY - CTRL SHIFT F12 EXPORT REPORT"
-        : "CTRL SHIFT F12: EXPORT REPORT ZIP");
+        ? "PREVIOUS SESSION ENDED UNEXPECTEDLY - DEV TOOLS > EXPORT REPORT"
+        : "DEV TOOLS > EXPORT REPORT ZIP");
 
     public void ExportReport()
     {

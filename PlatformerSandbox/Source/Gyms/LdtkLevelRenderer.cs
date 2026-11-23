@@ -39,7 +39,10 @@ internal static class LdtkLevelRenderer
         Texture2D? contactShadow = null,
         Action? beginLightingLayer = null,
         Action<Camera2DView, SceneLightingLayer>? composeLightingLayer = null,
-        Action? endLightingFrame = null)
+        Action? endLightingFrame = null,
+        Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
+            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface = null,
+        LdtkLightingScene? animationScene = null)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         WorldPlayerSnapshot player = world.GetPlayer(1);
@@ -57,7 +60,7 @@ internal static class LdtkLevelRenderer
                 showCollisionDebug, showDebugHud, collisionBackdrop, view,
                 playerAnimations, characterSprites, drawParticleLayer, lightingScene,
                 lightTint, heroTint, contactShadow, beginLightingLayer,
-                composeLightingLayer, endLightingFrame);
+                composeLightingLayer, endLightingFrame, drawMaterialSurface);
             return;
         }
 
@@ -84,7 +87,8 @@ internal static class LdtkLevelRenderer
             hasVisuals ? new Color(15, 22, 35) : new Color(30, 43, 57));
         visuals?.Draw(batch, LdtkVisualPlane.Background,
             cameraLeftPx, cameraTopPx, viewport, lightingScene,
-            composeLighting is null ? null : false);
+            composeLighting is null ? null : false,
+            animationScene: animationScene);
         DrawParticleLayer(ParticleVisualLayer.Background);
 
         // Graybox fallback makes collision terrain recognizable until actual
@@ -104,7 +108,8 @@ internal static class LdtkLevelRenderer
         }
         visuals?.Draw(batch, LdtkVisualPlane.Terrain,
             cameraLeftPx, cameraTopPx, viewport, lightingScene,
-            composeLighting is null ? null : false);
+            composeLighting is null ? null : false,
+            animationScene: animationScene);
 
         // Moving platforms are authoritative solids. Show their live bounds
         // in this development scene even if the gray collision backing is off.
@@ -125,10 +130,12 @@ internal static class LdtkLevelRenderer
             batch.Begin(samplerState: SamplerState.PointClamp);
             visuals?.Draw(batch, LdtkVisualPlane.Background,
                 cameraLeftPx, cameraTopPx, viewport, lightingScene,
-                true, lightTint, contactShadow);
+                true, lightTint, contactShadow,
+                animationScene: animationScene);
             visuals?.Draw(batch, LdtkVisualPlane.Terrain,
                 cameraLeftPx, cameraTopPx, viewport, lightingScene,
-                true, lightTint, contactShadow);
+                true, lightTint, contactShadow,
+                animationScene: animationScene);
         }
         DrawParticleLayer(ParticleVisualLayer.World);
 
@@ -137,7 +144,8 @@ internal static class LdtkLevelRenderer
         DrawParticleLayer(ParticleVisualLayer.Foreground);
         visuals?.Draw(batch, LdtkVisualPlane.Foreground,
             cameraLeftPx, cameraTopPx, viewport, lightingScene,
-            null, lightTint, contactShadow);
+            null, lightTint, contactShadow,
+            animationScene: animationScene);
 
         // F9 explicitly reveals invisible collision while testing art alignment.
         if (showCollisionDebug)
@@ -195,8 +203,8 @@ internal static class LdtkLevelRenderer
                 new Color(209, 220, 235), 1);
             GymDebugText.Draw(batch, pixel, 27, 103,
                 "BG/TERRAIN/FG LAYERS: " + (visuals?.Definition.Layers.Count ?? 0) +
-                "  BACKING F10: " + (showSolidBacking ? "ON" : "OFF") +
-                "  OUTLINES F9: " + (showCollisionDebug ? "ON" : "OFF"),
+                "  BACKING: " + (showSolidBacking ? "ON" : "OFF") +
+                "  OUTLINES: " + (showCollisionDebug ? "ON" : "OFF"),
                 new Color(209, 220, 235), 1);
             GymDebugText.Draw(batch, pixel, 27, 121,
                 "A/D SPACE MOVE  R RESPAWN  T RELOAD  P PAUSE",
@@ -205,7 +213,7 @@ internal static class LdtkLevelRenderer
                 paused ? "PAUSED" : "EDIT LDTK > SAVE > T TO RELOAD LATEST FILE",
                 new Color(108, 224, 178), 1);
             GymDebugText.Draw(batch, pixel, 27, 157,
-                "F7 ORIGINAL F8 PARALLAX F9 SCENERY F10 TERRAIN AT TITLE",
+                "CHOOSE ACTIVE SCENES IN SELECT LEVEL MENU",
                 new Color(161, 184, 201), 1);
         }
     }
@@ -219,7 +227,9 @@ internal static class LdtkLevelRenderer
         Action<ParticleVisualLayer>? drawParticleLayer, LdtkLightingScene scene,
         Func<string, Color>? lightTint, Func<LightPoint, Color>? heroTint,
         Texture2D? contactShadow, Action beginLayer,
-        Action<Camera2DView, SceneLightingLayer> composeLayer, Action? endFrame)
+        Action<Camera2DView, SceneLightingLayer> composeLayer, Action? endFrame,
+        Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
+            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         bool showBacking = collisionBackdrop ?? visuals?.Terrain?.DrawCollisionBackdrop ?? true;
@@ -251,7 +261,8 @@ internal static class LdtkLevelRenderer
             // shaded only in the post pass (important for lit shadow casters).
             visuals?.Draw(batch, plane, view.CameraLeftPx, view.CameraTopPx, viewport,
                 scene, post, post == true ? lightTint : null,
-                post == true ? contactShadow : null, layer.Id, layer.ParallaxMultiplier);
+                post == true ? contactShadow : null, layer.Id, layer.ParallaxMultiplier,
+                post == true ? drawMaterialSurface : null);
         }
         void DrawTerrain()
         {
@@ -363,8 +374,8 @@ internal static class LdtkLevelRenderer
                 " TILES: " + (visuals?.Definition.TileCount ?? 0),
                 new Color(209, 220, 235), 1);
             GymDebugText.Draw(batch, pixel, 27, 103,
-                "F9 COLLISION: " + (showCollisionDebug ? "ON" : "OFF") +
-                "  F10 BACKING: " + (showBacking ? "ON" : "OFF"),
+                "COLLISION: " + (showCollisionDebug ? "ON" : "OFF") +
+                "  BACKING: " + (showBacking ? "ON" : "OFF"),
                 new Color(209, 220, 235), 1);
             GymDebugText.Draw(batch, pixel, 27, 121,
                 "A/D SPACE MOVE  R RESPAWN  T RELOAD  P PAUSE",
