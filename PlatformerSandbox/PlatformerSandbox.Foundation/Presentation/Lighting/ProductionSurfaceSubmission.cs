@@ -30,6 +30,9 @@ public sealed record ProductionSurfaceSubmission
     public bool BackRimOnOverlap { get; init; }
     public double BackRimWidthPx { get; init; } = 4.5;
     public double BackRimIntensity { get; init; } = 1.25;
+    public LightRgb EmissionColor { get; init; } = LightRgb.White;
+    public double EmissionIntensity { get; init; }
+    public string? EmissionMap { get; init; }
 
     public static ProductionSurfaceSubmission From(string instanceId, LightingSurfaceOptions options)
     {
@@ -51,7 +54,10 @@ public sealed record ProductionSurfaceSubmission
             MaterialDepthZ = options.MaterialDepthZ,
             BackRimOnOverlap = options.BackRimOnOverlap,
             BackRimWidthPx = options.BackRimWidthPx,
-            BackRimIntensity = options.BackRimIntensity
+            BackRimIntensity = options.BackRimIntensity,
+            EmissionColor = options.EmissionColor,
+            EmissionIntensity = options.EmissionIntensity,
+            EmissionMap = options.EmissionMap
         };
         result.Validate();
         return result;
@@ -69,6 +75,10 @@ public sealed record ProductionSurfaceSubmission
         if (Center is LightPoint point) point.Validate();
         ValidateMap(NormalMap);
         ValidateMap(EdgeMap);
+        ValidateMap(EmissionMap);
+        EmissionColor.Validate(nameof(EmissionColor));
+        if (!double.IsFinite(EmissionIntensity) || EmissionIntensity is < 0 or > 8)
+            throw new ArgumentOutOfRangeException(nameof(EmissionIntensity));
         if (!double.IsFinite(MaterialDepthZ) || MaterialDepthZ is < -100 or > 100 ||
             !double.IsFinite(BackRimWidthPx) || BackRimWidthPx is < 0.5 or > 24 ||
             !double.IsFinite(BackRimIntensity) || BackRimIntensity is < 0 or > 4)
@@ -76,6 +86,8 @@ public sealed record ProductionSurfaceSubmission
         if (CastsShadows != (CasterId is not null) ||
             (CastsShadows && CasterId != InstanceId))
             throw new ArgumentException("Surface caster identity must match its artwork IID.");
+        if (EmissionIntensity > 0 && Shading == ProductionSurfaceShading.Legacy)
+            throw new NotSupportedException("Emissive radiance needs the opted-in material pass.");
         if (BackRimOnOverlap && !CastsShadows)
             throw new NotSupportedException("Overlap back-rim requires a casting wall silhouette.");
     }
@@ -92,7 +104,7 @@ public sealed record ProductionSurfaceSubmission
 }
 
 /// <summary>
-/// Stable, bounded per-surface selection for the reference two-light GPU shader.
+/// Stable, bounded per-surface selection for production multi-pass materials.
 /// Author-authored layer routing takes precedence over channel fallback; light
 /// influence is ranked at the surface center and ties resolve by ID.
 /// </summary>
@@ -117,7 +129,7 @@ public static class ProductionSurfaceLightSelection
         ArgumentNullException.ThrowIfNull(visible);
         ArgumentNullException.ThrowIfNull(layer);
         center.Validate();
-        if (maximum is < 0 or > 2 || !double.IsFinite(radiusScale) || radiusScale <= 0)
+        if (maximum is < 0 or > 12 || !double.IsFinite(radiusScale) || radiusScale <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximum));
         return visible.Where(l => LightLayerRouting.Illuminates(l, layer) && l.Intensity > 0)
             .Select(l => new { Light = l, Score = RadialLighting.Attenuation(l with

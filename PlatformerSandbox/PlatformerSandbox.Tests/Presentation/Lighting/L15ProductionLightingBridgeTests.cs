@@ -48,7 +48,7 @@ public sealed class L15ProductionLightingBridgeTests
     public void AuthoredStage15SceneIncludesIndependentPlanesAndShadowRouting()
     {
         var scene = Scene();
-        Assert.Equal(4, scene.Lights.Count);
+        Assert.Equal(11, scene.Lights.Count); // Phase 18: seven extra authored material-test lights.
         Assert.True(scene.Occluders.Count >= 3);
         Assert.Contains(scene.Surfaces.Values, s => s.CastsShadows);
         Assert.Contains(scene.Surfaces.Values, s => !s.ReceivesLight);

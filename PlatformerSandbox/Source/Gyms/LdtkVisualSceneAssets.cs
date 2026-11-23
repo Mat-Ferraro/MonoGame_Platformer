@@ -100,6 +100,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                                 "Stage 15B GPU surface has no corresponding TerrainArtwork asset.");
                         if (!string.IsNullOrEmpty(surface.NormalMap)) LoadImage(surface.NormalMap);
                         if (!string.IsNullOrEmpty(surface.EdgeMap)) LoadImage(surface.EdgeMap);
+                        if (!string.IsNullOrEmpty(surface.EmissionMap)) LoadImage(surface.EmissionMap);
                     }
         }
         catch
@@ -120,7 +121,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
         Func<string, Color>? lightTint = null, Texture2D? contactShadow = null,
         string? renderLayer = null, double parallaxMultiplier = 1,
         Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
-            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterial = null,
+            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterial = null,
         LdtkLightingScene? animationScene = null)
     {
         // Ordinary drawing (null) preserves the legacy renderer. During lighting,
@@ -232,6 +233,10 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                             string.IsNullOrEmpty(submission.EdgeMap) ? null :
                             sb => DrawArtwork(sb, art, cameraX, cameraY, view,
                                 Color.White, null, _images[submission.EdgeMap!]);
+                        Action<SpriteBatch>? emission =
+                            string.IsNullOrEmpty(submission.EmissionMap) ? null :
+                            sb => DrawArtwork(sb, art, cameraX, cameraY, view,
+                                Color.White, null, _images[submission.EmissionMap!]);
                         // Use exactly the projection/pivot/rotation that
                         // DrawArtwork uses, so the cropped shader and final
                         // composite cannot disagree with the painted sprite.
@@ -243,7 +248,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                                 art.PivotX, art.PivotY, art.RotationDegrees,
                                 view.Width, view.Height);
                         batch.End();
-                        drawMaterial(submission, region, albedo, normals, edges);
+                        drawMaterial(submission, region, albedo, normals, edges, emission);
                         batch.Begin(samplerState: SamplerState.PointClamp);
                     }
                     else DrawArtwork(batch, art, cameraX, cameraY, view,

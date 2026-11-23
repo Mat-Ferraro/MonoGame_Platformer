@@ -33,6 +33,10 @@ public sealed record LightingSurfaceOptions
     public bool BackRimOnOverlap { get; init; }
     public double BackRimWidthPx { get; init; } = 4.5;
     public double BackRimIntensity { get; init; } = 1.25;
+    // L19: emissive radiance does not require a nearby dynamic light.
+    public LightRgb EmissionColor { get; init; } = LightRgb.White;
+    public double EmissionIntensity { get; init; }
+    public string? EmissionMap { get; init; }
     /// <summary>Do not multiply receiver pixels by backdrop shadow masks when this
     /// surface is unlit, a shadow caster, explicitly refuses cast shadows,
     /// or has an authored contact-shadow decoration drawn beneath it.</summary>
@@ -54,6 +58,12 @@ public sealed record LightingSurfaceOptions
             throw new ArgumentOutOfRangeException(nameof(MaterialDepthZ));
         ProductionSurfaceSubmission.ValidateMap(NormalMap);
         ProductionSurfaceSubmission.ValidateMap(EdgeMap);
+        ProductionSurfaceSubmission.ValidateMap(EmissionMap);
+        EmissionColor.Validate(nameof(EmissionColor));
+        if (!double.IsFinite(EmissionIntensity) || EmissionIntensity is < 0 or > 8)
+            throw new ArgumentOutOfRangeException(nameof(EmissionIntensity));
+        if (EmissionIntensity > 0 && MaterialShading == ProductionSurfaceShading.Legacy)
+            throw new NotSupportedException("Emission requires a production GPU material (Flat/Normal/Rim/Hybrid).");
         if (MaterialShading != ProductionSurfaceShading.Legacy)
         {
             if (!ReceivesLight ||

@@ -10,7 +10,9 @@ namespace PlatformerSandbox.Lighting;
 /// gameplay simulation and remains available while diagnostic HUD is hidden.</summary>
 internal enum LightingToolAction
 {
-    None, TogglePanel, ToggleLights, NextPreset, NextQuality, CycleShadowEdges, ToggleShadowFilter, ToggleShadowQualityPolicy,
+    None, TogglePanel, ToggleToolsPage, ToggleHdr, ToggleEmission, ToggleBloom,
+    CycleExposure, CycleBloomThreshold, CycleBloomStrength,
+    ToggleLights, NextPreset, NextQuality, ToggleMaterialLights, CycleShadowEdges, ToggleShadowFilter, ToggleShadowQualityPolicy,
     SelectShadowLight, CycleShadowEmitter, ToggleReducedFlashes,
     ToggleStress, ToggleWallMotion, ToggleInspectionLight, CycleHud, ToggleCollision, ToggleBackdrop,
     ToggleAudioMute, VolumeDown, VolumeUp, ExportReport
@@ -18,16 +20,30 @@ internal enum LightingToolAction
 
 internal sealed class LightingToolsPanel
 {
-    private static readonly LightingToolAction[] Actions =
+    // Page switching keeps *every* developer control mouse-accessible even
+    // at 720p; no hidden keyboard shortcuts or unreachable bottom rows.
+    private readonly LightingToolAction[] _lightingActions =
     [
+        LightingToolAction.ToggleToolsPage,
         LightingToolAction.ToggleLights,
         LightingToolAction.NextPreset,
         LightingToolAction.NextQuality,
+        LightingToolAction.ToggleMaterialLights,
+        LightingToolAction.ToggleHdr,
+        LightingToolAction.ToggleEmission,
+        LightingToolAction.ToggleBloom,
+        LightingToolAction.CycleExposure,
+        LightingToolAction.CycleBloomThreshold,
+        LightingToolAction.CycleBloomStrength,
         LightingToolAction.CycleShadowEdges,
         LightingToolAction.ToggleShadowFilter,
         LightingToolAction.ToggleShadowQualityPolicy,
         LightingToolAction.SelectShadowLight,
-        LightingToolAction.CycleShadowEmitter,
+        LightingToolAction.CycleShadowEmitter
+    ];
+    private readonly LightingToolAction[] _systemActions =
+    [
+        LightingToolAction.ToggleToolsPage,
         LightingToolAction.ToggleReducedFlashes,
         LightingToolAction.ToggleStress,
         LightingToolAction.ToggleWallMotion,
@@ -41,19 +57,21 @@ internal sealed class LightingToolsPanel
         LightingToolAction.ExportReport
     ];
 
+    private bool _systemPage;
+    private LightingToolAction[] Actions => _systemPage ? _systemActions : _lightingActions;
     public bool Open { get; private set; }
-    public void Close() => Open = false;
+    public void Close() { Open = false; _systemPage = false; }
 
     private static Rectangle Trigger(int width) => new(Math.Max(8, width - 166), 8, 154, 28);
-    private static int RowHeight(int height) => Math.Clamp((height - 174) / Actions.Length, 19, 30);
-    private static Rectangle Panel(int width, int height)
+    private int RowHeight(int height) => Math.Clamp((height - 174) / Actions.Length, 19, 30);
+    private Rectangle Panel(int width, int height)
     {
         int w = Math.Min(344, Math.Max(180, width - 16));
         int h = 53 + Actions.Length * RowHeight(height) + 94;
         return new Rectangle(Math.Max(4, width - w - 12), 43, w,
             Math.Min(h, Math.Max(1, height - 50)));
     }
-    private static Rectangle Row(Rectangle panel, int index, int height) =>
+    private Rectangle Row(Rectangle panel, int index, int height) =>
         new(panel.Left + 10, panel.Top + 42 + index * RowHeight(height),
             panel.Width - 20, RowHeight(height) - 2);
 
@@ -69,12 +87,20 @@ internal sealed class LightingToolsPanel
         Rectangle panel = Panel(width, height);
         if (!panel.Contains(x, y)) return LightingToolAction.None;
         for (int i = 0; i < Actions.Length; i++)
-            if (Row(panel, i, height).Contains(x, y)) return Actions[i];
+            if (Row(panel, i, height).Contains(x, y))
+            {
+                LightingToolAction action = Actions[i];
+                if (action == LightingToolAction.ToggleToolsPage) _systemPage = !_systemPage;
+                return action;
+            }
         return LightingToolAction.None;
     }
 
     public void Draw(SpriteBatch batch, Texture2D pixel, int width, int height,
-        bool lights, string preset, string quality, string shadowEdge,
+        bool lights, string preset, string quality, string materialLights,
+        bool hdr, bool hdrSupported, bool emission, bool bloom,
+        string exposure, string bloomThreshold, string bloomStrength,
+        string shadowEdge,
         string shadowFilter, string shadowQualityPolicy, string shadowLight, string shadowEmitter,
         bool reducedFlashes,
         bool stress, bool wallMotion, bool inspectionLight, string hud, bool collision, bool backdrop,
@@ -89,18 +115,12 @@ internal sealed class LightingToolsPanel
         batch.Draw(pixel, panel, new Color(16, 26, 39) * .98f);
         batch.Draw(pixel, new Rectangle(panel.X, panel.Y, 3, panel.Height), new Color(94, 220, 178));
         GymDebugText.Draw(batch, pixel, panel.X + 11, panel.Y + 10,
-            "LIGHTING AND DIAGNOSTICS", new Color(107, 223, 188), 1);
+            _systemPage ? "SYSTEM / DIAGNOSTICS" : "LIGHTING / POST FX",
+            new Color(107, 223, 188), 1);
 
-        string[] labels =
+        string[] labels = _systemPage ?
         [
-            "LIGHTING: " + (lights ? "ON" : "OFF"),
-            "LOOK: " + preset,
-            "QUALITY: " + quality,
-            "SHADOW EDGE: " + shadowEdge,
-            "SHADOW FILTER: " + shadowFilter,
-            "SHADOW QUALITY: " + shadowQualityPolicy,
-            "EDIT LIGHT: " + shadowLight,
-            "LIGHT SIZE: " + shadowEmitter,
+            "PAGE: SYSTEM  (CLICK FOR LIGHTING)",
             "REDUCE FLASH: " + (reducedFlashes ? "ON" : "OFF"),
             "STRESS LIGHTS: " + (stress ? "ON" : "OFF"),
             "MOVING WALLS: " + (wallMotion ? "PLAY" : "PAUSE"),
@@ -112,6 +132,24 @@ internal sealed class LightingToolsPanel
             "VOLUME DOWN (" + masterVolume + " PCT)",
             "VOLUME UP (" + masterVolume + " PCT)",
             "EXPORT CRASH REPORT ZIP"
+        ] :
+        [
+            "PAGE: LIGHTING  (CLICK FOR SYSTEM)",
+            "LIGHTING: " + (lights ? "ON" : "OFF"),
+            "LOOK: " + preset,
+            "QUALITY: " + quality,
+            "MATERIAL LIGHTS: " + materialLights,
+            "HDR: " + (hdr ? (hdrSupported ? "ON FLOAT16" : "REQUESTED / FALLBACK") : "OFF"),
+            "EMISSION: " + (emission ? "ON" : "OFF"),
+            "BLOOM: " + (bloom ? "ON" : "OFF"),
+            "EXPOSURE: " + exposure,
+            "BLOOM THRESHOLD: " + bloomThreshold,
+            "BLOOM GAIN: " + bloomStrength,
+            "SHADOW EDGE: " + shadowEdge,
+            "SHADOW FILTER: " + shadowFilter,
+            "SHADOW QUALITY: " + shadowQualityPolicy,
+            "EDIT LIGHT: " + shadowLight,
+            "LIGHT SIZE: " + shadowEmitter
         ];
         for (int i = 0; i < Actions.Length; i++)
         {

@@ -55,6 +55,20 @@ sampler2D ProductionVisibility1Sampler = sampler_state
     AddressU = CLAMP; AddressV = CLAMP;
 };
 float ProductionMaskMode; // lab=0 (analytic 3 polygons); gameplay=1 (LDtk visibility fans)
+// Phase 18: 0 legacy lab, 1 production ambient/alpha base, 2 additive light pair.
+// Ambient and alpha must be written ONCE, not once per two-light shader batch.
+float ProductionLightPassMode;
+// L19: emission is added ONCE in the ambient/alpha pass; it is independent
+// of light eligibility, shadow masks and virtual depth. Map red channel is
+// brightness, alpha of source art still limits the final surface composite.
+Texture2D EmissionMap;
+sampler2D EmissionSampler = sampler_state
+{
+    Texture = <EmissionMap>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float4 ProductionEmission; // rgb hue, a strength (0..8)
 
 // Phase 17B: separable Gaussian visibility filter. The source is an existing
 // hard-visibility mask; source and destination are always DIFFERENT RTs.
@@ -369,6 +383,12 @@ float4 MainPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
     }
 
     float4 albedo = tex2D(SpriteTextureSampler, uv) * vertexColor;
+    if (ProductionLightPassMode > 0.5 && ProductionLightPassMode < 1.5)
+    {
+        float mask = tex2D(EmissionSampler, uv).r;
+        float3 emitted = ProductionEmission.rgb * ProductionEmission.a * mask * albedo.a;
+        return float4(albedo.rgb * AmbientRgb + emitted, albedo.a);
+    }
     float4 sampledNormal = tex2D(NormalSampler, uv);
     float3 n = sampledNormal.xyz * 2.0 - 1.0;
     n = normalize(float3(n.xy * NormalStrength, max(0.001, n.z)));
@@ -410,8 +430,16 @@ float4 MainPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
     if (DebugOutputMode > 2.5)
         return float4(saturate(DebugLightIndex > 0.5 ? diffuse1 : diffuse0), 1);
 
+    // Additive pairs must not repeat ambient or write alpha. Light energy is
+    // accumulated into the already initialized surface target, preserving
+    // transparent artwork and independent shadow/rim visibility per light.
+    if (ProductionLightPassMode > 1.5)
+    {
+        float3 contribution = max(0.0, albedo.rgb * (diffuse0 + diffuse1) +
+            albedo.a * (rim0 + rim1 + backRim));
+        return float4(contribution, 0.0);
+    }
     float3 illumination = AmbientRgb + diffuse0 + diffuse1;
-    // Albedo was captured premultiplied by alpha; rim must be alpha-gated.
     float3 rgb = saturate(albedo.rgb * illumination + albedo.a * (rim0 + rim1 + backRim));
     return float4(rgb, albedo.a);
 }
@@ -434,3 +462,74 @@ technique GaussianVisibility
         PixelShader = compile PS_SHADERMODEL GaussianVisibilityPS();
     }
 }
+
+// L19: HDR tone map and half-resolution bloom. Operates on the fully composed
+// scene BEFORE HUD/UI; the existing SpriteDrawing technique is unchanged.
+Texture2D L19SourceTexture;
+sampler2D L19SourceSampler = sampler_state
+{
+    Texture = <L19SourceTexture>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+Texture2D L19BloomTexture;
+sampler2D L19BloomSampler = sampler_state
+{
+    Texture = <L19BloomTexture>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float L19Exposure;
+float L19Threshold;
+float L19BloomGain;
+float2 L19BlurStep;
+
+float3 L19Tone(float3 hdr)
+{
+    // Exponential photographic tonemap: monotone, bounded, no channel clipping
+    // before exposure; disabled entirely when HDR is toggled off at the host.
+    return saturate(1.0 - exp(-max(hdr, 0.0) * max(0.001, L19Exposure)));
+}
+float4 L19TonePS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float4 scene = tex2D(L19SourceSampler, uv);
+    return float4(L19Tone(scene.rgb), 1.0);
+}
+float4 L19ExtractPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 rgb = max(0.0, tex2D(L19SourceSampler, uv).rgb);
+    float brightness = max(rgb.r, max(rgb.g, rgb.b));
+    float knee = max(0.001, L19Threshold * 0.4);
+    float soft = saturate((brightness - L19Threshold + knee) / (2.0 * knee));
+    float selected = max(0.0, brightness - L19Threshold) + soft * soft * knee;
+    return float4(rgb * (selected / max(0.0001, brightness)), 1.0);
+}
+float4 L19BlurPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 c = tex2D(L19SourceSampler, uv).rgb * 0.227027;
+    float2 s1 = L19BlurStep * 1.384615;
+    float2 s2 = L19BlurStep * 3.230769;
+    c += (tex2D(L19SourceSampler, uv + s1).rgb +
+          tex2D(L19SourceSampler, uv - s1).rgb) * 0.316216;
+    c += (tex2D(L19SourceSampler, uv + s2).rgb +
+          tex2D(L19SourceSampler, uv - s2).rgb) * 0.070270;
+    return float4(c, 1.0);
+}
+float4 L19CompositePS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 scene = tex2D(L19SourceSampler, uv).rgb;
+    float3 glow = tex2D(L19BloomSampler, uv).rgb * L19BloomGain;
+    return float4(L19Tone(scene + glow), 1.0);
+}
+// Bloom-only in SDR: retain the original scene color transfer when HDR off.
+float4 L19SdrCompositePS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 scene = tex2D(L19SourceSampler, uv).rgb;
+    float3 glow = tex2D(L19BloomSampler, uv).rgb * L19BloomGain;
+    return float4(saturate(scene + glow), 1.0);
+}
+technique L19ToneMap { pass P0 { PixelShader = compile PS_SHADERMODEL L19TonePS(); } }
+technique L19BloomExtract { pass P0 { PixelShader = compile PS_SHADERMODEL L19ExtractPS(); } }
+technique L19BloomBlur { pass P0 { PixelShader = compile PS_SHADERMODEL L19BlurPS(); } }
+technique L19BloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L19CompositePS(); } }
+technique L19SdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L19SdrCompositePS(); } }

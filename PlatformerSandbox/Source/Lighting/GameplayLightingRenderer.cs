@@ -54,6 +54,28 @@ internal sealed class GameplayLightingRenderer : IDisposable
     // Phase 17B: one lazily allocated scratch mask for separable Gaussian blur.
     // Never sampled while bound; HARD mode allocates no additional GPU memory.
     private RenderTarget2D? _softBlurScratch;
+    // Phase 19: floating-point scene accumulation (when supported) and a
+    // half-size two-target bloom chain. All resources are renderer-owned.
+    private RenderTarget2D? _l19BloomA;
+    private RenderTarget2D? _l19BloomB;
+    private RenderTarget2D? _l19EmissionMap;
+    private readonly Texture2D _l19WhiteEmissionMask;
+    private bool _l19HdrUnavailable;
+    private bool _l19HdrAllocated;
+    private bool _l19LastHdrRequest;
+    public bool HdrEnabled { get; set; }
+    public bool HdrActive => _l19HdrAllocated;
+    public bool HdrUnsupported => _l19HdrUnavailable;
+    public bool EmissionEnabled { get; set; } = true;
+    public bool BloomEnabled { get; set; }
+    public float PostExposure { get; set; } = 1.15f;
+    public float BloomThreshold { get; set; } = 1.05f;
+    public float BloomStrength { get; set; } = 0.45f;
+    public int LastEmissiveSurfaces { get; private set; }
+    public double LastPostProcessCpuMilliseconds { get; private set; }
+    public int LastBloomPasses { get; private set; }
+    public long LastBloomPixels { get; private set; }
+
     // Phase 17C: a lazily allocated, 4KB polar first-hit distance profile.
     // Rebuilt only for actual, contact-hardened visibility masks, based on the
     // SAME fan as the corresponding hard mask (including self exclusion).
@@ -119,6 +141,13 @@ internal sealed class GameplayLightingRenderer : IDisposable
     /// <summary>Stage 15B CPU-side instrumentation, not GPU timing.</summary>
     public int LastMaterialSurfaces { get; private set; }
     public int LastMaterialLightsDropped { get; private set; }
+    // Phase 18: per-frame production contributions (not unique scene lights).
+    public int LastMaterialLightsEvaluated { get; private set; }
+    public int LastMaterialLightPasses { get; private set; }
+    public int LastMaterialAmbientPasses { get; private set; }
+    public int LastMaterialMaxLightsOnSurface { get; private set; }
+    public ProductionMaterialLightMode MaterialLightMode { get; set; } =
+        ProductionMaterialLightMode.AllEligible;
     public int LastMaterialVisibilityMasks { get; private set; }
     public int LastSoftLayerMasks { get; private set; }
     public int LastSoftMaterialMasks { get; private set; }
@@ -177,8 +206,14 @@ internal sealed class GameplayLightingRenderer : IDisposable
     // for two-pass softness (only allocated after a Soft preset is selected).
     // This excludes driver allocations, row padding and backbuffers.
     public double EstimatedTargetsMegabytes => _world is null ? 0 :
-        _world.Width * (double)_world.Height * 4 *
-            (11 + (_softBlurScratch is { IsDisposed: false } ? 1 : 0)) / (1024 * 1024);
+        (_world.Width * (double)_world.Height *
+            // Four targets switch from 4 bytes/pixel to 8 in HDR mode.
+            (44 + (_l19HdrAllocated ? 16 : 0) +
+             (_softBlurScratch is { IsDisposed: false } ? 4 : 0) +
+             (_l19EmissionMap is { IsDisposed: false } ? 4 : 0)) +
+         (_l19BloomA is { IsDisposed: false } ?
+              2.0 * _l19BloomA.Width * _l19BloomA.Height * (_l19HdrAllocated ? 8 : 4) : 0)) /
+         (1024 * 1024);
 
     public GameplayLightingRenderer(GraphicsDevice device, Effect? basicSurfaceEffect = null)
     {
@@ -191,6 +226,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         _neutralProductionNormal = MakeSolidTexture(new Color(128, 128, 255, 255));
         _neutralProductionEdge = MakeSolidTexture(new Color(128, 128, 128, 0));
         _whiteProductionVisibility = MakeSolidTexture(Color.White);
+        _l19WhiteEmissionMask = MakeSolidTexture(Color.White);
         _geometryEffect = new BasicEffect(device)
         {
             VertexColorEnabled = true,
@@ -247,24 +283,21 @@ internal sealed class GameplayLightingRenderer : IDisposable
 
     private void EnsureTargets(int w, int h)
     {
-        if (_world is { IsDisposed: false } && _world.Width == w && _world.Height == h) return;
+        if (_world is { IsDisposed: false } && _world.Width == w && _world.Height == h &&
+            _l19LastHdrRequest == HdrEnabled) return;
+        _l19LastHdrRequest = HdrEnabled;
         _world?.Dispose(); _illumination?.Dispose(); _individual?.Dispose(); _visibility?.Dispose();
         _litLayer?.Dispose(); _layeredCanvas?.Dispose(); _basicAlbedoCanvas?.Dispose();
         _basicNormalMap?.Dispose(); _basicEdgeMap?.Dispose();
         _productionMask0?.Dispose(); _productionMask1?.Dispose();
         _softBlurScratch?.Dispose();
         _softBlurScratch = null;
+        _l19BloomA?.Dispose(); _l19BloomB?.Dispose();
+        _l19BloomA = null; _l19BloomB = null;
+        _l19EmissionMap?.Dispose(); _l19EmissionMap = null;
         _world = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _illumination = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
-            DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _individual = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
-            DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         _visibility = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
-            DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _litLayer = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
-            DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _layeredCanvas = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         _basicAlbedoCanvas = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
@@ -276,8 +309,93 @@ internal sealed class GameplayLightingRenderer : IDisposable
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         _productionMask1 = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        // Use true RGBA16F for *accumulation*, not only a float final pass.
+        // RGBA8 is retained as a tested fallback for unsupported GPUs.
+        SurfaceFormat sceneFormat = HdrEnabled && !_l19HdrUnavailable
+            ? SurfaceFormat.HalfVector4 : SurfaceFormat.Color;
+        try
+        {
+            CreateL19SceneTargets(w, h, sceneFormat);
+        }
+        catch (Exception e) when (sceneFormat == SurfaceFormat.HalfVector4 &&
+            e is not OutOfMemoryException)
+        {
+            System.Diagnostics.Debug.WriteLine("L19 floating-point target unavailable: " + e);
+            _illumination?.Dispose(); _individual?.Dispose(); _litLayer?.Dispose();
+            _layeredCanvas?.Dispose();
+            _l19HdrUnavailable = true;
+            CreateL19SceneTargets(w, h, SurfaceFormat.Color);
+        }
+        _l19HdrAllocated = sceneFormat == SurfaceFormat.HalfVector4 && !_l19HdrUnavailable;
         _geometryEffect.Projection = Matrix.CreateOrthographicOffCenter(0, w, h, 0, 0, 1);
         TargetRebuilds++; // Diagnostic: should change on first use / actual resize only.
+    }
+
+    private void CreateL19SceneTargets(int w, int h, SurfaceFormat format)
+    {
+        _illumination = NewL19Target(w, h, format);
+        _individual = NewL19Target(w, h, format);
+        _litLayer = NewL19Target(w, h, format);
+        _layeredCanvas = NewL19Target(w, h, format);
+    }
+
+    private RenderTarget2D NewL19Target(int width, int height, SurfaceFormat format) =>
+        new(_device, width, height, false, format, DepthFormat.None, 0,
+            RenderTargetUsage.PreserveContents);
+
+    private Texture2D CaptureL19EmissionMask(SpriteBatch batch,
+        Action<SpriteBatch>? draw, LightingViewport viewport)
+    {
+        if (draw is null) return _l19WhiteEmissionMask;
+        if (_l19EmissionMap is null || _l19EmissionMap.IsDisposed ||
+            _l19EmissionMap.Width != viewport.Width || _l19EmissionMap.Height != viewport.Height)
+        {
+            _l19EmissionMap?.Dispose();
+            _l19EmissionMap = NewL19Target(viewport.Width, viewport.Height, SurfaceFormat.Color);
+        }
+        // Avoid simultaneously binding this target as a shader sampler.
+        _basicSurfaceEffect!.Parameters["EmissionMap"].SetValue(_l19WhiteEmissionMask);
+        CaptureBasicSurfaceMap(batch, _l19EmissionMap, Color.Black, draw);
+        return _l19EmissionMap;
+    }
+
+    private void L19Fullscreen(SpriteBatch batch, Texture2D input, string technique,
+        RenderTarget2D? output, int width, int height)
+    {
+        Effect effect = _basicSurfaceEffect!;
+        effect.Parameters["SpriteTexture"].SetValue(input);
+        effect.Parameters["L19SourceTexture"].SetValue(input);
+        effect.CurrentTechnique = effect.Techniques[technique];
+        _device.SetRenderTarget(output);
+        batch.Begin(SpriteSortMode.Immediate, BlendState.Opaque,
+            SamplerState.LinearClamp, DepthStencilState.None,
+            RasterizerState.CullNone, effect);
+        try { batch.Draw(input, new Rectangle(0, 0, width, height), Color.White); }
+        finally { batch.End(); }
+    }
+
+    private bool EnsureL19BloomTargets()
+    {
+        int w = Math.Max(1, (_layeredCanvas!.Width + 1) / 2);
+        int h = Math.Max(1, (_layeredCanvas!.Height + 1) / 2);
+        if (_l19BloomA is { IsDisposed: false } &&
+            _l19BloomA.Width == w && _l19BloomA.Height == h) return true;
+        _l19BloomA?.Dispose(); _l19BloomB?.Dispose();
+        _l19BloomA = null; _l19BloomB = null;
+        try
+        {
+            SurfaceFormat format = _l19HdrAllocated ? SurfaceFormat.HalfVector4 : SurfaceFormat.Color;
+            _l19BloomA = NewL19Target(w, h, format);
+            _l19BloomB = NewL19Target(w, h, format);
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            System.Diagnostics.Debug.WriteLine("L19 bloom allocation unavailable: " + e);
+            _l19BloomA?.Dispose(); _l19BloomB?.Dispose();
+            _l19BloomA = null; _l19BloomB = null;
+            return false;
+        }
     }
 
     public void BeginWorld()
@@ -300,12 +418,18 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastLights = lights.Count; LastShadowLights = 0; LastShadowTriangles = 0;
         LastSubmitMilliseconds = 0; LastMaterialSurfaces = 0;
         LastMaterialLightsDropped = 0; LastMaterialVisibilityMasks = 0;
+        LastMaterialLightsEvaluated = 0; LastMaterialLightPasses = 0;
+        LastMaterialAmbientPasses = 0; LastMaterialMaxLightsOnSurface = 0;
         LastSoftLayerMasks = 0; LastSoftMaterialMasks = 0;
         LastContactProfilesBuilt = 0;
         LastContactProfileCpuMilliseconds = 0;
         LastContactProfileBytesUploaded = 0;
         LastSoftFilterPasses = 0;
         LastSoftFilterPixels = 0;
+        LastEmissiveSurfaces = 0;
+        LastPostProcessCpuMilliseconds = 0;
+        LastBloomPasses = 0;
+        LastBloomPixels = 0;
         _contactReady = false;
         LastMaterialBackRimSurfaces = 0; Frames++;
         LastLayerCpuMilliseconds = 0;
@@ -336,11 +460,56 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public void EndLayeredFrame(SpriteBatch batch)
     {
         if (_capturing) throw new InvalidOperationException("Cannot present while capturing a layer.");
-        _device.SetRenderTarget(null);
-        batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
-        batch.Draw(_layeredCanvas!, new Rectangle(0, 0, _layeredCanvas!.Width,
-            _layeredCanvas.Height), Color.White);
-        batch.End();
+        var l19Watch = Stopwatch.StartNew();
+        // The lit scene is complete. Bloom operates here, BEFORE any HUD/UI.
+        // No source texture is ever sampled while bound for writing.
+        if (_basicSurfaceEffect is not null && (HdrEnabled || BloomEnabled))
+        {
+            new L19PostProcessPolicy(PostExposure, BloomThreshold, BloomStrength).Validate();
+            Effect fx = _basicSurfaceEffect;
+            fx.Parameters["L19Exposure"].SetValue(PostExposure);
+            fx.Parameters["L19Threshold"].SetValue(BloomThreshold);
+            fx.Parameters["L19BloomGain"].SetValue(BloomStrength);
+            bool bloom = BloomEnabled && BloomStrength > 0 && EnsureL19BloomTargets();
+            int w = _layeredCanvas!.Width, h = _layeredCanvas.Height;
+            if (bloom)
+            {
+                L19Fullscreen(batch, _layeredCanvas!, "L19BloomExtract", _l19BloomA,
+                    _l19BloomA!.Width, _l19BloomA.Height);
+                fx.Parameters["L19BlurStep"].SetValue(new Vector2(1f / _l19BloomA.Width, 0));
+                L19Fullscreen(batch, _l19BloomA, "L19BloomBlur", _l19BloomB,
+                    _l19BloomB!.Width, _l19BloomB.Height);
+                fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l19BloomB.Height));
+                L19Fullscreen(batch, _l19BloomB, "L19BloomBlur", _l19BloomA,
+                    _l19BloomA.Width, _l19BloomA.Height);
+                fx.Parameters["L19BloomTexture"].SetValue((Texture2D)_l19BloomA);
+                L19Fullscreen(batch, _layeredCanvas,
+                    HdrActive ? "L19BloomComposite" : "L19SdrBloomComposite", null, w, h);
+                LastBloomPasses = 4;
+                LastBloomPixels = 3L * _l19BloomA.Width * _l19BloomA.Height + (long)w * h;
+            }
+            else if (HdrActive)
+                L19Fullscreen(batch, _layeredCanvas!, "L19ToneMap", null, w, h);
+            else
+            {
+                _device.SetRenderTarget(null);
+                batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
+                batch.Draw(_layeredCanvas, new Rectangle(0, 0, w, h), Color.White);
+                batch.End();
+            }
+            fx.CurrentTechnique = fx.Techniques["SpriteDrawing"];
+        }
+        else
+        {
+            _device.SetRenderTarget(null);
+            batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
+            batch.Draw(_layeredCanvas!, new Rectangle(0, 0, _layeredCanvas!.Width,
+                _layeredCanvas.Height), Color.White);
+            batch.End();
+        }
+        l19Watch.Stop();
+        LastPostProcessCpuMilliseconds = l19Watch.Elapsed.TotalMilliseconds;
+        LastSubmitMilliseconds += LastPostProcessCpuMilliseconds;
         AverageSubmitMilliseconds += (LastSubmitMilliseconds - AverageSubmitMilliseconds) *
             (Frames == 1 ? 1 : .05);
         _cpuWindow.Add(LastSubmitMilliseconds);
@@ -573,7 +742,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LightingArtPreset art, SceneLightingLayer layer,
         Action<SpriteBatch> drawAlbedo,
         Action<SpriteBatch>? drawNormals = null,
-        Action<SpriteBatch>? drawEdges = null)
+        Action<SpriteBatch>? drawEdges = null,
+        Action<SpriteBatch>? drawEmission = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(batch);
@@ -606,13 +776,11 @@ internal sealed class GameplayLightingRenderer : IDisposable
             return; // No mask geometry, RT clears or shader work off-screen.
         }
         LastMaterialRegionsDrawn++;
-        LastMaterialShadePixels += region.Area;
-        LastMaterialShadePixelsAvoided += (long)viewport.Width * viewport.Height - region.Area;
 
-        // The production presenter has already culled the visible light list.
-        // Rank the two nearest effective lights to this surface (no unstable
-        // list-index channel remapping) and apply the same art intensity/radius
-        // scales as the normal layered composer.
+        // The presenter has already enforced the global quality/camera budget.
+        // Phase 18 preserves deterministic influence ranking but now evaluates
+        // EVERY selected light in batches of two instead of silently dropping
+        // all but the first pair. CompareTwo is a visible A/B developer option.
         _basicViewport = viewport;
         _productionLightRadiusScale = art.LightRadiusScale;
         _basicAmbient = (art.Ambient * ((1 - art.AtmosphericDarkness) *
@@ -621,26 +789,20 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LightingOccluder? ownWall = ProductionWallLightRouting.OwnWall(surface, blockers);
         LightPoint center = viewport.Unproject(new LightPoint(
             viewport.Width * .5, viewport.Height * .5));
-        // Surface center is supplied in presentation world coordinates in the
-        // submission contract. It is not inferred from collision geometry.
         if (surface.Center is LightPoint authoredCenter) center = authoredCenter;
+        int maximum = ProductionMaterialLightPlan.Limit(MaterialLightMode);
         IReadOnlyList<RadialLight> selected =
             ProductionSurfaceLightSelection.Select(visible, layer, center,
-                radiusScale: art.LightRadiusScale);
+                maximum: maximum, radiusScale: art.LightRadiusScale);
         int eligible = ProductionSurfaceLightSelection.CountEligible(visible, layer,
             center, art.LightRadiusScale);
         LastMaterialLightsDropped += Math.Max(0, eligible - selected.Count);
-        var configured = new List<BasicMaterialLight>(2);
-        for (int i = 0; i < selected.Count; i++)
-        {
-            RadialLight original = selected[i];
-            configured.Add(new BasicMaterialLight(original with
-            {
-                Radius = Math.Min(10000, original.Radius * art.LightRadiusScale),
-                Intensity = Math.Min(4, original.Intensity * art.LightMultiplier)
-            }, i == 0 ? BasicLightReceiverChannels.Light1 : BasicLightReceiverChannels.Light2));
-        }
-        _basicLights = configured;
+        LastMaterialLightsEvaluated += selected.Count;
+        LastMaterialMaxLightsOnSurface = Math.Max(LastMaterialMaxLightsOnSurface, selected.Count);
+        int materialPasses = 1 + ProductionMaterialLightPlan.Batches(selected.Count).Count;
+        LastMaterialShadePixels += region.Area * (long)materialPasses;
+        LastMaterialShadePixelsAvoided +=
+            ((long)viewport.Width * viewport.Height - region.Area) * materialPasses;
         var material = new BasicSurfaceMaterial(BasicSurfaceLightingMode.Lit,
             BasicLightReceiverChannels.Both, 1)
         {
@@ -652,20 +814,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
         material.Validate();
 
         var watch = Stopwatch.StartNew();
-        // The lab's three-polygon shader geometry is intentionally empty here.
-        // Instead bind the production ray-cast visibility fan of each selected
-        // light, with only THIS surface's exact caster ID removed. Back-rim
-        // always uses the same mask, even on a surface whose diffuse face opts
-        // out of ordinary projected shadow reception.
-        bool back0 = selected.Count > 0 &&
-            ProductionWallLightRouting.Behind(surface, selected[0], ownWall);
-        bool back1 = selected.Count > 1 &&
-            ProductionWallLightRouting.Behind(surface, selected[1], ownWall);
-        (Texture2D visibility0, Texture2D visibility1) =
-            DrawProductionVisibility(batch, viewport, surface, selected, blockers,
-                layer, back0, back1);
-        if (back0 || back1) LastMaterialBackRimSurfaces++;
-
+        // Capture maps ONCE per surface, not for every light pair. Accumulation
+        // occurs entirely inside _litLayer, then composites alpha only once.
         Rectangle full = new(0, 0, viewport.Width, viewport.Height);
         _device.SetRenderTarget(_world);
         _device.Clear(Color.Transparent);
@@ -673,9 +823,6 @@ internal sealed class GameplayLightingRenderer : IDisposable
             samplerState: SamplerState.PointClamp);
         try { drawAlbedo(batch); }
         finally { batch.End(); }
-        // A missing map is an all-neutral texture. Binding a 1x1 texture is
-        // exactly equivalent under PointClamp to clearing an entire RT and
-        // sampling that color; importantly it avoids two RT switches/clears.
         ProductionMaterialMapPassPlan maps = ProductionMaterialPassPlanner.Maps(
             drawNormals is not null, drawEdges is not null);
         Texture2D normalTexture = _neutralProductionNormal;
@@ -694,52 +841,115 @@ internal sealed class GameplayLightingRenderer : IDisposable
             edgeTexture = _basicEdgeMap!;
         }
         else LastMaterialNeutralMapsReused++;
+        Texture2D emissiveMask = surface.EmissionIntensity > 0 && EmissionEnabled
+            ? CaptureL19EmissionMask(batch, drawEmission, viewport)
+            : _l19WhiteEmissionMask;
+        // First write the ambient/albedo/alpha base. The effect short-circuits
+        // normals and all light evaluation in this pass. This keeps ambient
+        // invariant when a surface has 0, 2, 3, or 12 selected lights.
+        _basicLights = Array.Empty<BasicMaterialLight>();
         BindBasicSurfaceShader(material);
-        // Lab shader bindings remain untouched. Override the four inputs for
-        // this production surface only; each draw binds all four explicitly.
-        Effect shader = _basicSurfaceEffect!;
-        shader.Parameters["NormalMap"].SetValue(normalTexture);
-        shader.Parameters["EdgeMap"].SetValue(edgeTexture);
-        shader.Parameters["ProductionVisibility0"].SetValue(visibility0);
-        shader.Parameters["ProductionVisibility1"].SetValue(visibility1);
-        // Production visibility textures are already Gaussian-filtered (or
-        // intentionally hard) before shading. Diffuse and back-rim sample the
-        // SAME mask without a second, differing visibility calculation.
-        BindProductionWallShader(surface, ownWall, selected, back0, back1);
+        BindProductionMaterialMaps(normalTexture, edgeTexture);
+        _basicSurfaceEffect!.Parameters["EmissionMap"].SetValue(emissiveMask);
+        if (EmissionEnabled && surface.EmissionIntensity > 0)
+        {
+            _basicSurfaceEffect.Parameters["ProductionEmission"].SetValue(new Vector4(
+                (float)surface.EmissionColor.R, (float)surface.EmissionColor.G,
+                (float)surface.EmissionColor.B, (float)surface.EmissionIntensity));
+            LastEmissiveSurfaces++;
+        }
+        _basicSurfaceEffect!.Parameters["ProductionVisibility0"].SetValue(_whiteProductionVisibility);
+        _basicSurfaceEffect.Parameters["ProductionVisibility1"].SetValue(_whiteProductionVisibility);
+        _basicSurfaceEffect.Parameters["ProductionLightPassMode"].SetValue(1f);
+        BindProductionWallShader(surface, ownWall, Array.Empty<RadialLight>(), false, false);
         _device.SetRenderTarget(_litLayer);
         _device.Clear(Color.Transparent);
-        // Draw the source with FULL viewport UVs: changing its destination
-        // rectangle would shift screen-position math and shadow-mask sampling.
-        // Instead scissor only rasterization. Restore device state immediately
-        // so later world, hero, FX and UI passes are never clipped.
-        RasterizerState previousRasterizer = _device.RasterizerState;
-        batch.Begin(SpriteSortMode.Immediate, BlendState.Opaque,
-            SamplerState.PointClamp, DepthStencilState.None,
-            _productionMaterialScissor, _basicSurfaceEffect);
-        try
+        DrawProductionMaterialRegion(batch, region, full, BlendState.Opaque);
+        LastMaterialAmbientPasses++;
+
+        bool anyBackRim = false;
+        // Each pair has independent visibility, depth, back-rim and self-caster
+        // routing. Both full-viewport visibility targets can be safely reused
+        // AFTER the previous pair has been accumulated into _litLayer.
+        foreach (ProductionMaterialLightBatch pair in ProductionMaterialLightPlan.Batches(selected.Count))
         {
-            _device.ScissorRectangle = new Rectangle(
-                region.X, region.Y, region.Width, region.Height);
-            batch.Draw(_world!, full, Color.White);
+            var lightsInPair = new List<RadialLight>(pair.Count);
+            var configured = new List<BasicMaterialLight>(pair.Count);
+            for (int slot = 0; slot < pair.Count; slot++)
+            {
+                RadialLight original = selected[pair.Start + slot];
+                lightsInPair.Add(original);
+                configured.Add(new BasicMaterialLight(original with
+                {
+                    Radius = Math.Min(10000, original.Radius * art.LightRadiusScale),
+                    Intensity = Math.Min(4, original.Intensity * art.LightMultiplier)
+                }, slot == 0 ? BasicLightReceiverChannels.Light1 : BasicLightReceiverChannels.Light2));
+            }
+            _basicLights = configured;
+            bool back0 = ProductionWallLightRouting.Behind(surface, lightsInPair[0], ownWall);
+            bool back1 = pair.Count > 1 &&
+                ProductionWallLightRouting.Behind(surface, lightsInPair[1], ownWall);
+            // Release previous pair's mask samplers before those RTs are reused.
+            _basicSurfaceEffect!.Parameters["ProductionVisibility0"].SetValue(_whiteProductionVisibility);
+            _basicSurfaceEffect.Parameters["ProductionVisibility1"].SetValue(_whiteProductionVisibility);
+            (Texture2D visibility0, Texture2D visibility1) =
+                DrawProductionVisibility(batch, viewport, surface, lightsInPair,
+                    blockers, layer, back0, back1);
+            anyBackRim |= back0 || back1;
+            BindBasicSurfaceShader(material);
+            BindProductionMaterialMaps(normalTexture, edgeTexture);
+            _basicSurfaceEffect!.Parameters["ProductionVisibility0"].SetValue(visibility0);
+            _basicSurfaceEffect.Parameters["ProductionVisibility1"].SetValue(visibility1);
+            _basicSurfaceEffect.Parameters["ProductionLightPassMode"].SetValue(2f);
+            BindProductionWallShader(surface, ownWall, lightsInPair, back0, back1);
+            _device.SetRenderTarget(_litLayer);
+            DrawProductionMaterialRegion(batch, region, full, _additive);
+            LastMaterialLightPasses++;
         }
-        finally
-        {
-            batch.End();
-            _device.ScissorRectangle = full;
-            _device.RasterizerState = previousRasterizer;
-        }
+        if (anyBackRim) LastMaterialBackRimSurfaces++;
+        // Only one final alpha composite per artwork, regardless of how many
+        // shadowed light pairs it received. Region and UV remain unchanged.
         _device.SetRenderTarget(_layeredCanvas);
         batch.Begin(blendState: BlendState.AlphaBlend,
             samplerState: SamplerState.PointClamp);
         Rectangle clipped = new(region.X, region.Y, region.Width, region.Height);
-        // Source and destination use the same pixels: overlapping materials
-        // remain layered, and no previous surface's RT pixels can leak.
         batch.Draw(_litLayer!, clipped, clipped, Color.White);
         batch.End();
         watch.Stop();
         LastSubmitMilliseconds += watch.Elapsed.TotalMilliseconds;
         LastMaterialCpuMilliseconds += watch.Elapsed.TotalMilliseconds;
         LastMaterialSurfaces++;
+    }
+
+    private void BindProductionMaterialMaps(Texture2D normal, Texture2D edge)
+    {
+        Effect shader = _basicSurfaceEffect!;
+        shader.Parameters["NormalMap"].SetValue(normal);
+        shader.Parameters["EdgeMap"].SetValue(edge);
+    }
+
+    private void DrawProductionMaterialRegion(SpriteBatch batch,
+        ProductionMaterialRegion region, Rectangle full, BlendState blend)
+    {
+        RasterizerState previousRasterizer = _device.RasterizerState;
+        try
+        {
+            batch.Begin(SpriteSortMode.Immediate, blend,
+                SamplerState.PointClamp, DepthStencilState.None,
+                _productionMaterialScissor, _basicSurfaceEffect);
+            try
+            {
+                _device.ScissorRectangle = new Rectangle(region.X, region.Y,
+                    region.Width, region.Height);
+                batch.Draw(_world!, full, Color.White);
+            }
+            finally { batch.End(); }
+        }
+        finally
+        {
+            _device.ScissorRectangle = full;
+            _device.RasterizerState = previousRasterizer;
+        }
     }
 
     private (Texture2D Mask0, Texture2D Mask1) DrawProductionVisibility(
@@ -924,6 +1134,10 @@ internal sealed class GameplayLightingRenderer : IDisposable
         int wallRimShadowSlot = -1)
     {
         Effect effect = _basicSurfaceEffect!;
+        effect.CurrentTechnique = effect.Techniques["SpriteDrawing"];
+        effect.Parameters["EmissionMap"].SetValue(_l19WhiteEmissionMask);
+        effect.Parameters["ProductionEmission"].SetValue(Vector4.Zero);
+        effect.Parameters["ProductionLightPassMode"].SetValue(0f);
         effect.Parameters["ProductionMaskMode"].SetValue(0f);
         effect.Parameters["ProductionVisibility0"].SetValue((Texture2D)_productionMask0!);
         effect.Parameters["ProductionVisibility1"].SetValue((Texture2D)_productionMask1!);
@@ -1543,6 +1757,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
         _basicNormalMap?.Dispose(); _basicEdgeMap?.Dispose();
         _productionMask0?.Dispose(); _productionMask1?.Dispose();
         _softBlurScratch?.Dispose();
+        _l19BloomA?.Dispose(); _l19BloomB?.Dispose();
+        _l19EmissionMap?.Dispose(); _l19WhiteEmissionMask.Dispose();
         _contactHitProfile?.Dispose();
         _falloff.Dispose(); _posterizedFalloff.Dispose(); _contactShadow.Dispose();
         _neutralProductionNormal.Dispose(); _neutralProductionEdge.Dispose();

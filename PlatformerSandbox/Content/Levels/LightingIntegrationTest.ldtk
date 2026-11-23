@@ -2228,6 +2228,119 @@
             "autoChainRef": false,
             "editorLinkStyle": "ZigZag",
             "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissionColor",
+            "uid": 91001,
+            "type": "F_Color",
+            "__type": "Color",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "L19 self-emission; independent of nearby lights and shadowing.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissionIntensity",
+            "uid": 91002,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 8,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "L19 self-emission; independent of nearby lights and shadowing.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissionMap",
+            "uid": 91003,
+            "type": "F_FilePath",
+            "__type": "FilePath",
+            "isArray": false,
+            "canBeNull": true,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": [
+              ".png"
+            ],
+            "defaultOverride": null,
+            "tilesetUid": null,
+            "doc": "L19 self-emission; independent of nearby lights and shadowing.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
           }
         ]
       },
@@ -5759,6 +5872,42 @@
                   "__tile": null,
                   "defUid": 9009,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissionColor",
+                  "__type": "Color",
+                  "__value": "#24E8FF",
+                  "defUid": 91001,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissionIntensity",
+                  "__type": "Float",
+                  "__value": 3.3,
+                  "defUid": 91002,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissionMap",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/LightingTest/L19PanelEmission.png",
+                  "defUid": 91003,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
                 }
               ],
               "__worldX": 1500,
@@ -6373,6 +6522,42 @@
                   "__tile": null,
                   "defUid": 9021,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissionColor",
+                  "__type": "Color",
+                  "__value": "#FF5FB8",
+                  "defUid": 91001,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissionIntensity",
+                  "__type": "Float",
+                  "__value": 3.8,
+                  "defUid": 91002,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissionMap",
+                  "__type": "FilePath",
+                  "__value": "TerrainArt/LightingTest/L19PillarEmission.png",
+                  "defUid": 91003,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": []
+                    }
+                  ]
                 }
               ],
               "__worldX": 2350,
@@ -8159,6 +8344,804 @@
               ],
               "__worldX": 2025,
               "__worldY": 580
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                95,
+                35
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFB562",
+              "iid": "8ec2aa18-011a-502c-a85a-314d27e71686",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1525,
+                565
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#FFB562",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 6.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.52,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 8,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1525,
+              "__worldY": 565
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                102,
+                36
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#A28DFF",
+              "iid": "7c5a913f-b98b-5cbb-b183-c721a02dcaad",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1645,
+                590
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#A28DFF",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 6.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.48,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 8,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1645,
+              "__worldY": 590
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                107,
+                44
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#A6FF88",
+              "iid": "ceb84415-b29a-5322-8a52-154c63a22b95",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1720,
+                710
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#A6FF88",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 5.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.55,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 8,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1720,
+              "__worldY": 710
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                97,
+                46
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FF889B",
+              "iid": "f6be2aac-b300-5ef0-be38-61362087d2ec",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                1555,
+                750
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#FF889B",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 5.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.38,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 8,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 1555,
+              "__worldY": 750
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                141,
+                38
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#FFC477",
+              "iid": "8754add2-8c27-5e12-a37d-894f90844b3e",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                2260,
+                620
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#FFC477",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 6.0,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.45,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": -1.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 2260,
+              "__worldY": 620
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                153,
+                38
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#68B5FF",
+              "iid": "cd67d3e9-e049-527e-bb3c-c797fcb77224",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                2460,
+                610
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#68B5FF",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 5.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.43,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": false,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 2460,
+              "__worldY": 610
+            },
+            {
+              "__identifier": "LightSource",
+              "__grid": [
+                155,
+                45
+              ],
+              "__pivot": [
+                0,
+                0
+              ],
+              "__tags": [],
+              "__tile": null,
+              "__smartColor": "#CE92FF",
+              "iid": "2e6268a7-9961-5966-bc14-16cc13929e85",
+              "width": 24,
+              "height": 24,
+              "defUid": 620,
+              "px": [
+                2495,
+                725
+              ],
+              "fieldInstances": [
+                {
+                  "__identifier": "Color",
+                  "__type": "Color",
+                  "__value": "#CE92FF",
+                  "__tile": null,
+                  "defUid": 6210,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "RadiusWorld",
+                  "__type": "Float",
+                  "__value": 4.5,
+                  "__tile": null,
+                  "defUid": 6211,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Intensity",
+                  "__type": "Float",
+                  "__value": 0.42,
+                  "__tile": null,
+                  "defUid": 6212,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "Priority",
+                  "__type": "Int",
+                  "__value": 7,
+                  "__tile": null,
+                  "defUid": 6213,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "CastShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "__tile": null,
+                  "defUid": 6214,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "AffectsLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8102,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "OccluderLayers",
+                  "__type": "String",
+                  "__value": "PLAYER",
+                  "__tile": null,
+                  "defUid": 8103,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionAxis",
+                  "__type": "String",
+                  "__value": "Static",
+                  "__tile": null,
+                  "defUid": 9004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionDistanceWorld",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MotionCyclesPerSecond",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "__tile": null,
+                  "defUid": 9006,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "LightDepthZ",
+                  "__type": "Float",
+                  "__value": -1.0,
+                  "__tile": null,
+                  "defUid": 9016,
+                  "realEditorValues": []
+                }
+              ],
+              "__worldX": 2495,
+              "__worldY": 725
             }
           ]
         },

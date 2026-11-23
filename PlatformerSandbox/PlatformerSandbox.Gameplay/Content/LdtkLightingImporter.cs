@@ -167,7 +167,10 @@ public static class LdtkLightingImporter
                         MaterialDepthZ = Number(fields, "MaterialDepthZ", 0, -100, 100),
                         BackRimOnOverlap = Bool(fields, "BackRimOnOverlap", false),
                         BackRimWidthPx = Number(fields, "BackRimWidthPx", 4.5, .5, 24),
-                        BackRimIntensity = Number(fields, "BackRimIntensity", 1.25, 0, 4)
+                        BackRimIntensity = Number(fields, "BackRimIntensity", 1.25, 0, 4),
+                        EmissionColor = ReadColor(fields, "EmissionColor", LightRgb.White),
+                        EmissionIntensity = Number(fields, "EmissionIntensity", 0, 0, 8),
+                        EmissionMap = OptionalMap(fields, "EmissionMap")
                     };
                     options.Validate();
                     if (options.MaterialShading != ProductionSurfaceShading.Legacy &&

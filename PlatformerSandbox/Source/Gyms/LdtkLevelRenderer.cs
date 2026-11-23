@@ -41,7 +41,7 @@ internal static class LdtkLevelRenderer
         Action<Camera2DView, SceneLightingLayer>? composeLightingLayer = null,
         Action? endLightingFrame = null,
         Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
-            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface = null,
+            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface = null,
         LdtkLightingScene? animationScene = null)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
@@ -229,7 +229,7 @@ internal static class LdtkLevelRenderer
         Texture2D? contactShadow, Action beginLayer,
         Action<Camera2DView, SceneLightingLayer> composeLayer, Action? endFrame,
         Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
-            Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface)
+            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         bool showBacking = collisionBackdrop ?? visuals?.Terrain?.DrawCollisionBackdrop ?? true;

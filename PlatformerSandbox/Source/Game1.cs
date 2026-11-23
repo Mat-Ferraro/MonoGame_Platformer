@@ -72,6 +72,14 @@ public sealed class Game1 : Game
     private string _lightingPresetId = "Illustrated";
     private double _lightingPresetNoticeSeconds;
     private LightingQuality _lightingQuality = LightingQuality.Balanced;
+    private ProductionMaterialLightMode _materialLightMode = ProductionMaterialLightMode.AllEligible;
+    // L19 presentation-only controls, deliberately independent for A/B tests.
+    private bool _l19Hdr;
+    private bool _l19Emission = true;
+    private bool _l19Bloom;
+    private float _l19Exposure = 1.15f;
+    private float _l19BloomThreshold = 0.85f;
+    private float _l19BloomStrength = 0.45f;
     private ShadowEdgePreset _shadowEdgePreset = ShadowEdgePreset.Hard;
     private ShadowFilterMode _shadowFilterMode = ShadowFilterMode.UniformGaussian;
     private ShadowQualityPolicy _shadowQualityPolicy = ShadowQualityPolicy.Manual;
@@ -1364,6 +1372,13 @@ public sealed class Game1 : Game
                             _gameLighting!.ShadowSoftnessPixels =
                                 ShadowEdgeSettings.EffectiveWidth(effectiveShadowPreset, shadowBudget);
                             _gameLighting.FilterMode = _shadowFilterMode;
+                            _gameLighting.MaterialLightMode = _materialLightMode;
+                            _gameLighting.HdrEnabled = _l19Hdr;
+                            _gameLighting.EmissionEnabled = _l19Emission;
+                            _gameLighting.BloomEnabled = _l19Bloom;
+                            _gameLighting.PostExposure = _l19Exposure;
+                            _gameLighting.BloomThreshold = _l19BloomThreshold;
+                            _gameLighting.BloomStrength = _l19BloomStrength;
                             _gameLighting.ShadowEmitterOverrides = _shadowEmitterOverrides;
                             _gameLighting.BeginLayeredFrame(lights, shadowBudget);
                         }
@@ -1383,12 +1398,12 @@ public sealed class Game1 : Game
                                 _spriteBatch, view, lights, frameLighting!.Occluders,
                                 art!, LightingFrameBudget.For(_lightingQuality), layer) : null,
                             lightingWorldActive ? () => _gameLighting!.EndLayeredFrame(_spriteBatch) : null,
-                            lightingWorldActive ? (submission, region, albedo, normals, edges) =>
+                            lightingWorldActive ? (submission, region, albedo, normals, edges, emission) =>
                                 _gameLighting!.DrawProductionMaterialSurface(_spriteBatch,
                                     GameplayLightingRenderer.View(camera), submission, region, lights,
                                     frameLighting!.Occluders, art!,
                                     frameLighting.Layers.Get(submission.LayerId),
-                                    albedo, normals, edges) : null,
+                                    albedo, normals, edges, emission) : null,
                             frameLighting);
                     }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
@@ -1443,6 +1458,12 @@ public sealed class Game1 : Game
                 _lightingTools.Draw(_spriteBatch, _pixel,
                     GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
                     _lightingEnabled, _lightingPresetId, _lightingQuality.ToString(),
+                    _materialLightMode == ProductionMaterialLightMode.AllEligible ? "ALL" :
+                        _materialLightMode == ProductionMaterialLightMode.CompareTwo ?
+                            "COMPARE 2" : "EMISSION ONLY",
+                    _l19Hdr, _gameLighting?.HdrActive ?? false, _l19Emission, _l19Bloom,
+                    _l19Exposure.ToString("F2"), _l19BloomThreshold.ToString("F2"),
+                    _l19BloomStrength.ToString("F2"),
                     ShadowEdgeSettings.Label(effectiveEdge),
                     _shadowFilterMode == ShadowFilterMode.ContactHardening ? "CONTACT" : "UNIFORM",
                     _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality ? "AUTO" : "MANUAL",
@@ -1568,6 +1589,26 @@ public sealed class Game1 : Game
                     " LAYER " + _gameLighting.LastSoftLayerMasks +
                     " MAT " + _gameLighting.LastSoftMaterialMasks,
                     new Color(213, 185, 241), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 332),
+                    "L18 MATERIAL: MODE " + (_materialLightMode == ProductionMaterialLightMode.AllEligible
+                        ? "ALL" : _materialLightMode == ProductionMaterialLightMode.CompareTwo
+                            ? "COMPARE-2" : "EMISSION-ONLY") +
+                    " EVAL " + _gameLighting.LastMaterialLightsEvaluated +
+                    " LIGHT-PASSES " + _gameLighting.LastMaterialLightPasses +
+                    " AMBIENT-PASSES " + _gameLighting.LastMaterialAmbientPasses +
+                    " MAX/SURFACE " + _gameLighting.LastMaterialMaxLightsOnSurface +
+                    " DROPPED " + _gameLighting.LastMaterialLightsDropped,
+                    new Color(252, 218, 155), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 350),
+                    "L19 HDR " + (_gameLighting.HdrActive ? "RGBA16F" :
+                        _gameLighting.HdrUnsupported ? "UNSUPPORTED" : "SDR") +
+                    " EMISSIVE " + _gameLighting.LastEmissiveSurfaces +
+                    " BLOOM PASSES " + _gameLighting.LastBloomPasses +
+                    " BLOOM PIXELS " + _gameLighting.LastBloomPixels +
+                    " POST CPU " + _gameLighting.LastPostProcessCpuMilliseconds.ToString("F2"),
+                    new Color(241, 175, 223), 1);
                 GymDebugText.Draw(_spriteBatch, _pixel, 12,
                     Math.Max(4, GraphicsDevice.Viewport.Height - 314),
                     "L17D CONTACT PROFILES " + _gameLighting.LastContactProfilesBuilt +
@@ -1978,6 +2019,37 @@ public sealed class Game1 : Game
                     LightingQuality.Balanced => LightingQuality.High,
                     _ => LightingQuality.Low
                 };
+                break;
+            case LightingToolAction.ToggleMaterialLights:
+                _materialLightMode = _materialLightMode switch
+                {
+                    ProductionMaterialLightMode.AllEligible => ProductionMaterialLightMode.CompareTwo,
+                    ProductionMaterialLightMode.CompareTwo => ProductionMaterialLightMode.EmissionOnly,
+                    _ => ProductionMaterialLightMode.AllEligible
+                };
+                break;
+            case LightingToolAction.ToggleToolsPage:
+                break; // The panel owns its page state.
+            case LightingToolAction.ToggleHdr:
+                _l19Hdr = !_l19Hdr;
+                break;
+            case LightingToolAction.ToggleEmission:
+                _l19Emission = !_l19Emission;
+                break;
+            case LightingToolAction.ToggleBloom:
+                _l19Bloom = !_l19Bloom;
+                break;
+            case LightingToolAction.CycleExposure:
+                _l19Exposure = _l19Exposure < 1f ? 1.15f :
+                    _l19Exposure < 1.5f ? 1.7f : 0.8f;
+                break;
+            case LightingToolAction.CycleBloomThreshold:
+                _l19BloomThreshold = _l19BloomThreshold < 1f ? 1.05f :
+                    _l19BloomThreshold < 1.5f ? 1.75f : 0.65f;
+                break;
+            case LightingToolAction.CycleBloomStrength:
+                _l19BloomStrength = _l19BloomStrength < 0.4f ? 0.45f :
+                    _l19BloomStrength < 0.9f ? 1.0f : 0.25f;
                 break;
             case LightingToolAction.CycleShadowEdges:
                 _shadowEdgePreset = ShadowEdgeSettings.Next(_shadowEdgePreset);
