@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -62,6 +63,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
     // reused; never sample a target while it is bound for writing.
     private RenderTarget2D? _l20BloomMidA, _l20BloomMidB;
     private RenderTarget2D? _l20BloomWideA, _l20BloomWideB;
+    public ReceiverProjectionMode? ReceiverComparisonOverride { get; set; }
+    public bool ReceiverOrientationEnabled { get; set; } = true;
+    public bool PolygonRimsEnabled { get; set; } = true;
     public float BloomScatter { get; set; } = .65f;
     public bool BloomOnly { get; set; }
     public int LastDirectionalLights { get; private set; }
@@ -813,6 +817,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(blockers);
         ArgumentNullException.ThrowIfNull(drawAlbedo);
         surface.Validate();
+        if (surface.Receiver.Active && ReceiverComparisonOverride is ReceiverProjectionMode mode)
+            surface = surface with { Receiver = surface.Receiver with { Mode = mode } };
         art.Validate(); layer.Validate(); viewport.Validate();
         if (surface.Shading == ProductionSurfaceShading.Legacy)
             throw new InvalidOperationException("Production material pass requires opt-in shading.");
@@ -857,6 +863,14 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 maximum: maximum, radiusScale: art.LightRadiusScale);
         int eligible = ProductionSurfaceLightSelection.CountEligible(visible, layer,
             center, art.LightRadiusScale);
+        if (surface.Receiver.Active)
+        {
+            // A room-sized receiver may intersect a local light far from its center.
+            var candidates = visible.Where(l => LightLayerRouting.Illuminates(l, layer) && l.Intensity > 0)
+                .OrderByDescending(l => l.Intensity).ThenBy(l => l.Id, StringComparer.Ordinal).ToArray();
+            eligible = candidates.Length;
+            selected = candidates.Take(maximum).ToArray();
+        }
         LastMaterialLightsDropped += Math.Max(0, eligible - selected.Count);
         LastMaterialLightsEvaluated += selected.Count;
         LastMaterialMaxLightsOnSurface = Math.Max(LastMaterialMaxLightsOnSurface, selected.Count);
@@ -866,8 +880,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
             int behind = 0;
             for (int i = 0; i < pair.Count; i++)
                 if (ProductionWallLightRouting.BehindAny(surface, selected[pair.Start+i], ownWalls)) behind++;
-            materialPasses += (behind < pair.Count ? 1 : 0) +
-                (surface.BackRimIntensity > 0 ? behind : 0);
+            materialPasses += (surface.Receiver.Active ? pair.Count : (behind < pair.Count ? 1 : 0)) +
+                (PolygonRimsEnabled && surface.BackRimIntensity > 0 ? behind : 0);
         }
         LastMaterialShadePixels += region.Area * (long)materialPasses;
         LastMaterialShadePixelsAvoided +=
@@ -978,12 +992,21 @@ internal sealed class GameplayLightingRenderer : IDisposable
             _basicSurfaceEffect.Parameters["ProductionLightPassMode"].SetValue(2f);
             BindProductionVisibilityMode();
             _device.SetRenderTarget(_litLayer);
-            if (frontLights.Count > 0)
+            if (surface.Receiver.Active)
+            {
+                for (int slot = 0; slot < configured.Count; slot++)
+                {
+                    DrawReceiverLight(batch, region, full, surface, configured[slot].Light,
+                        slot == 0 ? visibility0 : visibility1, art.LightMultiplier);
+                    LastMaterialLightPasses++;
+                }
+            }
+            else if (frontLights.Count > 0)
             {
                 DrawProductionMaterialRegion(batch, region, full, _materialAdditive);
                 LastMaterialLightPasses++;
             }
-            if ((back0 || back1) && surface.BackRimIntensity > 0)
+            if (PolygonRimsEnabled && (back0 || back1) && surface.BackRimIntensity > 0)
             {
                 if (uploadedEdgeCount == 0) uploadedEdgeCount = UploadPolygonEdges(ownWalls);
                 int edgeCount = uploadedEdgeCount;
@@ -1060,7 +1083,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
             }
             RadialLight light = selected[slot];
             bool back = slot == 0 ? back0 : back1;
-            bool receivesProjected = surface.ReceivesShadows && layer.ReceivesShadows;
+            if (back && !PolygonRimsEnabled) continue;
+            bool receivesProjected = surface.ReceivesShadows && layer.ReceivesShadows &&
+                surface.Receiver.Mode != ReceiverProjectionMode.Clipped;
             if (!ProductionMaterialPassPlanner.NeedsVisibility(receivesProjected,
                 back, light.CastShadows, _shadowQuota.Contains(light.Id)))
             {
@@ -1088,19 +1113,22 @@ internal sealed class GameplayLightingRenderer : IDisposable
             IReadOnlyList<LightPoint> fan;
             if (light.Shape == LightShape.Directional)
             {
-                DrawDirectionalMask(viewport, light, nearby, target);
+                DrawDirectionalMask(viewport, light, nearby, target, surface.Receiver);
                 fan = Array.Empty<LightPoint>();
                 _contactReady = false;
             }
             else fan = DrawVisibilityFan(viewport, scaled,
-                nearby, _productionRadialSamples, target);
-            if (_shadowSoftnessPixels > 0f)
+                nearby, _productionRadialSamples, target, surface.Receiver);
+            // Back-rim slots do not illuminate the front face; use the unblurred
+            // visibility mask for them. Never let penumbra filtering create a rim.
+            if (ProductionMaterialPassPlanner.FilterVisibility(back, _shadowSoftnessPixels))
             {
                 // Filter only real ray masks; the immutable 1x1 white fallback
                 // never requires filtering. One shared temporary serves both
                 // material lights without sampling an active render target.
-                if (light.Shape != LightShape.Directional)
+                if (light.Shape != LightShape.Directional && surface.Receiver.Mode != ReceiverProjectionMode.Folded)
                     PrepareContactProfile(scaled, fan, viewport);
+                else _contactReady = false;
                 RenderTarget2D scratch = EnsureSoftBlurScratch(viewport.Width, viewport.Height);
                 GaussianVisibilityPass(batch, target, scratch, viewport,
                     horizontal: true, blend: BlendState.Opaque);
@@ -1145,7 +1173,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
     }
 
     private void DrawDirectionalMask(LightingViewport view, RadialLight light,
-        IReadOnlyList<LightingOccluder> blockers, RenderTarget2D target)
+        IReadOnlyList<LightingOccluder> blockers, RenderTarget2D target,
+        SurfaceReceiverProjection? receiver = null)
     {
         _device.SetRenderTarget(target);
         _device.Clear(Color.White);
@@ -1155,13 +1184,14 @@ internal sealed class GameplayLightingRenderer : IDisposable
         var triangles = new List<VertexPositionColor>(Math.Min(blockers.Count, 96) * 39);
         foreach (LightingOccluder blocker in blockers)
         {
-            if (!DirectionalShadowProjection.IntersectsViewport(blocker, light.Direction,
-                light.DirectionalShadowLength, view)) continue;
+            if (receiver?.Mode != ReceiverProjectionMode.Folded &&
+                !DirectionalShadowProjection.IntersectsViewport(blocker, light.Direction,
+                    light.DirectionalShadowLength, view)) continue;
             IReadOnlyList<LightPoint> world = DirectionalShadowProjection.Triangles(
                 blocker, light.Direction, light.DirectionalShadowLength);
             foreach (LightPoint point in world)
             {
-                LightPoint screen = view.Project(point);
+                LightPoint screen = view.Project(receiver?.ProjectShadow(point) ?? point);
                 triangles.Add(new VertexPositionColor(new Vector3(
                     (float)screen.X, (float)screen.Y, 0), Color.Black));
             }
@@ -1181,7 +1211,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
     }
 
     private IReadOnlyList<LightPoint> DrawVisibilityFan(LightingViewport viewport, RadialLight light,
-        IReadOnlyList<LightingOccluder> blockers, int samples, RenderTarget2D destination)
+        IReadOnlyList<LightingOccluder> blockers, int samples, RenderTarget2D destination,
+        SurfaceReceiverProjection? receiver = null)
     {
         var geometryTimer = Stopwatch.StartNew();
         IReadOnlyList<LightPoint> boundary;
@@ -1195,12 +1226,13 @@ internal sealed class GameplayLightingRenderer : IDisposable
         _device.Clear(Color.Black);
         if (boundary.Count < 3) return boundary;
         var triangles = new VertexPositionColor[boundary.Count * 3];
-        LightPoint center = viewport.Project(light.Position);
+        LightPoint center = viewport.Project(receiver?.ProjectShadow(light.Position) ?? light.Position);
         Vector3 source = new((float)center.X, (float)center.Y, 0);
         for (int i = 0; i < boundary.Count; i++)
         {
-            LightPoint a = viewport.Project(boundary[i]);
-            LightPoint b = viewport.Project(boundary[(i + 1) % boundary.Count]);
+            LightPoint a = viewport.Project(receiver?.ProjectShadow(boundary[i]) ?? boundary[i]);
+            LightPoint next = boundary[(i + 1) % boundary.Count];
+            LightPoint b = viewport.Project(receiver?.ProjectShadow(next) ?? next);
             triangles[3 * i] = new VertexPositionColor(source, Color.White);
             triangles[3 * i + 1] = new VertexPositionColor(
                 new Vector3((float)a.X, (float)a.Y, 0), Color.White);
@@ -1283,13 +1315,46 @@ internal sealed class GameplayLightingRenderer : IDisposable
             (float)Math.Cos(light.ConeAngleDegrees*Math.PI/360)));
         fx.Parameters["LightExtra"].SetValue(new Vector4(
             (float)Math.Cos(light.ConeAngleDegrees*(1-light.ConeSoftness)*Math.PI/360),
-            (float)(light.TubeLength*_basicViewport.PixelsPerUnit*.5),0,0));
+            (float)(light.TubeLength*_basicViewport.PixelsPerUnit*.5),
+            (float)(light.DirectionalShadowLength*_basicViewport.PixelsPerUnit),0));
         fx.Parameters["LightEnergy"].SetValue(new Vector4((float)light.Color.R,(float)light.Color.G,
             (float)light.Color.B,(float)(light.Intensity*gain)));
         fx.Parameters["RimSettings"].SetValue(new Vector4((float)surface.BackRimWidthPx,
-            (float)surface.BackRimIntensity,insideContour,0));
+            (float)surface.BackRimIntensity,insideContour,
+            light.CastShadows && _shadowQuota.Contains(light.Id) ? 1f : 0f));
         fx.Parameters["InsideCenter"].SetValue(new Vector2((float)(insideCenter?.X ?? 0),
             (float)(insideCenter?.Y ?? 0)));
+        DrawProductionMaterialRegion(batch, region, full, _materialAdditive, fx);
+        fx.Parameters["VisibilityMap"].SetValue(_whiteProductionVisibility);
+    }
+
+    private void DrawReceiverLight(SpriteBatch batch, ProductionMaterialRegion region, Rectangle full,
+        ProductionSurfaceSubmission surface, RadialLight light, Texture2D visibility, double gain)
+    {
+        var receiver = surface.Receiver;
+        Effect fx = _polygonRimEffect ?? throw new InvalidOperationException("Receiver effect not loaded.");
+        fx.CurrentTechnique = fx.Techniques["ReceiverLight"];
+        fx.Parameters["VisibilityMap"].SetValue(visibility);
+        fx.Parameters["ViewportSize"].SetValue(new Vector2(full.Width, full.Height));
+        LightPoint center = _basicViewport.Project(light.Position);
+        float ppu = (float)_basicViewport.PixelsPerUnit;
+        double m = Math.Sqrt(light.Direction.X*light.Direction.X + light.Direction.Y*light.Direction.Y);
+        fx.Parameters["LightPositionRadius"].SetValue(new Vector4((float)center.X, (float)center.Y,
+            (float)(light.Radius * ppu), 0));
+        fx.Parameters["LightShapeDirection"].SetValue(new Vector4((float)light.Shape,
+            (float)(light.Direction.X/m), (float)(-light.Direction.Y/m),
+            (float)Math.Cos(light.ConeAngleDegrees*Math.PI/360)));
+        fx.Parameters["LightExtra"].SetValue(new Vector4(
+            (float)Math.Cos(light.ConeAngleDegrees*(1-light.ConeSoftness)*Math.PI/360),
+            (float)(light.TubeLength*ppu*.5),
+            (float)((light.VirtualZ-surface.MaterialDepthZ)*ppu), (float)light.ReceiverDirectionalDepth));
+        fx.Parameters["LightEnergy"].SetValue(new Vector4((float)light.Color.R, (float)light.Color.G,
+            (float)light.Color.B, (float)(light.Intensity*gain)));
+        float seam = (float)_basicViewport.Project(new LightPoint(0, receiver.SeamY)).Y;
+        fx.Parameters["ReceiverFold"].SetValue(new Vector4((float)receiver.Mode, seam,
+            (float)(receiver.BandWorld*ppu), (float)receiver.Compression));
+        fx.Parameters["ReceiverAngles"].SetValue(new Vector4((float)(receiver.PitchDegrees*Math.PI/180),
+            (float)(receiver.FacePitchDegrees*Math.PI/180), ReceiverOrientationEnabled ? (float)receiver.OrientationStrength : 0f, (float)receiver.Shear));
         DrawProductionMaterialRegion(batch, region, full, _materialAdditive, fx);
         fx.Parameters["VisibilityMap"].SetValue(_whiteProductionVisibility);
     }

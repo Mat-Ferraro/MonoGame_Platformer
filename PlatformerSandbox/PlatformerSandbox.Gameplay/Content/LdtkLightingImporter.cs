@@ -123,6 +123,7 @@ public static class LdtkLightingImporter
                         Priority = (int)Number(fields, "Priority", 1, -100, 100),
                         CastShadows = Bool(fields, "CastShadows", true),
                         VirtualZ = Number(fields, "LightDepthZ", 0, -100, 100),
+                        ReceiverDirectionalDepth = Number(fields, "ReceiverDirectionalDepth", 1, -4, 4),
                         Channels = LightChannel.All,
                         AffectsLayers = CsvLayers(fields, "AffectsLayers", sceneLayers),
                         OccluderLayers = CsvLayers(fields, "OccluderLayers", sceneLayers)
@@ -164,10 +165,34 @@ public static class LdtkLightingImporter
                     };
                     string surfaceLayerId = LayerId(fields, sceneLayers, group);
                     SceneLightingLayer layerDefaults = sceneLayers.Get(surfaceLayerId);
+                    string receiverText = Text(fields, "ReceiverProjection", "Legacy");
+                    if (!Enum.TryParse<ReceiverProjectionMode>(receiverText, false, out var receiverMode) ||
+                        !Enum.IsDefined(receiverMode) || receiverText != receiverMode.ToString())
+                        throw new ArgumentException("Unknown ReceiverProjection: " + receiverText);
+                    double topPx = entity.GetProperty("px")[1].GetDouble() -
+                        entity.GetProperty("__pivot")[1].GetDouble() * entity.GetProperty("height").GetDouble();
+                    var receiver = new SurfaceReceiverProjection
+                    {
+                        Mode = receiverMode, SeamY = (height - topPx) * UnitsPerPixel,
+                        BandWorld = Number(fields, "ReceiverBandWorld", .75, .05, 20),
+                        Compression = Number(fields, "ReceiverCompression", .3, .1, 1),
+                        Shear = Number(fields, "ReceiverShear", .15, -2, 2),
+                        PitchDegrees = Number(fields, "ReceiverPitchDeg", 90, -180, 180),
+                        FacePitchDegrees = Number(fields, "ReceiverFacePitchDeg", 0, -180, 180),
+                        OrientationStrength = Number(fields, "ReceiverNormalStrength", .8, 0, 1)
+                    };
+                    if (receiver.Active && (kind != "TerrainArtwork" ||
+                        Number(fields, "RotationDeg", 0, -360, 360) != 0 ||
+                        Number(fields, "ParallaxX", 0, -100, 200) != 0 ||
+                        Number(fields, "ParallaxY", 0, -100, 200) != 0 ||
+                        layerDefaults.ParallaxMultiplier != 1 ||
+                        Bool(fields, "FlipY", false)))
+                        throw new NotSupportedException("Oriented receivers require stationary, axis-aligned, world-parallax TerrainArtwork.");
                     LightingSurfaceOptions options = new()
                     {
                         ReceivesLight = Bool(fields, "ReceivesLight", true),
                         ReceivesShadows = Bool(fields, "ReceivesShadows", layerDefaults.ReceivesShadows),
+                        Receiver = receiver,
                         CastsShadows = Bool(fields, "CastsShadows", layerDefaults.CastsShadowsByDefault),
                         ContactShadow = Bool(fields, "ContactShadow", false),
                         LightingMode = SurfaceMode(fields),

@@ -20,6 +20,7 @@ public sealed record ProductionSurfaceSubmission
     public string? CasterId { get; init; }
     public LightPoint? Center { get; init; }
     public ProductionSurfaceShading Shading { get; init; } = ProductionSurfaceShading.Legacy;
+    public SurfaceReceiverProjection Receiver { get; init; } = new();
     public bool ReceivesShadows { get; init; }
     public bool CastsShadows { get; init; }
     public string? NormalMap { get; init; }
@@ -48,6 +49,7 @@ public sealed record ProductionSurfaceSubmission
             CasterId = options.CastsShadows ? instanceId : null,
             Shading = options.MaterialShading,
             ReceivesShadows = options.ReceivesShadows,
+            Receiver = options.Receiver,
             CastsShadows = options.CastsShadows,
             NormalMap = options.NormalMap,
             EdgeMap = options.EdgeMap,
@@ -67,6 +69,10 @@ public sealed record ProductionSurfaceSubmission
 
     public void Validate()
     {
+        Receiver.Validate();
+        if (Receiver.Active && (Shading != ProductionSurfaceShading.Flat || CastsShadows ||
+            NormalMap is not null || EdgeMap is not null))
+            throw new NotSupportedException("Oriented receivers require non-casting Flat artwork without tangent maps.");
         if (string.IsNullOrWhiteSpace(InstanceId) || InstanceId.Length > 100 ||
             !SceneLightingLayer.IsId(LayerId) || Channel == LightChannel.None ||
             (Channel & ~LightChannel.All) != 0 || !Enum.IsDefined(Shading))

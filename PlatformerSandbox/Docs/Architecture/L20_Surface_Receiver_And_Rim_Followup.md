@@ -1,0 +1,25 @@
+# Phase 20G–20J: receiver projection and shadowed rim follow-up
+
+Incremental package for the installed Phase 20 Universal Lighting ZIP. No old Phase 16E hotfix. Existing flat scenes retain the Legacy receiver mode. No simulation, physics, asset image, or Material Showcase LDtk changes. This is a 2.5D artistic receiver approximation, not a full 3D shadow pipeline.
+
+## Rim policy
+
+Behind-only light slots use the hard external visibility mask (front slots still filter). The polygon shader rejects a rim if its pixel or nearest in-viewport boundary sample is not fully visible. Its owner-excluded mask is supplemented by a boundary-to-light ray check against the other edges/contours of the same owner, bounded by the directional reach. The explicit embedded contour remains excluded, and separate contours can occlude it. Non-shadow-casting lights and lights outside the shadow quota do not perform own-hull ray blocking. The diagnostic toggle disables the additive polygon rim only, not painted outlines or normal/edge-map lighting in the older effect. Hard-rim policy is deliberately conservative, including at penumbrae.
+
+## Receiver authoring
+
+Only opted-in, lit, stationary, axis-aligned TerrainArtwork on world-parallax layers, with Flat material, no casting or tangent maps. Default Legacy leaves old renderer behavior intact. Receiver artwork may have its own material depth and opacity, although the new shader's transparent compositing must be visually verified. The seam is the artwork's top edge, using the LDtk pivot and 32 px/world unit. Floor band is the strip below the seam. Modes:
+
+- Flat: existing unwarped visibility across the full receiver; optional orientation response.
+- Clipped: no incoming projected shadows on this receiver; wall and hero shadows remain unchanged.
+- Folded: project the existing per-light shadow geometry by `x'=x+shear*d`, `y'=seam-compression*d`, where `d=seam-y`. Sample the transformed mask only inside the top band. The terrain face below receives independent illumination without inherited wall shadows. Invert the same transform for local light falloff inside the band. The seam is invariant even during camera movement. Soft shadow filtering is uniform for folded receivers (no radial contact profile under affine warp). The wall remains an ordinary flat receiver. The runtime comparison switches the same ground artwork between modes.
+
+`ReceiverProjection` = Legacy/Flat/Clipped/Folded; `ReceiverBandWorld` (.05–20); `ReceiverCompression` (.1–1); `ReceiverShear` (-2–2); `ReceiverPitchDeg` and `ReceiverFacePitchDeg` (-180–180); `ReceiverNormalStrength` (0–1). Normal angle 0 faces camera, 90 faces world-up, -90 faces down. Per-light `ReceiverDirectionalDepth` (-4–4, default 1) provides a virtual Z component toward directional light; local lights use existing LightDepthZ minus MaterialDepthZ. Incidence blends 1 and a Lambert cosine; ambient and emission remain in the original base pass. World/hero and original material paths are unchanged except intentional rim suppression. Directional depth affects receiver intensity, not actual 3D shadow projection.
+
+## Validation
+
+Start LIGHT TYPES LAB, sun only, bloom/emission off, clipped mode default. DEV TOOLS -> MATERIALS -> LIGHT TYPES. RECEIVER cycles Flat/Clipped/Folded. RECEIVER NORMALS switches direct incidence response. POLYGON RIMS isolates new additive rims. With camera stationary, compare identical casters and light; then move the camera and toggle moon, point, spot, tube and all. Verify wall shadow ends at seam in clipped mode, folded shadow is compressed/sheared and stops at floor band bottom, terrain face stays independently lit, and hero shadows do not change between modes. With overlapping caster shadows, toggle polygon rims on/off to check lit silhouette persists but shadowed rim does not. Repeat with soft shadows and moving/rotating geometry. Confirm Material Showcase and Integration Test parity, including intentionally transparent art. Check full HUD material mask/CPU stats with stress on/off.
+
+## Known boundaries
+
+The receiver pass uses per-light GPU material draws, with a 12-light existing material budget. Large opted-in surfaces choose from camera-visible routed lights instead of testing their center. Directional folded masks conservatively skip viewport culling, and the edge ray check costs another bounded loop for candidate rim pixels. No measured GPU performance yet. Arbitrary 3D orientation, slanted seams, volumetric caster thickness, overlapping/holed contours, true extended-emitter visibility, and rotated receiver art are not implemented. The fold is affine rather than ray/plane intersection in 3D; floor and terrain face are defined by a top band, not by automatically detecting the artwork. The existing L_BASIC shader is not included or rewritten; front-facing artist edge-map leakage, if any, needs separate investigation. The original project export omitted older images and effects, so the previous all-asset preflight cannot be completed here. New shader must compile on actual DesktopGL.

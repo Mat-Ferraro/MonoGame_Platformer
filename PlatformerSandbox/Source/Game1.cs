@@ -85,6 +85,8 @@ public sealed class Game1 : Game
     private float _l19BloomStrength = 0.45f;
     private float _l20BloomScatter = .65f;
     private bool _l20BloomOnly;
+    private bool _l20ReceiverNormals = true, _l20PolygonRims = true;
+    private ReceiverProjectionMode _l20ReceiverMode = ReceiverProjectionMode.Clipped;
     private int _l20LightFilter; // 0 all, 1 sun, 2 moon, 3 point, 4 spot, 5 tube
     private ShadowEdgePreset _shadowEdgePreset = ShadowEdgePreset.Hard;
     private ShadowFilterMode _shadowFilterMode = ShadowFilterMode.UniformGaussian;
@@ -1389,7 +1391,10 @@ public sealed class Game1 : Game
                                 _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality
                                     ? ShadowContactControls.QualityPreset(_lightingQuality)
                                     : _shadowEdgePreset;
-                            _gameLighting!.ShadowSoftnessPixels =
+                            _gameLighting!.ReceiverComparisonOverride = _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab ? _l20ReceiverMode : null;
+                            _gameLighting.ReceiverOrientationEnabled = _ldtkLighting?.LevelId != GameLevelIds.LightTypesLab || _l20ReceiverNormals;
+                            _gameLighting.PolygonRimsEnabled = _ldtkLighting?.LevelId != GameLevelIds.LightTypesLab || _l20PolygonRims;
+                            _gameLighting.ShadowSoftnessPixels =
                                 ShadowEdgeSettings.EffectiveWidth(effectiveShadowPreset, shadowBudget);
                             _gameLighting.FilterMode = _shadowFilterMode;
                             _gameLighting.MaterialLightMode = _materialLightMode;
@@ -1509,7 +1514,7 @@ public sealed class Game1 : Game
                     },
                     CurrentShowcaseFocusLabel(), CurrentShowcaseNotes(),
                     CurrentLightTypeFilterLabel(), _l20BloomScatter.ToString("F2"),
-                    _l20BloomOnly, CurrentLightTypeNotes());
+                    _l20BloomOnly, CurrentLightTypeNotes(), _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab ? _l20ReceiverMode.ToString().ToUpperInvariant() : "LAB ONLY", _l20ReceiverNormals, _l20PolygonRims);
             }
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
@@ -1823,6 +1828,8 @@ public sealed class Game1 : Game
             _lightingQuality = LightingQuality.High;
             _lightingEnabled = true;
             _l19dWorldLightsEnabled = true;
+            _l20ReceiverMode = ReceiverProjectionMode.Clipped;
+            _l20ReceiverNormals = _l20PolygonRims = true;
             _l20LightFilter = 1; // Start with just the sun, not all sources.
             _l19Hdr = true;
             // Teach light distribution and cast-shadow geometry first; prevent
@@ -2305,6 +2312,21 @@ public sealed class Game1 : Game
             case LightingToolAction.CycleBloomStrength:
                 _l19BloomStrength = _l19BloomStrength < 0.4f ? 0.45f :
                     _l19BloomStrength < 0.9f ? 1.0f : 0.25f;
+                break;
+            case LightingToolAction.ToggleReceiverNormals:
+                if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab) _l20ReceiverNormals = !_l20ReceiverNormals;
+                break;
+            case LightingToolAction.TogglePolygonRims:
+                if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab) _l20PolygonRims = !_l20PolygonRims;
+                break;
+            case LightingToolAction.CycleReceiverProjection:
+                if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab)
+                    _l20ReceiverMode = _l20ReceiverMode switch
+                    {
+                        ReceiverProjectionMode.Flat => ReceiverProjectionMode.Clipped,
+                        ReceiverProjectionMode.Clipped => ReceiverProjectionMode.Folded,
+                        _ => ReceiverProjectionMode.Flat
+                    };
                 break;
             case LightingToolAction.CycleLightTypeFilter:
                 if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab)

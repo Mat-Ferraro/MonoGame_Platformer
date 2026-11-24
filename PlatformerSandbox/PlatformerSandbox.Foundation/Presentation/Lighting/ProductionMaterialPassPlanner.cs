@@ -23,4 +23,9 @@ public static class ProductionMaterialPassPlanner
     public static bool NeedsVisibility(bool receivesProjectedShadows, bool backRim,
         bool lightCastsShadows, bool withinShadowBudget) =>
         (receivesProjectedShadows || backRim) && lightCastsShadows && withinShadowBudget;
+
+    /// <summary>Rims require the binary visibility gate; only front/receiver
+    /// lighting consumes filtered visibility. Behind slots have no front light.</summary>
+    public static bool FilterVisibility(bool backRim, double softnessPixels) =>
+        !backRim && softnessPixels > 0;
 }

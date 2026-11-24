@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using PlatformerSandbox.Foundation.Presentation.Lighting;
 using PlatformerSandbox.Gameplay.Content;
 using Xunit;
@@ -168,15 +169,28 @@ public sealed class L025DramaticContrastPresetsTests
     public void UnknownOrDuplicatePresetSelectionsCannotBeLoaded()
     {
         string valid = ReadFixture("Content", "Lighting", "L456_GameplayLighting.json");
-        // Replace only the scene selection's default; leave global Illustrated intact.
-        string unknown = valid.Replace("\"defaultPreset\": \"FlatDramatic\"",
-            "\"defaultPreset\": \"missing_preset\"");
-        Assert.Throws<ArgumentException>(() => LightingGameCatalog.FromJson(unknown));
-        string duplicate = valid.Replace("\"FlatDramatic\",\n        \"FlatReadable\"",
-            "\"FlatDramatic\",\n        \"FlatDramatic\"");
-        Assert.NotEqual(valid, duplicate);
-        Assert.Throws<ArgumentException>(() => LightingGameCatalog.FromJson(duplicate));
+        // Verify the unmodified fixture loads, then mutate only the intended
+        // scene. JSON structure, not formatting or newline style, is the contract.
+        _ = LightingGameCatalog.FromJson(valid);
+        JsonObject unknown = FindFlatScene(JsonNode.Parse(valid)!);
+        unknown["defaultPreset"] = "missing_preset";
+        string unknownJson = unknown.Root.ToJsonString();
+        Assert.Throws<ArgumentException>(() => LightingGameCatalog.FromJson(unknownJson));
+
+        JsonObject duplicate = FindFlatScene(JsonNode.Parse(valid)!);
+        JsonArray choices = duplicate["presetIds"]!.AsArray();
+        Assert.Contains(choices, node => node!.GetValue<string>() == "FlatReadable");
+        Assert.Contains(choices, node => node!.GetValue<string>() == "FlatDramatic");
+        int index = Enumerable.Range(0, choices.Count).Single(i =>
+            choices[i]!.GetValue<string>() == "FlatReadable");
+        choices[index] = "FlatDramatic";
+        string duplicateJson = duplicate.Root.ToJsonString();
+        Assert.Throws<ArgumentException>(() => LightingGameCatalog.FromJson(duplicateJson));
     }
+
+    private static JsonObject FindFlatScene(JsonNode root) => root["scenePresets"]!
+        .AsArray().Single(node => node?["sceneId"]?.GetValue<string>() == "LIGHTING_FLAT_TEST")!
+        .AsObject();
 
     [Fact]
     public void PresetsDoNotRewriteFlatLdtkLightPositionsOrSurfaceFlags()

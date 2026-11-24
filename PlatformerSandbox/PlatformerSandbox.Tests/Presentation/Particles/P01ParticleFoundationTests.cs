@@ -317,11 +317,23 @@ public sealed class P01ParticleFoundationTests
     {
         var system = new ParticleSystem(64, maxUpdateDeltaSeconds: 1);
         var emitter = new ParticleEmitter(system, Emitter(burst: 64, rate: 0), seed: 1);
-        emitter.Burst(Origin);
-        system.Update(.01);
-        system.Clear();
+        const int warmupBursts = 512;
+        const int measuredBursts = 200;
+        const int particlesPerBurst = 64;
+        // Exercise the exact hot path repeatedly before measuring steady-state
+        // allocations. A single invocation is insufficient on tiered runtimes.
+        for (int i = 0; i < warmupBursts; i++)
+        {
+            emitter.Burst(Origin);
+            system.Update(.01);
+            system.Clear();
+        }
+        Assert.Equal((long)warmupBursts * particlesPerBurst, system.Diagnostics.Spawned);
+        Assert.Equal(0, system.ActiveCount);
+        // Warm the allocation counter too; no forced collection or retries.
+        _ = GC.GetAllocatedBytesForCurrentThread();
         long start = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < measuredBursts; i++)
         {
             emitter.Burst(Origin);
             system.Update(.01);
@@ -330,7 +342,10 @@ public sealed class P01ParticleFoundationTests
         long allocated = GC.GetAllocatedBytesForCurrentThread() - start;
         Assert.InRange(allocated, 0, 4096);
         Assert.Equal(0, system.ActiveCount);
-        Assert.Equal(200 * 64 + 64, system.Diagnostics.Spawned);
+        Assert.Equal((long)(warmupBursts + measuredBursts) * particlesPerBurst,
+            system.Diagnostics.Spawned);
+        Assert.Equal(0L, system.Diagnostics.DroppedAtCapacity);
+        Assert.Equal(0L, system.Diagnostics.DroppedInvalid);
     }
 
     [Fact]

@@ -65,6 +65,8 @@ public sealed record RadialLight
     /// <summary>Optional authored virtual depth for GPU wall lighting. 0 is the legacy plane.
     /// This is NOT LDtk draw-order or the name of a render layer.</summary>
     public double VirtualZ { get; init; }
+    // Positive virtual Z component toward a directional source (receiver normals only).
+    public double ReceiverDirectionalDepth { get; init; } = 1;
     /// <summary>Allows this light to reveal the front face of explicitly
     /// silhouetted scenery. Ordinary lights leave silhouettes dark. This does
     /// not change occluder geometry or an object's CastsShadows flag.</summary>
@@ -94,6 +96,8 @@ public sealed record RadialLight
             !double.IsFinite(TubeLength) || TubeLength is < 0.1 or > 40 ||
             !double.IsFinite(DirectionalShadowLength) || DirectionalShadowLength is < 0.25 or > 30)
             throw new ArgumentOutOfRangeException(nameof(Shape), "Invalid bounded light shape parameters.");
+        if (!double.IsFinite(ReceiverDirectionalDepth) || ReceiverDirectionalDepth is < -4 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(ReceiverDirectionalDepth));
         if (!double.IsFinite(VirtualZ) || VirtualZ is < -100 or > 100)
             throw new ArgumentOutOfRangeException(nameof(VirtualZ));
         Color.Validate(nameof(Color));

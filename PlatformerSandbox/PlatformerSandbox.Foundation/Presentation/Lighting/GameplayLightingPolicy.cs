@@ -14,6 +14,7 @@ public enum LightingSurfaceMode { Inherit, Lit, Unlit, Silhouette }
 public sealed record LightingSurfaceOptions
 {
     public bool ReceivesLight { get; init; } = true;
+    public SurfaceReceiverProjection Receiver { get; init; } = new();
     public bool ReceivesShadows { get; init; } = true;
     public bool CastsShadows { get; init; }
     public bool ContactShadow { get; init; }
@@ -45,6 +46,10 @@ public sealed record LightingSurfaceOptions
         MaterialShading != ProductionSurfaceShading.Legacy;
     public void Validate()
     {
+        Receiver.Validate();
+        if (Receiver.Active && (MaterialShading != ProductionSurfaceShading.Flat || CastsShadows ||
+            NormalMap is not null || EdgeMap is not null))
+            throw new NotSupportedException("Oriented receivers require non-casting Flat artwork without tangent maps.");
         if (!Enum.IsDefined(LightingMode) || !SceneLightingLayer.IsId(LayerId) || Channel == LightChannel.None ||
             (Channel & ~LightChannel.All) != 0)
             throw new ArgumentOutOfRangeException(nameof(Channel));

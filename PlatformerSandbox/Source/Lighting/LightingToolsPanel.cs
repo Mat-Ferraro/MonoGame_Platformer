@@ -13,7 +13,7 @@ internal enum LightingToolAction
     None, TogglePanel, ToggleToolsPage, ToggleHdr, ToggleEmission, ToggleBloom,
     CycleExposure, CycleBloomThreshold, CycleBloomStrength, CycleMaterialValidationPreset,
     CycleShowcaseFocus, ToggleShowcaseWorldLights,
-    CycleLightTypeFilter, CycleBloomScatter, ToggleBloomOnly,
+    CycleLightTypeFilter, CycleReceiverProjection, ToggleReceiverNormals, TogglePolygonRims, CycleBloomScatter, ToggleBloomOnly,
     ToggleLights, NextPreset, NextQuality, ToggleMaterialLights, CycleShadowEdges, ToggleShadowFilter, ToggleShadowQualityPolicy,
     SelectShadowLight, CycleShadowEmitter, ToggleReducedFlashes,
     ToggleStress, ToggleWallMotion, ToggleInspectionLight, CycleHud, ToggleCollision, ToggleBackdrop,
@@ -79,6 +79,9 @@ internal sealed class LightingToolsPanel
     [
         LightingToolAction.ToggleToolsPage,
         LightingToolAction.CycleLightTypeFilter,
+        LightingToolAction.CycleReceiverProjection,
+        LightingToolAction.ToggleReceiverNormals,
+        LightingToolAction.TogglePolygonRims,
         LightingToolAction.ToggleShowcaseWorldLights,
         LightingToolAction.ToggleHdr,
         LightingToolAction.ToggleEmission,
@@ -145,7 +148,7 @@ internal sealed class LightingToolsPanel
         bool stress, bool wallMotion, bool inspectionLight, string hud, bool collision, bool backdrop,
         bool mute, int masterVolume, IReadOnlyList<string> lightStatuses,
         string materialDemoPreset, string showcaseFocus, IReadOnlyList<string> showcaseNotes,
-        string lightTypeFilter, string bloomScatter, bool bloomOnly, IReadOnlyList<string> typeNotes)
+        string lightTypeFilter, string bloomScatter, bool bloomOnly, IReadOnlyList<string> typeNotes, string receiverMode = "LAB ONLY", bool receiverNormals = true, bool polygonRims = true)
     {
         Rectangle trigger = Trigger(width);
         batch.Draw(pixel, trigger, new Color(35, 87, 83));
@@ -192,6 +195,9 @@ internal sealed class LightingToolsPanel
         [
             "PAGE: LIGHT TYPES  (CLICK FOR SYSTEM)",
             "LIGHT FILTER: " + lightTypeFilter,
+            "RECEIVER: " + receiverMode,
+            "RECEIVER NORMALS: " + (receiverNormals ? "ON" : "OFF"),
+            "POLYGON RIMS: " + (polygonRims ? "ON" : "OFF"),
             "WORLD LIGHTS: " + (worldLights ? "ON" : "OFF"),
             "HDR: " + (hdr ? (hdrSupported ? "ON FLOAT16" : "FALLBACK") : "OFF"),
             "EMISSION: " + (emission ? "ON" : "OFF"),

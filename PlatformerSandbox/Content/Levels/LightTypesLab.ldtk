@@ -11,7 +11,7 @@
   "iid": "b0b8285f-0856-5367-b0b3-54c261df057a",
   "jsonVersion": "1.5.3",
   "appBuildId": 473703,
-  "nextUid": 91010,
+  "nextUid": 91018,
   "identifierStyle": "Capitalize",
   "toc": [],
   "worldLayout": "Free",
@@ -2452,6 +2452,300 @@
             "autoChainRef": false,
             "editorLinkStyle": "ZigZag",
             "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverProjection",
+            "uid": 91010,
+            "type": "F_String",
+            "__type": "String",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_String",
+              "params": [
+                "Legacy"
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverProjection (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverBandWorld",
+            "uid": 91011,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0.05,
+            "max": 20,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                0.75
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverBandWorld (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverCompression",
+            "uid": 91012,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0.1,
+            "max": 1,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                0.3
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverCompression (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverShear",
+            "uid": 91013,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": -2,
+            "max": 2,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                0.15
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverShear (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverPitchDeg",
+            "uid": 91014,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": -180,
+            "max": 180,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                90
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverPitchDeg (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverFacePitchDeg",
+            "uid": 91015,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": -180,
+            "max": 180,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                0
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverFacePitchDeg (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverNormalStrength",
+            "uid": 91016,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 1,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                0.8
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverNormalStrength (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
           }
         ]
       },
@@ -4524,6 +4818,48 @@
             "autoChainRef": false,
             "editorLinkStyle": "ZigZag",
             "textLanguageMode": null
+          },
+          {
+            "identifier": "ReceiverDirectionalDepth",
+            "uid": 91017,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": -4,
+            "max": 4,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V_Float",
+              "params": [
+                1
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "Phase 20: ReceiverDirectionalDepth (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
           }
         ]
       },
@@ -5289,6 +5625,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 0,
@@ -5447,7 +5839,7 @@
                 {
                   "__identifier": "MaterialShading",
                   "__type": "String",
-                  "__value": "Legacy",
+                  "__value": "Flat",
                   "__tile": null,
                   "defUid": 9007,
                   "realEditorValues": []
@@ -5498,6 +5890,70 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Clipped",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "MaterialDepthZ",
+                  "__type": "Float",
+                  "__value": -1.0,
+                  "__tile": null,
+                  "defUid": 9012,
                   "realEditorValues": []
                 }
               ],
@@ -5770,6 +6226,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 70,
@@ -6015,6 +6527,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -6262,6 +6830,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1350,
@@ -6507,6 +7131,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -6754,6 +7434,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 240,
@@ -6999,6 +7735,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -7246,6 +8038,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1450,
@@ -7491,6 +8339,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -7738,6 +8642,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1720,
@@ -7984,6 +8944,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2110,
@@ -8193,6 +9209,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -8404,6 +9476,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1362,
@@ -8613,6 +9741,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -8860,6 +10044,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1080,
@@ -9105,6 +10345,62 @@
                   "__value": null,
                   "__tile": null,
                   "defUid": 91005,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -9352,6 +10648,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 2296,
@@ -9562,6 +10914,62 @@
                   "__tile": null,
                   "defUid": 91005,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 722,
@@ -9731,6 +11139,14 @@
                   "__value": 5.5,
                   "__tile": null,
                   "defUid": 91004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverDirectionalDepth",
+                  "__type": "Float",
+                  "__value": 1,
+                  "__tile": null,
+                  "defUid": 91017,
                   "realEditorValues": []
                 }
               ],
@@ -9902,6 +11318,14 @@
                   "__tile": null,
                   "defUid": 91004,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverDirectionalDepth",
+                  "__type": "Float",
+                  "__value": 1,
+                  "__tile": null,
+                  "defUid": 91017,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1576,
@@ -10071,6 +11495,14 @@
                   "__value": 6.0,
                   "__tile": null,
                   "defUid": 91004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverDirectionalDepth",
+                  "__type": "Float",
+                  "__value": 1,
+                  "__tile": null,
+                  "defUid": 91017,
                   "realEditorValues": []
                 }
               ],
@@ -10242,6 +11674,14 @@
                   "__tile": null,
                   "defUid": 91004,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverDirectionalDepth",
+                  "__type": "Float",
+                  "__value": 1,
+                  "__tile": null,
+                  "defUid": 91017,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1576,
@@ -10411,6 +11851,14 @@
                   "__value": 6.0,
                   "__tile": null,
                   "defUid": 91004,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverDirectionalDepth",
+                  "__type": "Float",
+                  "__value": 1,
+                  "__tile": null,
+                  "defUid": 91017,
                   "realEditorValues": []
                 }
               ],
@@ -10690,6 +12138,62 @@
                   "__tile": null,
                   "defUid": 9015,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 100,
@@ -10967,6 +12471,62 @@
                   "__value": 1.1,
                   "__tile": null,
                   "defUid": 9015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -11246,6 +12806,62 @@
                   "__tile": null,
                   "defUid": 9015,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 800,
@@ -11523,6 +13139,62 @@
                   "__value": 1.1,
                   "__tile": null,
                   "defUid": 9015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -11802,6 +13474,62 @@
                   "__tile": null,
                   "defUid": 9015,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
+                  "realEditorValues": []
                 }
               ],
               "__worldX": 1500,
@@ -12079,6 +13807,62 @@
                   "__value": 1.1,
                   "__tile": null,
                   "defUid": 9015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
@@ -12397,6 +14181,62 @@
                   "__value": 35,
                   "__tile": null,
                   "defUid": 9304,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverProjection",
+                  "__type": "String",
+                  "__value": "Legacy",
+                  "__tile": null,
+                  "defUid": 91010,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverBandWorld",
+                  "__type": "Float",
+                  "__value": 0.75,
+                  "__tile": null,
+                  "defUid": 91011,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverCompression",
+                  "__type": "Float",
+                  "__value": 0.3,
+                  "__tile": null,
+                  "defUid": 91012,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverShear",
+                  "__type": "Float",
+                  "__value": 0.15,
+                  "__tile": null,
+                  "defUid": 91013,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverPitchDeg",
+                  "__type": "Float",
+                  "__value": 90,
+                  "__tile": null,
+                  "defUid": 91014,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverFacePitchDeg",
+                  "__type": "Float",
+                  "__value": 0,
+                  "__tile": null,
+                  "defUid": 91015,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "ReceiverNormalStrength",
+                  "__type": "Float",
+                  "__value": 0.8,
+                  "__tile": null,
+                  "defUid": 91016,
                   "realEditorValues": []
                 }
               ],
