@@ -42,4 +42,9 @@ public readonly record struct L19PostProcessPolicy(
     /// <summary>Threshold + horizontal + vertical + final scene composite.</summary>
     public static int BloomGpuPassCount(bool enabled, bool allocated) =>
         enabled && allocated ? 4 : 0;
+
+    /// <summary>L20 three-level bloom pass estimate (extract, six blur passes,
+    /// two downsamples, final composite). L19 retains its original contract.</summary>
+    public static int MultiResolutionBloomGpuPassCount(bool enabled, bool allocated) =>
+        enabled && allocated ? 10 : 0;
 }

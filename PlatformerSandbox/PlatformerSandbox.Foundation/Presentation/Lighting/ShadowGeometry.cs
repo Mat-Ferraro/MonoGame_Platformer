@@ -1,18 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 
 public sealed record LightingOccluder
 {
+    public const int MaxVertices = 64;
     public string Id { get; init; } = "";
+    // Compound contours have distinct IDs but share one artwork owner.
+    public string? OwnerId { get; init; }
+    public string Owner => OwnerId ?? Id;
     /// <summary>Presentation depth plane that owns this occluder.</summary>
     public string LayerId { get; init; } = "PLAYER";
     public LightPoint[] Vertices { get; init; } = Array.Empty<LightPoint>();
     public void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Id) || !SceneLightingLayer.IsId(LayerId) ||
-            Vertices is null || Vertices.Length is < 3 or > 64)
+        if (string.IsNullOrWhiteSpace(Id) || (OwnerId is not null && string.IsNullOrWhiteSpace(OwnerId)) || !SceneLightingLayer.IsId(LayerId) ||
+            Vertices is null || Vertices.Length is < 3 or > MaxVertices)
             throw new ArgumentException("An occluder requires a name and 3–64 polygon vertices.");
         foreach (LightPoint p in Vertices) p.Validate();
         if (Math.Abs(ShadowGeometry.SignedDoubleArea(Vertices)) < 1e-9)
@@ -22,10 +27,15 @@ public sealed record LightingOccluder
             LightPoint a = Vertices[i], b = Vertices[(i + 1) % Vertices.Length];
             if (ShadowGeometry.DistanceSquared(a, b) < 1e-12)
                 throw new ArgumentException("Occluder edges cannot have zero length.");
+            LightPoint c = Vertices[(i + 2) % Vertices.Length];
+            double turn = (b.X-a.X)*(c.Y-b.Y)-(b.Y-a.Y)*(c.X-b.X);
+            if (Math.Abs(turn) <= 1e-10 &&
+                (b.X-a.X)*(c.X-b.X)+(b.Y-a.Y)*(c.Y-b.Y) < 0)
+                throw new ArgumentException("Occluder adjacent edges cannot backtrack.");
             for (int j = i + 1; j < Vertices.Length; j++)
             {
                 if ((j == i + 1) || (i == 0 && j == Vertices.Length - 1)) continue;
-                if (ShadowGeometry.SegmentsIntersect(a, b, Vertices[j], Vertices[(j + 1) % Vertices.Length]))
+                if (ShadowGeometry.EdgesTouchOrCross(a, b, Vertices[j], Vertices[(j + 1) % Vertices.Length]))
                     throw new ArgumentException("Self-intersecting occluder polygon.");
             }
         }
@@ -63,6 +73,18 @@ public static class ShadowGeometry
         double abC = Cross(a, b, c), abD = Cross(a, b, d);
         double cdA = Cross(c, d, a), cdB = Cross(c, d, b);
         return (abC * abD < -epsilon && cdA * cdB < -epsilon);
+    }
+
+    public static bool EdgesTouchOrCross(LightPoint a, LightPoint b, LightPoint c, LightPoint d)
+    {
+        const double eps = 1e-10;
+        bool On(LightPoint p, LightPoint q, LightPoint r) => Math.Abs(Cross(p,q,r)) <= eps &&
+            r.X >= Math.Min(p.X,q.X)-eps && r.X <= Math.Max(p.X,q.X)+eps &&
+            r.Y >= Math.Min(p.Y,q.Y)-eps && r.Y <= Math.Max(p.Y,q.Y)+eps;
+        double x = Cross(a,b,c), y = Cross(a,b,d), z = Cross(c,d,a), w = Cross(c,d,b);
+        return ((x > eps && y < -eps || x < -eps && y > eps) &&
+                (z > eps && w < -eps || z < -eps && w > eps)) ||
+            On(a,b,c) || On(a,b,d) || On(c,d,a) || On(c,d,b);
     }
 
     public static bool Contains(LightingOccluder occluder, LightPoint p)
@@ -104,7 +126,34 @@ public static class ShadowGeometry
     /// inventing depth information. Used to draw a complete light blocker into each
     /// per-light mask and to draw its visible stone surface as a separate receiver.
     /// </summary>
+    private sealed class CachedTriangles
+    {
+        public LightPoint[]? Snapshot;
+        public IReadOnlyList<LightTriangle>? Triangles;
+    }
+    private static readonly ConditionalWeakTable<LightPoint[], CachedTriangles> TriangleCache = new();
+
     public static IReadOnlyList<LightTriangle> Triangulate(LightingOccluder occluder)
+    {
+        ArgumentNullException.ThrowIfNull(occluder);
+        // Scene-owned vertex arrays are immutable after publication; moving hulls
+        // publish a fresh array. Weak keys do not retain unloaded scenes.
+        if (occluder.Vertices is null || string.IsNullOrWhiteSpace(occluder.Id) ||
+            !SceneLightingLayer.IsId(occluder.LayerId))
+            throw new ArgumentException("Invalid occluder identity or vertices.");
+        var cache = TriangleCache.GetValue(occluder.Vertices, _ => new CachedTriangles());
+        lock (cache)
+        {
+            if (cache.Snapshot is not null && cache.Triangles is not null &&
+                occluder.Vertices.AsSpan().SequenceEqual(cache.Snapshot)) return cache.Triangles;
+            var result = TriangulateCore(occluder);
+            cache.Snapshot = (LightPoint[])occluder.Vertices.Clone();
+            cache.Triangles = result;
+            return result;
+        }
+    }
+
+    private static IReadOnlyList<LightTriangle> TriangulateCore(LightingOccluder occluder)
     {
         ArgumentNullException.ThrowIfNull(occluder);
         occluder.Validate();
@@ -112,6 +161,18 @@ public static class ShadowGeometry
         int winding = SignedDoubleArea(points) > 0 ? 1 : -1;
         var remaining = new List<int>();
         for (int i = 0; i < points.Length; i++) remaining.Add(i);
+        // Remove redundant straight-line points, but keep actual authored edges
+        // for visibility and rim lighting. Reversed overlapping edges are invalid.
+        for (int i = remaining.Count - 1; i >= 0 && remaining.Count > 3; i--)
+        {
+            int k = i % remaining.Count;
+            LightPoint a = points[remaining[(k + remaining.Count - 1) % remaining.Count]];
+            LightPoint b = points[remaining[k]];
+            LightPoint c = points[remaining[(k + 1) % remaining.Count]];
+            if (Math.Abs(Cross(a,b,c)) <= 1e-10 &&
+                (b.X-a.X)*(c.X-b.X)+(b.Y-a.Y)*(c.Y-b.Y) >= 0)
+                remaining.RemoveAt(k);
+        }
         var result = new List<LightTriangle>(points.Length - 2);
         int safety = points.Length * points.Length;
         while (remaining.Count > 3 && safety-- > 0)
@@ -146,7 +207,7 @@ public static class ShadowGeometry
         if (remaining.Count != 3)
             throw new ArgumentException("Occluder triangulation did not converge.", nameof(occluder));
         result.Add(new LightTriangle(points[remaining[0]], points[remaining[1]], points[remaining[2]]));
-        return result;
+        return result.AsReadOnly();
     }
 
     private static bool WithinTriangle(LightPoint p, LightPoint a, LightPoint b, LightPoint c, int winding)

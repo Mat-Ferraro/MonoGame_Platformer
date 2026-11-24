@@ -11,20 +11,29 @@ namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 /// </summary>
 public static class ProductionWallLightRouting
 {
-    public static LightingOccluder? OwnWall(ProductionSurfaceSubmission surface,
+    public const int MaxOwnerEdges = 128;
+
+    public static IReadOnlyList<LightingOccluder> OwnWalls(ProductionSurfaceSubmission surface,
         IReadOnlyList<LightingOccluder> blockers)
     {
         ArgumentNullException.ThrowIfNull(surface);
         ArgumentNullException.ThrowIfNull(blockers);
-        if (surface.CasterId is null) return null;
-        LightingOccluder[] matches = blockers.Where(b =>
-            string.Equals(b.Id, surface.CasterId, StringComparison.Ordinal)).ToArray();
-        if (matches.Length != 1 || matches[0].LayerId != surface.LayerId ||
-            matches[0].Vertices.Length != 4)
-            throw new InvalidOperationException(
-                "GPU casting artwork must have exactly one matching four-vertex LDtk hull on its render layer.");
-        return matches[0];
+        if (surface.CasterId is null) return Array.Empty<LightingOccluder>();
+        var matches = blockers.Where(b => b.Owner == surface.CasterId).ToArray();
+        if (matches.Length == 0 || matches.Any(b => b.LayerId != surface.LayerId || b.Vertices is null ||
+                b.Vertices.Length is < 3 or > LightingOccluder.MaxVertices) ||
+            matches.Select(b => b.Id).Distinct(StringComparer.Ordinal).Count() != matches.Length ||
+            matches.Sum(b => b.Vertices.Length) > MaxOwnerEdges)
+            throw new InvalidOperationException($"Artwork '{surface.InstanceId}' has missing, duplicate, wrong-layer or over-budget shadow contours.");
+        return matches;
     }
+
+    // Compatibility for callers that specifically expect a single contour.
+    public static LightingOccluder? OwnWall(ProductionSurfaceSubmission surface,
+        IReadOnlyList<LightingOccluder> blockers) => OwnWalls(surface, blockers).SingleOrDefault();
+
+    public static bool BehindAny(ProductionSurfaceSubmission surface, RadialLight light,
+        IReadOnlyList<LightingOccluder> walls) => walls.Any(w => Behind(surface, light, w));
 
     public static bool Behind(ProductionSurfaceSubmission surface,
         RadialLight light, LightingOccluder? ownWall)
@@ -34,7 +43,8 @@ public static class ProductionWallLightRouting
         if (ownWall is null) return false; // Ordinary material panels are not walls.
         if (light.VirtualZ < surface.MaterialDepthZ - 1e-7) return true;
         return Math.Abs(light.VirtualZ - surface.MaterialDepthZ) <= 1e-7 &&
-            surface.BackRimOnOverlap && ShadowGeometry.Contains(ownWall, light.Position);
+            surface.BackRimOnOverlap && light.Shape != LightShape.Directional &&
+            ShadowGeometry.Contains(ownWall, light.Position);
     }
 
     public static IReadOnlyList<LightingOccluder> OtherBlockers(
@@ -45,7 +55,7 @@ public static class ProductionWallLightRouting
         ArgumentNullException.ThrowIfNull(light);
         ArgumentNullException.ThrowIfNull(blockers);
         if (!light.CastShadows) return Array.Empty<LightingOccluder>();
-        return blockers.Where(b => b.Id != surface.CasterId &&
+        return blockers.Where(b => b.Owner != surface.CasterId &&
             LightLayerRouting.Occludes(light, b)).ToArray();
     }
 

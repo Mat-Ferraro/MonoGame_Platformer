@@ -222,6 +222,10 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                         if (lighting is not null &&
                             lighting.SurfaceCenters.TryGetValue(art.InstanceId, out LightPoint center))
                             submission = submission with { Center = center };
+                        // Capture the actual artwork opacity in the production contract.
+                        // The draw callback already applies it to the source alpha.
+                        // This remains independent of CastsShadows.
+                        submission = submission with { VisualOpacity = art.Opacity };
                         submission.Validate();
                         Action<SpriteBatch> albedo = sb => DrawArtwork(sb, art,
                             cameraX, cameraY, view, Color.White, null);

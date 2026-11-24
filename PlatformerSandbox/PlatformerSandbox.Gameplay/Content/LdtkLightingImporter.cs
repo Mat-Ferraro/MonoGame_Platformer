@@ -109,10 +109,17 @@ public static class LdtkLightingImporter
                     {
                         Id = iid,
                         Owner = "level",
+                        Tag = OptionalLightTag(fields),
                         Position = new LightPoint(e.Bounds.Center.X, e.Bounds.Center.Y),
                         Color = ReadColor(fields, "Color", new LightRgb(1, .75, .5)),
                         Radius = Number(fields, "RadiusWorld", 5, .1, 60),
                         Intensity = Number(fields, "Intensity", 1.4, 0, 4),
+                        Shape = LightShapeKind(fields),
+                        Direction = LightShapeDirection(fields),
+                        ConeAngleDegrees = Number(fields, "ConeAngleDegrees", 55, 5, 170),
+                        ConeSoftness = Number(fields, "ConeSoftness", .15, 0, .95),
+                        TubeLength = Number(fields, "TubeLengthWorld", 3, .1, 40),
+                        DirectionalShadowLength = Number(fields, "ShadowLengthWorld", 6, .25, 30),
                         Priority = (int)Number(fields, "Priority", 1, -100, 100),
                         CastShadows = Bool(fields, "CastShadows", true),
                         VirtualZ = Number(fields, "LightDepthZ", 0, -100, 100),
@@ -133,7 +140,14 @@ public static class LdtkLightingImporter
                     LdtkAuthoredEntity e = new(entity, width, height);
                     string blockerLayer = LayerId(fields, sceneLayers,
                         RenderLayerGroup.Gameplay);
-                    occluders.Add(FromBounds(iid, e.Bounds.Left, e.Bounds.Bottom,
+                    if (Text(fields, "ShadowShape", "Rectangle") != "Rectangle")
+                    {
+                        var hulls = FromArtworkBounds(entity, fields, width, height, iid, blockerLayer);
+                        if (occluders.Count + hulls.Count > 96)
+                            throw new ArgumentException("Too many lighting blocker contours.");
+                        occluders.AddRange(hulls);
+                    }
+                    else occluders.Add(FromBounds(iid, e.Bounds.Left, e.Bounds.Bottom,
                         e.Bounds.Right, e.Bounds.Top, blockerLayer));
                     var motion = ReadOccluderMotion(fields,
                         new LightPoint(e.Bounds.Center.X, e.Bounds.Center.Y));
@@ -195,10 +209,10 @@ public static class LdtkLightingImporter
                         if (!options.CastsShadows)
                             throw new ArgumentException("Animated TerrainArtwork must cast shadows.");
                         // The current production tangent-space maps are not rotated with the sprite.
-                        if (options.MaterialShading is ProductionSurfaceShading.Normal or
-                            ProductionSurfaceShading.Rim or ProductionSurfaceShading.Hybrid)
+                        if (blockerMotion.Rotation != PresentationOccluderRotationMode.Static &&
+                            (options.NormalMap is not null || options.EdgeMap is not null))
                             throw new NotSupportedException(
-                                "Animated mapped artwork requires transformed tangent maps; use Legacy or Flat.");
+                                "Rotating mapped artwork requires transformed tangent maps; use an unmapped material.");
                         occluderMotions.Add(iid, blockerMotion);
                     }
                     surfaces.Add(iid, options);
@@ -214,8 +228,10 @@ public static class LdtkLightingImporter
                     {
                         if (occluders.Count >= 96)
                             throw new ArgumentException("Too many lighting blockers (including sprite geometry).");
-                        var hull = FromArtworkBounds(entity, fields, width, height, iid, options.LayerId);
-                        occluders.Add(hull);
+                        var hulls = FromArtworkBounds(entity, fields, width, height, iid, options.LayerId);
+                        if (occluders.Count + hulls.Count > 96)
+                            throw new ArgumentException("Too many lighting blocker contours.");
+                        occluders.AddRange(hulls);
                     }
                 }
             }
@@ -226,6 +242,36 @@ public static class LdtkLightingImporter
             new ReadOnlyDictionary<string, LightPoint>(centers), sceneLayers,
             new ReadOnlyDictionary<string, PresentationLightMotion>(lightMotions),
             new ReadOnlyDictionary<string, PresentationOccluderMotion>(occluderMotions));
+    }
+
+    private static string OptionalLightTag(Dictionary<string, JsonElement> fields)
+    {
+        if (!fields.TryGetValue("LightRole", out var raw) || raw.ValueKind == JsonValueKind.Null)
+            return "";
+        if (raw.ValueKind != JsonValueKind.String)
+            throw new ArgumentException("LightRole must be a string.");
+        string tag = raw.GetString() ?? "";
+        if (tag.Length > 32 || tag.Any(c => !(char.IsAsciiLetterOrDigit(c) || c == '_')))
+            throw new ArgumentException("LightRole is an invalid lighting tag.");
+        return tag;
+    }
+
+    private static LightShape LightShapeKind(Dictionary<string, JsonElement> fields)
+    {
+        if (!fields.TryGetValue("LightType", out var raw) || raw.ValueKind == JsonValueKind.Null)
+            return LightShape.Point;
+        if (raw.ValueKind != JsonValueKind.String ||
+            !Enum.TryParse<LightShape>(raw.GetString(), false, out var kind) ||
+            !Enum.IsDefined(kind))
+            throw new ArgumentException("LightType must be Point, Directional, Spot or Tube.");
+        return kind;
+    }
+
+    private static LightPoint LightShapeDirection(Dictionary<string, JsonElement> fields)
+    {
+        double degrees = Number(fields, "DirectionDegrees", -33, -360, 360);
+        double radians = degrees * Math.PI / 180;
+        return new LightPoint(Math.Cos(radians), Math.Sin(radians));
     }
 
     private static ProductionSurfaceShading MaterialMode(Dictionary<string, JsonElement> fields)
@@ -414,7 +460,7 @@ public static class LdtkLightingImporter
             new LightPoint(r, t), new LightPoint(l, t)]
     };
 
-    private static LightingOccluder FromArtworkBounds(JsonElement raw,
+    private static IReadOnlyList<LightingOccluder> FromArtworkBounds(JsonElement raw,
         Dictionary<string, JsonElement> fields, int levelWidth, int levelHeight, string id, string layerId)
     {
         double x = raw.GetProperty("px")[0].GetDouble();
@@ -434,14 +480,28 @@ public static class LdtkLightingImporter
             throw new ArgumentException("Invalid authored shadow caster sprite dimensions or inset.");
         double a = degrees * Math.PI / 180;
         double co = Math.Cos(a), si = Math.Sin(a);
+        bool flipX = Bool(fields, "FlipX", false), flipY = Bool(fields, "FlipY", false);
         LightPoint Transform(double ux, double uy)
         {
+            if (flipX) ux = w - ux;
+            if (flipY) uy = h - uy;
             double dx = ux - px * w, dy = uy - py * h;
             double sx = x + dx * co - dy * si;
             double sy = y + dx * si + dy * co;
             return new LightPoint(sx * UnitsPerPixel, (levelHeight - sy) * UnitsPerPixel);
         }
         string shape = Text(fields, "ShadowShape", "Rectangle");
+        if (shape == "Custom")
+        {
+            if (shadowInset != 0) throw new ArgumentException("Custom vertices already define the hull; set ShadowHullInsetPx to 0.");
+            var contours = ShadowContourAuthoring.Parse(Text(fields, "ShadowVertices", ""));
+            return contours.Select((points, index) => new LightingOccluder
+            {
+                Id = index == 0 ? id : id + ":contour:" + index,
+                OwnerId = id, LayerId = layerId,
+                Vertices = points.Select(p => Transform(p.X * w, p.Y * h)).ToArray()
+            }).ToArray();
+        }
         LightPoint[] vertices = shape switch
         {
             "Rectangle" => [Transform(shadowInset, shadowInset),
@@ -455,8 +515,16 @@ public static class LdtkLightingImporter
                 Transform(shadowInset, h - shadowInset),
                 Transform(w - shadowInset, h - shadowInset),
                 Transform(w * .78, shadowInset)],
-            _ => throw new ArgumentException("ShadowShape must be Rectangle, Triangle, or Trapezoid.")
+            // A five-point house/obelisk silhouette (tip, shoulders, and base).
+            // LDtk imagery may remain independently alpha-blended.
+            "Pentagon" => [Transform(w * .5, shadowInset),
+                Transform(w - shadowInset, h * .28),
+                Transform(w - shadowInset, h - shadowInset),
+                Transform(shadowInset, h - shadowInset),
+                Transform(shadowInset, h * .28)],
+            _ => throw new ArgumentException(
+                "ShadowShape must be Rectangle, Triangle, Trapezoid, Pentagon, or Custom.")
         };
-        return new LightingOccluder { Id = id, LayerId = layerId, Vertices = vertices };
+        return new[] { new LightingOccluder { Id = id, LayerId = layerId, Vertices = vertices } };
     }
 }

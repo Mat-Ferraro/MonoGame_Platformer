@@ -33,6 +33,8 @@ public sealed record ProductionSurfaceSubmission
     public LightRgb EmissionColor { get; init; } = LightRgb.White;
     public double EmissionIntensity { get; init; }
     public string? EmissionMap { get; init; }
+    /// <summary>Authored artwork alpha multiplier, independent of shadow-casting.</summary>
+    public double VisualOpacity { get; init; } = 1;
 
     public static ProductionSurfaceSubmission From(string instanceId, LightingSurfaceOptions options)
     {
@@ -76,6 +78,8 @@ public sealed record ProductionSurfaceSubmission
         ValidateMap(NormalMap);
         ValidateMap(EdgeMap);
         ValidateMap(EmissionMap);
+        if (!double.IsFinite(VisualOpacity) || VisualOpacity is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(VisualOpacity));
         EmissionColor.Validate(nameof(EmissionColor));
         if (!double.IsFinite(EmissionIntensity) || EmissionIntensity is < 0 or > 8)
             throw new ArgumentOutOfRangeException(nameof(EmissionIntensity));

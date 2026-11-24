@@ -11,7 +11,9 @@ namespace PlatformerSandbox.Lighting;
 internal enum LightingToolAction
 {
     None, TogglePanel, ToggleToolsPage, ToggleHdr, ToggleEmission, ToggleBloom,
-    CycleExposure, CycleBloomThreshold, CycleBloomStrength,
+    CycleExposure, CycleBloomThreshold, CycleBloomStrength, CycleMaterialValidationPreset,
+    CycleShowcaseFocus, ToggleShowcaseWorldLights,
+    CycleLightTypeFilter, CycleBloomScatter, ToggleBloomOnly,
     ToggleLights, NextPreset, NextQuality, ToggleMaterialLights, CycleShadowEdges, ToggleShadowFilter, ToggleShadowQualityPolicy,
     SelectShadowLight, CycleShadowEmitter, ToggleReducedFlashes,
     ToggleStress, ToggleWallMotion, ToggleInspectionLight, CycleHud, ToggleCollision, ToggleBackdrop,
@@ -35,6 +37,8 @@ internal sealed class LightingToolsPanel
         LightingToolAction.CycleExposure,
         LightingToolAction.CycleBloomThreshold,
         LightingToolAction.CycleBloomStrength,
+        LightingToolAction.CycleBloomScatter,
+        LightingToolAction.ToggleBloomOnly,
         LightingToolAction.CycleShadowEdges,
         LightingToolAction.ToggleShadowFilter,
         LightingToolAction.ToggleShadowQualityPolicy,
@@ -57,10 +61,45 @@ internal sealed class LightingToolsPanel
         LightingToolAction.ExportReport
     ];
 
-    private bool _systemPage;
-    private LightingToolAction[] Actions => _systemPage ? _systemActions : _lightingActions;
+    private readonly LightingToolAction[] _materialActions =
+    [
+        LightingToolAction.ToggleToolsPage,
+        LightingToolAction.CycleMaterialValidationPreset,
+        LightingToolAction.CycleShowcaseFocus,
+        LightingToolAction.ToggleShowcaseWorldLights,
+        LightingToolAction.ToggleMaterialLights,
+        LightingToolAction.ToggleHdr,
+        LightingToolAction.ToggleEmission,
+        LightingToolAction.ToggleBloom,
+        LightingToolAction.CycleExposure,
+        LightingToolAction.CycleBloomThreshold,
+        LightingToolAction.CycleBloomStrength
+    ];
+    private readonly LightingToolAction[] _lightTypeActions =
+    [
+        LightingToolAction.ToggleToolsPage,
+        LightingToolAction.CycleLightTypeFilter,
+        LightingToolAction.ToggleShowcaseWorldLights,
+        LightingToolAction.ToggleHdr,
+        LightingToolAction.ToggleEmission,
+        LightingToolAction.ToggleBloom,
+        LightingToolAction.ToggleBloomOnly,
+        LightingToolAction.CycleBloomScatter,
+        LightingToolAction.CycleBloomThreshold,
+        LightingToolAction.CycleBloomStrength,
+        LightingToolAction.CycleExposure,
+        LightingToolAction.NextQuality
+    ];
+    private int _pageIndex; // 0 Lighting, 1 Materials, 2 Light Types, 3 System
+    private LightingToolAction[] Actions => _pageIndex switch
+    {
+        1 => _materialActions,
+        2 => _lightTypeActions,
+        3 => _systemActions,
+        _ => _lightingActions
+    };
     public bool Open { get; private set; }
-    public void Close() { Open = false; _systemPage = false; }
+    public void Close() { Open = false; _pageIndex = 0; }
 
     private static Rectangle Trigger(int width) => new(Math.Max(8, width - 166), 8, 154, 28);
     private int RowHeight(int height) => Math.Clamp((height - 174) / Actions.Length, 19, 30);
@@ -90,21 +129,23 @@ internal sealed class LightingToolsPanel
             if (Row(panel, i, height).Contains(x, y))
             {
                 LightingToolAction action = Actions[i];
-                if (action == LightingToolAction.ToggleToolsPage) _systemPage = !_systemPage;
+                if (action == LightingToolAction.ToggleToolsPage) _pageIndex = (_pageIndex + 1) % 4;
                 return action;
             }
         return LightingToolAction.None;
     }
 
     public void Draw(SpriteBatch batch, Texture2D pixel, int width, int height,
-        bool lights, string preset, string quality, string materialLights,
+        bool lights, bool worldLights, string preset, string quality, string materialLights,
         bool hdr, bool hdrSupported, bool emission, bool bloom,
         string exposure, string bloomThreshold, string bloomStrength,
         string shadowEdge,
         string shadowFilter, string shadowQualityPolicy, string shadowLight, string shadowEmitter,
         bool reducedFlashes,
         bool stress, bool wallMotion, bool inspectionLight, string hud, bool collision, bool backdrop,
-        bool mute, int masterVolume, IReadOnlyList<string> lightStatuses)
+        bool mute, int masterVolume, IReadOnlyList<string> lightStatuses,
+        string materialDemoPreset, string showcaseFocus, IReadOnlyList<string> showcaseNotes,
+        string lightTypeFilter, string bloomScatter, bool bloomOnly, IReadOnlyList<string> typeNotes)
     {
         Rectangle trigger = Trigger(width);
         batch.Draw(pixel, trigger, new Color(35, 87, 83));
@@ -115,10 +156,12 @@ internal sealed class LightingToolsPanel
         batch.Draw(pixel, panel, new Color(16, 26, 39) * .98f);
         batch.Draw(pixel, new Rectangle(panel.X, panel.Y, 3, panel.Height), new Color(94, 220, 178));
         GymDebugText.Draw(batch, pixel, panel.X + 11, panel.Y + 10,
-            _systemPage ? "SYSTEM / DIAGNOSTICS" : "LIGHTING / POST FX",
+            _pageIndex == 3 ? "SYSTEM / DIAGNOSTICS" :
+                _pageIndex == 2 ? "LIGHT TYPES / L20" :
+                _pageIndex == 1 ? "MATERIAL SHOWCASE" : "LIGHTING / POST FX",
             new Color(107, 223, 188), 1);
 
-        string[] labels = _systemPage ?
+        string[] labels = _pageIndex == 3 ?
         [
             "PAGE: SYSTEM  (CLICK FOR LIGHTING)",
             "REDUCE FLASH: " + (reducedFlashes ? "ON" : "OFF"),
@@ -132,9 +175,36 @@ internal sealed class LightingToolsPanel
             "VOLUME DOWN (" + masterVolume + " PCT)",
             "VOLUME UP (" + masterVolume + " PCT)",
             "EXPORT CRASH REPORT ZIP"
+        ] : _pageIndex == 1 ?
+        [
+            "PAGE: MATERIALS  (CLICK FOR LIGHT TYPES)",
+            "MATERIAL PRESET: " + materialDemoPreset,
+            "SHOWCASE FOCUS: " + showcaseFocus,
+            "WORLD LIGHTS: " + (worldLights ? "ON" : "OFF"),
+            "MATERIAL LIGHTS: " + materialLights,
+            "HDR: " + (hdr ? (hdrSupported ? "ON FLOAT16" : "REQUESTED / FALLBACK") : "OFF"),
+            "EMISSION: " + (emission ? "ON" : "OFF"),
+            "BLOOM: " + (bloom ? "ON" : "OFF"),
+            "EXPOSURE: " + exposure,
+            "BLOOM THRESHOLD: " + bloomThreshold,
+            "BLOOM GAIN: " + bloomStrength
+        ] : _pageIndex == 2 ?
+        [
+            "PAGE: LIGHT TYPES  (CLICK FOR SYSTEM)",
+            "LIGHT FILTER: " + lightTypeFilter,
+            "WORLD LIGHTS: " + (worldLights ? "ON" : "OFF"),
+            "HDR: " + (hdr ? (hdrSupported ? "ON FLOAT16" : "FALLBACK") : "OFF"),
+            "EMISSION: " + (emission ? "ON" : "OFF"),
+            "BLOOM: " + (bloom ? "ON" : "OFF"),
+            "BLOOM VIEW: " + (bloomOnly ? "BLOOM ONLY" : "FINAL COMPOSITE"),
+            "BLOOM SCATTER: " + bloomScatter,
+            "BLOOM THRESHOLD: " + bloomThreshold,
+            "BLOOM GAIN: " + bloomStrength,
+            "EXPOSURE: " + exposure,
+            "QUALITY: " + quality
         ] :
         [
-            "PAGE: LIGHTING  (CLICK FOR SYSTEM)",
+            "PAGE: LIGHTING  (CLICK FOR MATERIALS)",
             "LIGHTING: " + (lights ? "ON" : "OFF"),
             "LOOK: " + preset,
             "QUALITY: " + quality,
@@ -145,6 +215,8 @@ internal sealed class LightingToolsPanel
             "EXPOSURE: " + exposure,
             "BLOOM THRESHOLD: " + bloomThreshold,
             "BLOOM GAIN: " + bloomStrength,
+            "BLOOM SCATTER: " + bloomScatter,
+            "BLOOM VIEW: " + (bloomOnly ? "BLOOM ONLY" : "FINAL COMPOSITE"),
             "SHADOW EDGE: " + shadowEdge,
             "SHADOW FILTER: " + shadowFilter,
             "SHADOW QUALITY: " + shadowQualityPolicy,
@@ -160,10 +232,13 @@ internal sealed class LightingToolsPanel
                 labels[i], new Color(221, 231, 234), 1);
         }
         int statusY = Math.Min(panel.Bottom - 69, panel.Y + 45 + Actions.Length * RowHeight(height));
+        IReadOnlyList<string> footerLines = _pageIndex == 1 ? showcaseNotes :
+            _pageIndex == 2 ? typeNotes : lightStatuses;
         GymDebugText.Draw(batch, pixel, panel.X + 12, statusY,
-            "AUTHORED LIGHT STATUS", new Color(114, 223, 178), 1);
-        for (int i = 0; i < Math.Min(lightStatuses.Count, 4); i++)
+            _pageIndex == 1 || _pageIndex == 2 ? "WHAT TO LOOK FOR" : "AUTHORED LIGHT STATUS",
+            new Color(114, 223, 178), 1);
+        for (int i = 0; i < Math.Min(footerLines.Count, 4); i++)
             GymDebugText.Draw(batch, pixel, panel.X + 12, statusY + 13 * (i + 1),
-                lightStatuses[i], new Color(196, 211, 231), 1);
+                footerLines[i], new Color(196, 211, 231), 1);
     }
 }

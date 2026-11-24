@@ -76,6 +76,8 @@ public sealed class GameLevelSelectionTests
         [
             GameLevelIds.LdtkConnectedA,
             GameLevelMenuCatalog.LightingIntegrationTest,
+            GameLevelIds.MaterialShowcaseTest,
+            GameLevelIds.LightTypesLab,
             GameLevelIds.LightingBasics,
             GameLevelIds.MovementGym
         ];

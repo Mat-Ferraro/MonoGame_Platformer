@@ -203,13 +203,14 @@ public sealed class GameplayLightingPresenter
         foreach (var entry in _scene.SurfaceCenters)
             centers.Add(entry.Key, entry.Value);
         int dynamic = 0;
+        var updatedCenters = new HashSet<string>(StringComparer.Ordinal);
         foreach (LightingOccluder hull in _scene.Occluders)
         {
-            if (_scene.OccluderMotions.TryGetValue(hull.Id, out var motion))
+            if (_scene.OccluderMotions.TryGetValue(hull.Owner, out var motion))
             {
                 current.Add(motion.Apply(hull, _occluderAnimationClock));
-                if (centers.TryGetValue(hull.Id, out LightPoint center))
-                    centers[hull.Id] = motion.At(_occluderAnimationClock).Transform(center, motion.Anchor);
+                if (updatedCenters.Add(hull.Owner) && centers.TryGetValue(hull.Owner, out LightPoint center))
+                    centers[hull.Owner] = motion.At(_occluderAnimationClock).Transform(center, motion.Anchor);
                 dynamic++;
             }
             else current.Add(hull);

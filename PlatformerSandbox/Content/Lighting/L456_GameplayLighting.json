@@ -110,6 +110,21 @@
         "FG4": 0.28,
         "FG5": 0.23
       }
+    },
+    {
+      "id": "LightTypesNeutral",
+      "ambient": {
+        "r": 0.23,
+        "g": 0.25,
+        "b": 0.29
+      },
+      "lightMultiplier": 1.0,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0,
+      "posterize": false,
+      "heroMinimumBrightness": 0.25,
+      "lightExposure": 1
     }
   ],
   "particleLights": [
@@ -183,6 +198,15 @@
       "presetIds": [
         "FlatDramatic",
         "FlatReadable"
+      ]
+    },
+    {
+      "sceneId": "LIGHT_TYPES_LAB",
+      "defaultPreset": "LightTypesNeutral",
+      "presetIds": [
+        "LightTypesNeutral",
+        "Illustrated",
+        "Moonlit"
       ]
     }
   ]

@@ -74,6 +74,7 @@ public class Builder : ContentBuilder
 
         // L-BASIC Stage 5: normal maps and directional rim lighting in the lab.
         content.Include("Effects/L_BASIC_SurfaceLighting.fx");
+        content.Include("Effects/L20_PolygonRim.fx");
 
         return content;
     }

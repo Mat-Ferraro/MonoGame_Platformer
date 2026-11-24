@@ -33,6 +33,9 @@ public readonly record struct LightRgb(double R, double G, double B)
     public static LightRgb operator *(LightRgb a, double scale) => new(a.R * scale, a.G * scale, a.B * scale);
 }
 
+/// <summary>Authorable 2D light shape. Point preserves the existing radial behavior.</summary>
+public enum LightShape { Point, Directional, Spot, Tube }
+
 [Flags]
 public enum LightChannel { None = 0, Backdrop = 1, Terrain = 2, Hero = 4, Effects = 8, All = 15 }
 
@@ -44,6 +47,20 @@ public sealed record RadialLight
     public LightRgb Color { get; init; } = LightRgb.White;
     public double Radius { get; init; } = 3.0;
     public double Intensity { get; init; } = 1.0;
+    /// <summary>Direction in world Y-up space: direction of incoming light for sun,
+    /// forward beam axis for spots and long axis for tube lights.</summary>
+    public LightShape Shape { get; init; } = LightShape.Point;
+    public LightPoint Direction { get; init; } = new(1, -0.65);
+    /// <summary>Full apex angle in degrees; spot only.</summary>
+    public double ConeAngleDegrees { get; init; } = 55;
+    /// <summary>Fraction of the half-angle reserved for the soft spotlight edge.</summary>
+    public double ConeSoftness { get; init; } = 0.15;
+    /// <summary>Full tube length in world units; tube only. Shadows use midpoint approximation.</summary>
+    public double TubeLength { get; init; } = 3;
+    /// <summary>How far a directional caster projects its 2D silhouette, in world
+    /// units. This is a finite artistic control, not the local light radius.
+    /// Point/spot/tube lighting ignores this property.</summary>
+    public double DirectionalShadowLength { get; init; } = 6;
     public bool CastShadows { get; init; }
     /// <summary>Optional authored virtual depth for GPU wall lighting. 0 is the legacy plane.
     /// This is NOT LDtk draw-order or the name of a render layer.</summary>
@@ -55,6 +72,9 @@ public sealed record RadialLight
     public int Priority { get; init; } = 0;
     public LightChannel Channels { get; init; } = LightChannel.All;
     public string Owner { get; init; } = "scene";
+    /// <summary>Optional art/test designation (SUN, MOON, POINT, SPOT, TUBE).
+    /// Never changes physics or collision and remains empty in legacy scenes.</summary>
+    public string Tag { get; init; } = "";
     /// <summary>Explicit scene-layer illumination targets. Null uses legacy channels.</summary>
     public IReadOnlyList<string>? AffectsLayers { get; init; }
     /// <summary>Independent list of depth planes whose blockers can shadow this light.</summary>
@@ -63,9 +83,17 @@ public sealed record RadialLight
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(Id) || Id.Length > 80 ||
-            string.IsNullOrWhiteSpace(Owner) || Owner.Length > 80)
+            string.IsNullOrWhiteSpace(Owner) || Owner.Length > 80 || Tag is null || Tag.Length > 32)
             throw new ArgumentException("Light ID and owner must be nonempty (at most 80 characters).");
         Position.Validate();
+        Direction.Validate();
+        if (!Enum.IsDefined(Shape) ||
+            (Direction.X * Direction.X + Direction.Y * Direction.Y) < 0.000001 ||
+            !double.IsFinite(ConeAngleDegrees) || ConeAngleDegrees is < 5 or > 170 ||
+            !double.IsFinite(ConeSoftness) || ConeSoftness is < 0 or > 0.95 ||
+            !double.IsFinite(TubeLength) || TubeLength is < 0.1 or > 40 ||
+            !double.IsFinite(DirectionalShadowLength) || DirectionalShadowLength is < 0.25 or > 30)
+            throw new ArgumentOutOfRangeException(nameof(Shape), "Invalid bounded light shape parameters.");
         if (!double.IsFinite(VirtualZ) || VirtualZ is < -100 or > 100)
             throw new ArgumentOutOfRangeException(nameof(VirtualZ));
         Color.Validate(nameof(Color));
@@ -111,8 +139,9 @@ public readonly record struct LightingViewport(int Width, int Height, LightPoint
     public bool InfluencesViewport(RadialLight light)
     {
         Validate(); light.Validate();
+        if (light.Shape == LightShape.Directional) return true; // no local radius
         LightPoint c = Project(light.Position);
-        double r = light.Radius * PixelsPerUnit;
+        double r = (light.Radius + (light.Shape == LightShape.Tube ? light.TubeLength * .5 : 0)) * PixelsPerUnit;
         return c.X + r >= 0 && c.X - r <= Width &&
             c.Y + r >= 0 && c.Y - r <= Height;
     }
@@ -124,13 +153,33 @@ public static class RadialLighting
     public static double Attenuation(RadialLight light, LightPoint sample)
     {
         light.Validate(); sample.Validate();
+        if (light.Intensity <= 0) return 0;
+        if (light.Shape == LightShape.Directional) return light.Intensity;
         double dx = sample.X - light.Position.X;
         double dy = sample.Y - light.Position.Y;
-        // Avoid unnecessary overflow on huge but finite cosmetic coordinates.
+        double magnitude = Math.Sqrt(light.Direction.X * light.Direction.X + light.Direction.Y * light.Direction.Y);
+        double dirX = light.Direction.X / magnitude, dirY = light.Direction.Y / magnitude;
+        if (light.Shape == LightShape.Tube)
+        {
+            // Uniform capsule-shaped emitter; shadows approximate its midpoint.
+            double projection = Math.Clamp(dx * dirX + dy * dirY,
+                -light.TubeLength * .5, light.TubeLength * .5);
+            dx -= dirX * projection;
+            dy -= dirY * projection;
+        }
         double d = Math.Sqrt(dx * dx + dy * dy);
         if (!double.IsFinite(d) || d >= light.Radius) return 0;
         double t = 1 - d / light.Radius;
-        return t * t * light.Intensity;
+        double angular = 1;
+        if (light.Shape == LightShape.Spot && d > 0.00001)
+        {
+            double dot = (dx * dirX + dy * dirY) / d;
+            double outer = Math.Cos(light.ConeAngleDegrees * Math.PI / 360);
+            double inner = Math.Cos(light.ConeAngleDegrees * (1 - light.ConeSoftness) * Math.PI / 360);
+            angular = Math.Clamp((dot - outer) / Math.Max(0.00001, inner - outer), 0, 1);
+            angular = angular * angular * (3 - 2 * angular);
+        }
+        return t * t * light.Intensity * angular;
     }
 }
 

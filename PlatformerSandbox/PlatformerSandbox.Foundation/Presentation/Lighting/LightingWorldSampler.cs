@@ -70,8 +70,27 @@ public static class LightingWorldSampler
         // forward receiver. It cannot receive the blackness of its own blocker.
         foreach (LightingOccluder blocker in blockers)
         {
-            if (blocker.Id == ownId || !LightLayerRouting.Occludes(light, blocker)) continue;
-            if (ShadowGeometry.IsOccluded(light.Position, point, new[] { blocker }))
+            if (blocker.Owner == ownId || !LightLayerRouting.Occludes(light, blocker)) continue;
+            // A finite directional shadow must not darken the hero for the
+            // whole level. Match the GPU world's authored projection reach.
+            double directionLength = Math.Sqrt(light.Direction.X * light.Direction.X +
+                light.Direction.Y * light.Direction.Y);
+            LightPoint rayOrigin = light.Shape == LightShape.Directional
+                ? new LightPoint(
+                    point.X - light.Direction.X / directionLength * light.DirectionalShadowLength,
+                    point.Y - light.Direction.Y / directionLength * light.DirectionalShadowLength)
+                : light.Position;
+            if (light.Shape == LightShape.Directional)
+            {
+                // GPU sweeps the closed polygon over the finite segment. Match
+                // that coverage, even when both ray endpoints lie inside it.
+                if (ShadowGeometry.Contains(blocker, point) || ShadowGeometry.Contains(blocker, rayOrigin))
+                    return true;
+                for (int i=0;i<blocker.Vertices.Length;i++)
+                    if (ShadowGeometry.EdgesTouchOrCross(rayOrigin, point,
+                        blocker.Vertices[i], blocker.Vertices[(i+1)%blocker.Vertices.Length])) return true;
+            }
+            else if (ShadowGeometry.IsOccluded(rayOrigin, point, new[] { blocker }))
                 return true;
         }
         return false;

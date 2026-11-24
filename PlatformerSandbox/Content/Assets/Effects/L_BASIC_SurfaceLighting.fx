@@ -151,6 +151,13 @@ float4 Light0PositionRadius;   // x, y, radius in pixels, virtual height in pixe
 float4 Light1PositionRadius;
 float4 Light0ColorIntensity;  // RGB and brightness (zero means disabled)
 float4 Light1ColorIntensity;
+// L20 light kind: 0 point, 1 directional, 2 spot, 3 tube.
+// shape = kind, directionScreen.x, directionScreen.y, cosOuter
+// extra = cosInner, tubeHalfLengthPx, reserved, reserved.
+float4 Light0Shape;
+float4 Light1Shape;
+float4 Light0ShapeExtra;
+float4 Light1ShapeExtra;
 
 // Stage 8: three bounded convex polygons (rectangle/triangle/trapezoid).
 // Two packed xy-pairs per shape; unused fourth vertex of triangle duplicates C.
@@ -264,20 +271,49 @@ float VisibilityForLight(float2 lightPosition, float2 receiverPosition,
     return result;
 }
 
+float L20ShapeAttenuation(float2 pixelPos, float4 positionRadius,
+    float4 shape, float4 extra, out float2 toLight)
+{
+    float kind = shape.x;
+    float2 direction = shape.yz;
+    float2 away = pixelPos - positionRadius.xy;
+    toLight = -away;
+    if (kind > 0.5 && kind < 1.5)
+    {
+        // Parallel, distance-independent sun/moon rays.
+        toLight = -direction * 100.0;
+        return 1.0;
+    }
+    if (kind > 2.5)
+    {
+        float projection = clamp(dot(away, direction), -extra.y, extra.y);
+        away -= projection * direction;
+        toLight = -away;
+    }
+    float distanceToLight = length(away);
+    float falloff = saturate(1.0 - distanceToLight / max(1.0, positionRadius.z));
+    float cone = 1.0;
+    if (kind > 1.5 && kind < 2.5 && distanceToLight > 0.0001)
+    {
+        float cosine = dot(away / distanceToLight, direction);
+        cone = smoothstep(shape.w, max(shape.w + 0.00001, extra.x), cosine);
+    }
+    return falloff * falloff * cone;
+}
+
 void EvaluateLight(float2 screenPosition, float3 normal, float2 edgeNormal,
     float edgeEligibility, float useNormals, float useRim,
     float4 positionRadius, float4 colorIntensity, float visibility,
+    float4 shape, float4 extra,
     out float3 diffuseEnergy, out float3 rimEnergy)
 {
-    float2 toLight = positionRadius.xy - screenPosition;
-    float radius = max(1.0, positionRadius.z);
-    float distanceToLight = length(toLight);
-    float falloff = saturate(1.0 - distanceToLight / radius);
-    float3 energy = colorIntensity.rgb * (colorIntensity.a * falloff * falloff * visibility);
+    float2 toLight;
+    float falloff = L20ShapeAttenuation(screenPosition, positionRadius, shape, extra, toLight);
+    float3 energy = colorIntensity.rgb * (colorIntensity.a * falloff * visibility);
     float3 unitLight = normalize(float3(toLight, max(1.0, positionRadius.w)));
     float directional = lerp(1.0, saturate(dot(normal, unitLight)), useNormals * NormalStrength);
     diffuseEnergy = energy * directional;
-    float2 planarDirection = toLight / max(0.0001, distanceToLight);
+    float2 planarDirection = toLight / max(0.0001, length(toLight));
     float facing = saturate(dot(edgeNormal, planarDirection));
     rimEnergy = energy * facing * edgeEligibility * RimStrength * useRim;
 }
@@ -399,9 +435,11 @@ float4 MainPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
     float useRim = ShadingMode > 1.5 ? 1.0 : 0.0;
     float3 diffuse0, rim0, diffuse1, rim1;
     EvaluateLight(pixelPos, n, e, edge.a, useNormal, useRim,
-        Light0PositionRadius, Light0ColorIntensity, visibility0, diffuse0, rim0);
+        Light0PositionRadius, Light0ColorIntensity, visibility0,
+        Light0Shape, Light0ShapeExtra, diffuse0, rim0);
     EvaluateLight(pixelPos, n, e, edge.a, useNormal, useRim,
-        Light1PositionRadius, Light1ColorIntensity, visibility1, diffuse1, rim1);
+        Light1PositionRadius, Light1ColorIntensity, visibility1,
+        Light1Shape, Light1ShapeExtra, diffuse1, rim1);
 
     // When a light is authored BEHIND this intersected wall, it cannot
     // illuminate the visible face. Other lights and ambient are unaffected.
@@ -533,3 +571,67 @@ technique L19BloomExtract { pass P0 { PixelShader = compile PS_SHADERMODEL L19Ex
 technique L19BloomBlur { pass P0 { PixelShader = compile PS_SHADERMODEL L19BlurPS(); } }
 technique L19BloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L19CompositePS(); } }
 technique L19SdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L19SdrCompositePS(); } }
+
+// L20A-C: common light-field shader for sun/moon, spot and tube lights.
+// Drawn before visibility multiplication and scene albedo; never affects the UI.
+float4 L20LightPositionRadius;
+float4 L20LightColorIntensity;
+float4 L20LightShape;
+float4 L20LightExtra;
+float4 L20LightFieldPS(float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float2 toLight;
+    float gain = L20ShapeAttenuation(uv * ViewportPixels,
+        L20LightPositionRadius, L20LightShape, L20LightExtra, toLight);
+    return float4(L20LightColorIntensity.rgb * L20LightColorIntensity.a * gain, 1);
+}
+technique L20LightField { pass P0 { PixelShader = compile PS_SHADERMODEL L20LightFieldPS(); } }
+
+// L20D: HDR multi-resolution bloom combines tightly focused highlights with
+// quarter- and eighth-scale scatter; no synthetic painted halo is involved.
+Texture2D L20BloomMidTexture;
+sampler2D L20BloomMidSampler = sampler_state
+{
+    Texture = <L20BloomMidTexture>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+Texture2D L20BloomWideTexture;
+sampler2D L20BloomWideSampler = sampler_state
+{
+    Texture = <L20BloomWideTexture>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float L20BloomScatter;
+float L20BloomOnly;
+float4 L20DownsamplePS(float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    return tex2D(L19SourceSampler, uv);
+}
+float3 L20BloomRgb(float2 uv)
+{
+    float s = saturate(L20BloomScatter);
+    float tight = 1.0 - 0.60 * s;
+    float mid = 0.25 + 0.25 * s;
+    float wide = 0.05 + 0.65 * s;
+    float norm = max(0.0001, tight + mid + wide);
+    return (tex2D(L19BloomSampler, uv).rgb * tight +
+        tex2D(L20BloomMidSampler, uv).rgb * mid +
+        tex2D(L20BloomWideSampler, uv).rgb * wide) / norm * L19BloomGain;
+}
+float4 L20HdrBloomPS(float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 glow = L20BloomRgb(uv);
+    float3 scene = L20BloomOnly > 0.5 ? 0.0 : tex2D(L19SourceSampler, uv).rgb;
+    return float4(L19Tone(scene + glow), 1);
+}
+float4 L20SdrBloomPS(float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float3 glow = L20BloomRgb(uv);
+    float3 scene = L20BloomOnly > 0.5 ? 0.0 : tex2D(L19SourceSampler, uv).rgb;
+    return float4(saturate(scene + glow), 1);
+}
+technique L20BloomDownsample { pass P0 { PixelShader = compile PS_SHADERMODEL L20DownsamplePS(); } }
+technique L20HdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L20HdrBloomPS(); } }
+technique L20SdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L20SdrBloomPS(); } }

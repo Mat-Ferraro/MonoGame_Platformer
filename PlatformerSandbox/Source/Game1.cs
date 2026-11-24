@@ -74,12 +74,18 @@ public sealed class Game1 : Game
     private LightingQuality _lightingQuality = LightingQuality.Balanced;
     private ProductionMaterialLightMode _materialLightMode = ProductionMaterialLightMode.AllEligible;
     // L19 presentation-only controls, deliberately independent for A/B tests.
+    // Phase 19B: mouse-driven, repeatable material comparison states.
+    private int _l19bMaterialPreset = -1; // -1 means manual/custom
+    private int _l19ShowcaseFocus;
     private bool _l19Hdr;
     private bool _l19Emission = true;
     private bool _l19Bloom;
     private float _l19Exposure = 1.15f;
     private float _l19BloomThreshold = 0.85f;
     private float _l19BloomStrength = 0.45f;
+    private float _l20BloomScatter = .65f;
+    private bool _l20BloomOnly;
+    private int _l20LightFilter; // 0 all, 1 sun, 2 moon, 3 point, 4 spot, 5 tube
     private ShadowEdgePreset _shadowEdgePreset = ShadowEdgePreset.Hard;
     private ShadowFilterMode _shadowFilterMode = ShadowFilterMode.UniformGaussian;
     private ShadowQualityPolicy _shadowQualityPolicy = ShadowQualityPolicy.Manual;
@@ -90,6 +96,8 @@ public sealed class Game1 : Game
     // Debug-only movable inspection light for the dedicated LDtk flat test.
     private bool _lightingInspectionLight;
     private bool _lightingEnabled = true;
+    // Phase 19D: world lights can be disabled without disabling HDR/emission/bloom.
+    private bool _l19dWorldLightsEnabled = true;
     private bool _lightingStress;
     private readonly LightingToolsPanel _lightingTools = new();
     private bool _previousUiMouseLeftDown;
@@ -366,7 +374,8 @@ public sealed class Game1 : Game
                 // Stage 15B: production and lab use the same material GPU shader.
                 // The effect remains owned by the host ContentManager.
                 _gameLighting = new GameplayLightingRenderer(GraphicsDevice,
-                    Content.Load<Effect>("Effects/L_BASIC_SurfaceLighting"));
+                    Content.Load<Effect>("Effects/L_BASIC_SurfaceLighting"),
+                    Content.Load<Effect>("Effects/L20_PolygonRim"));
                 _lightingEvents = new GameplayLightingPresenter();
                 ActivateLightingWorld();
             }
@@ -1350,11 +1359,22 @@ public sealed class Game1 : Game
                             ? null : layer => _particleVfx.DrawLayer(_spriteBatch, particleView, layer);
                         LightingArtPreset? art = lightingWorldActive
                             ? _lightingCatalog!.GetPreset(_lightingPresetId) : null;
-                        IReadOnlyList<RadialLight> lights = lightingWorldActive
+                        IReadOnlyList<RadialLight> lights = lightingWorldActive &&
+                            _l19dWorldLightsEnabled
                             ? _lightingEvents!.BuildVisible(
                                 GameplayLightingRenderer.View(camera), EnumerateParticleLights(),
                                 LightingStressCandidates(camera))
                             : Array.Empty<RadialLight>();
+                        if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab &&
+                            _l20LightFilter != 0)
+                        {
+                            string selectedTag = _l20LightFilter switch
+                            {
+                                1 => "SUN", 2 => "MOON", 3 => "POINT", 4 => "SPOT", _ => "TUBE"
+                            };
+                            lights = new List<RadialLight>(lights).FindAll(l =>
+                                string.Equals(l.Tag, selectedTag, StringComparison.Ordinal));
+                        }
                         if (lightingWorldActive)
                         {
                             _lastLightingView = GameplayLightingRenderer.View(camera);
@@ -1379,6 +1399,8 @@ public sealed class Game1 : Game
                             _gameLighting.PostExposure = _l19Exposure;
                             _gameLighting.BloomThreshold = _l19BloomThreshold;
                             _gameLighting.BloomStrength = _l19BloomStrength;
+                            _gameLighting.BloomScatter = _l20BloomScatter;
+                            _gameLighting.BloomOnly = _l20BloomOnly;
                             _gameLighting.ShadowEmitterOverrides = _shadowEmitterOverrides;
                             _gameLighting.BeginLayeredFrame(lights, shadowBudget);
                         }
@@ -1457,7 +1479,7 @@ public sealed class Game1 : Game
                         ? ShadowContactControls.QualityPreset(_lightingQuality) : _shadowEdgePreset;
                 _lightingTools.Draw(_spriteBatch, _pixel,
                     GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height,
-                    _lightingEnabled, _lightingPresetId, _lightingQuality.ToString(),
+                    _lightingEnabled, _l19dWorldLightsEnabled, _lightingPresetId, _lightingQuality.ToString(),
                     _materialLightMode == ProductionMaterialLightMode.AllEligible ? "ALL" :
                         _materialLightMode == ProductionMaterialLightMode.CompareTwo ?
                             "COMPARE 2" : "EMISSION ONLY",
@@ -1473,7 +1495,21 @@ public sealed class Game1 : Game
                     _debugHudMode.ToString(), _ldtkShowCollisionDebug,
                     _ldtkDrawCollisionBackdrop, _audio?.IsMuted ?? false,
                     _audio is null ? 0 : (int)Math.Round(_audio.Mixer.MasterVolume * 100),
-                    lightStatuses);
+                    lightStatuses,
+                    _l19bMaterialPreset switch
+                    {
+                        0 => "BASELINE",
+                        1 => "SELF EMISSION",
+                        2 => "BLOOM HERO",
+                        3 => "TRANSPARENCY",
+                        4 => "GHOST / OPACITY",
+                        5 => "HOLOGRAM / HDR",
+                        6 => "SHOWCASE BOOST",
+                        _ => "CUSTOM"
+                    },
+                    CurrentShowcaseFocusLabel(), CurrentShowcaseNotes(),
+                    CurrentLightTypeFilterLabel(), _l20BloomScatter.ToString("F2"),
+                    _l20BloomOnly, CurrentLightTypeNotes());
             }
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
@@ -1609,6 +1645,14 @@ public sealed class Game1 : Game
                     " BLOOM PIXELS " + _gameLighting.LastBloomPixels +
                     " POST CPU " + _gameLighting.LastPostProcessCpuMilliseconds.ToString("F2"),
                     new Color(241, 175, 223), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 12,
+                    Math.Max(4, GraphicsDevice.Viewport.Height - 368),
+                    "L20 LIGHTS: SUN/MOON " + _gameLighting.LastDirectionalLights +
+                    " SPOT " + _gameLighting.LastSpotLights +
+                    " TUBE " + _gameLighting.LastTubeLights +
+                    " SCATTER " + _l20BloomScatter.ToString("F2") +
+                    " BLOOM-ONLY " + (_l20BloomOnly ? "ON" : "OFF"),
+                    new Color(148, 236, 242), 1);
                 GymDebugText.Draw(_spriteBatch, _pixel, 12,
                     Math.Max(4, GraphicsDevice.Viewport.Height - 314),
                     "L17D CONTACT PROFILES " + _gameLighting.LastContactProfilesBuilt +
@@ -1766,6 +1810,32 @@ public sealed class Game1 : Game
         _ldtkConnectedLevel = connectedLdtk;
         _ldtkParticleZones = particleZones;
         _ldtkLighting = lighting;
+        // Phase 19D teaching lab: start with a visibly dramatic, curated look.
+        // Existing gameplay/integration levels retain the user's lighting state.
+        if (levelId == GameLevelIds.MaterialShowcaseTest)
+        {
+            _lightingQuality = LightingQuality.High;
+            ApplyMaterialShowcasePreset(6);
+            _lightingEnabled = true;
+        }
+        else if (levelId == GameLevelIds.LightTypesLab)
+        {
+            _lightingQuality = LightingQuality.High;
+            _lightingEnabled = true;
+            _l19dWorldLightsEnabled = true;
+            _l20LightFilter = 1; // Start with just the sun, not all sources.
+            _l19Hdr = true;
+            // Teach light distribution and cast-shadow geometry first; prevent
+            // emission from the bright fixtures contaminating the comparison.
+            _l19Emission = false;
+            _l19Bloom = false;
+            _l19Exposure = 0.85f;
+            _l19BloomStrength = .55f;
+            _l19BloomThreshold = 1.15f;
+            _l20BloomScatter = .55f;
+            _l20BloomOnly = false;
+        }
+        else _l19dWorldLightsEnabled = true;
         _ldtkActiveWindIds.Clear();
         _ldtkWindDirty = false;
         _lastLdtkInteraction = "NONE";
@@ -1992,12 +2062,191 @@ public sealed class Game1 : Game
         return result;
     }
 
+    private string CurrentLightTypeFilterLabel() => _l20LightFilter switch
+    {
+        0 => "ALL (STRESS)",
+        1 => "SUN / LONG SHADOWS",
+        2 => "MOON / COOL RAYS",
+        3 => "POINT / TORCH",
+        4 => "SPOT / SEARCHLIGHT",
+        5 => "TUBE / EXTENDED",
+        _ => "ALL"
+    };
+
+    private IReadOnlyList<string> CurrentLightTypeNotes() => _l20LightFilter switch
+    {
+        1 => ["SUN: parallel amber rays across the wall and the player.",
+              "EXPECT: long shadows projected down and to the right.",
+              "USE: daylight, outdoor scenes, time-of-day."],
+        2 => ["MOON: cool blue directional wash, different direction.",
+              "EXPECT: the entire scene is affected, not one circular pool.",
+              "USE: night scenes, silhouettes, atmospheric readability."],
+        3 => ["POINT: isolated local falloff and caster occlusion.",
+              "EXPECT: a circular patch and shadowed region behind the prop.",
+              "USE: torches, magic crystals, explosions."],
+        4 => ["SPOT: strongly directional cone and soft aperture.",
+              "EXPECT: light bends around YOU as you cross the beam.",
+              "USE: flashlights, sentries, cinematic reveals."],
+        5 => ["TUBE: capsule-shaped lighting extending along a fixture.",
+              "EXPECT: wide elongated environmental illumination.",
+              "SHADOWS: midpoint approximation; not true multisample area shadows."],
+        _ => ["ALL: performance / integration stress case.",
+              "Watch the WALL, ground, blocker and PLAYER together.",
+              "BLOOM ONLY shows glow separately from illumination."]
+    };
+
+    private string CurrentShowcaseFocusLabel() => _l19ShowcaseFocus switch
+    {
+        0 => "A SELF EMISSION",
+        1 => "B BLOOM",
+        2 => "C TRANSPARENCY",
+        3 => "D HOLOGRAM / HDR",
+        _ => "WHY / WHEN"
+    };
+
+    private IReadOnlyList<string> CurrentShowcaseNotes() => _l19ShowcaseFocus switch
+    {
+        0 =>
+        [
+            "A: LEFT emits. RIGHT is unpowered.",
+            "USE: runes, crystals, powered signs.",
+            "WHY: glow works without world lights.",
+            "TRY: SELF EMISSION vs BASELINE."
+        ],
+        1 =>
+        [
+            "B: watch pink WALL and PLAYER light.",
+            "USE: neon, lava, magic portals.",
+            "WHY: halo sells powerful emitters.",
+            "TRY: BLOOM HERO vs SHOWCASE BOOST."
+        ],
+        2 =>
+        [
+            "C: follow crosshairs THROUGH objects.",
+            "USE: glass, ghosts, forcefields.",
+            "WHY: opacity != shadow casting.",
+            "TRY: WORLD LIGHTS; only SOLID casts."
+        ],
+        3 =>
+        [
+            "D: LEFT emits; RIGHT is unpowered.",
+            "USE: holograms, scanners, screens.",
+            "WHY: HDR + bloom retain hot glow.",
+            "TRY: cyan light on WALL and PLAYER."
+        ],
+        _ =>
+        [
+            "SELF EMISSION = object glows by itself.",
+            "BLOOM = bright pixels bleed softly into nearby space.",
+            "ALPHA: see-through, shadow independent.",
+            "NEXT: sunlight and spot light types."
+        ]
+    };
+
+    private void ApplyMaterialShowcasePreset(int preset)
+    {
+        _l19bMaterialPreset = preset;
+        _lightingStress = false;
+        switch (preset)
+        {
+            case 0: // Baseline
+                _materialLightMode = ProductionMaterialLightMode.AllEligible;
+                _l19Hdr = false;
+                _l19Emission = false;
+                _l19Bloom = false;
+                _l19Exposure = 1f;
+                _l19BloomThreshold = 1.75f;
+                _l19BloomStrength = .25f;
+                _l19ShowcaseFocus = 0;
+                _l19dWorldLightsEnabled = true;
+                break;
+            case 1: // Self emission only
+                _materialLightMode = ProductionMaterialLightMode.EmissionOnly;
+                _l19Hdr = true;
+                _l19Emission = true;
+                _l19Bloom = false;
+                _l19Exposure = 1f;
+                _l19BloomThreshold = 1.75f;
+                _l19BloomStrength = .25f;
+                _l19ShowcaseFocus = 0;
+                _l19dWorldLightsEnabled = false; // prove emitter needs no authored local light
+                break;
+            case 2: // Bloom hero
+                _materialLightMode = ProductionMaterialLightMode.EmissionOnly;
+                _l19Hdr = true;
+                _l19Emission = true;
+                _l19Bloom = true;
+                _l19Exposure = .90f;
+                _l19BloomThreshold = .65f;
+                _l19BloomStrength = 1.25f;
+                _l19ShowcaseFocus = 1;
+                _l19dWorldLightsEnabled = false; // isolate bloom from magenta world light
+                break;
+            case 3: // Transparency
+                _materialLightMode = ProductionMaterialLightMode.AllEligible;
+                _l19Hdr = true;
+                _l19Emission = false;
+                _l19Bloom = false;
+                _l19Exposure = 1f;
+                _l19BloomThreshold = 1.05f;
+                _l19BloomStrength = .25f;
+                _l19ShowcaseFocus = 2;
+                _l19dWorldLightsEnabled = true;
+                break;
+            case 4: // Ghost / opacity
+                _materialLightMode = ProductionMaterialLightMode.AllEligible;
+                _l19Hdr = true;
+                _l19Emission = false;
+                _l19Bloom = false;
+                _l19Exposure = .95f;
+                _l19BloomThreshold = 1.05f;
+                _l19BloomStrength = .25f;
+                _l19ShowcaseFocus = 2;
+                _l19dWorldLightsEnabled = true;
+                break;
+            case 5: // Hologram / HDR
+                _materialLightMode = ProductionMaterialLightMode.EmissionOnly;
+                _l19Hdr = true;
+                _l19Emission = true;
+                _l19Bloom = true;
+                _l19Exposure = 1.15f;
+                _l19BloomThreshold = .85f;
+                _l19BloomStrength = .80f;
+                _l19ShowcaseFocus = 3;
+                _l19dWorldLightsEnabled = true;
+                break;
+            case 6: // Showcase boost
+                _materialLightMode = ProductionMaterialLightMode.AllEligible;
+                _l19Hdr = true;
+                _l19Emission = true;
+                _l19Bloom = true;
+                _l19Exposure = .80f;
+                _l19BloomThreshold = .60f;
+                _l19BloomStrength = 1.35f;
+                _l19ShowcaseFocus = 4;
+                _l19dWorldLightsEnabled = true;
+                break;
+            default:
+                _l19bMaterialPreset = -1;
+                break;
+        }
+    }
+
     private void ApplyLightingToolAction(LightingToolAction action)
     {
+        if (action is LightingToolAction.ToggleHdr or
+            LightingToolAction.ToggleEmission or LightingToolAction.ToggleBloom or
+            LightingToolAction.ToggleMaterialLights or LightingToolAction.CycleExposure or
+            LightingToolAction.CycleBloomThreshold or LightingToolAction.CycleBloomStrength)
+            _l19bMaterialPreset = -1;
         switch (action)
         {
             case LightingToolAction.ToggleLights:
                 _lightingEnabled = !_lightingEnabled;
+                break;
+            case LightingToolAction.ToggleShowcaseWorldLights:
+                _l19dWorldLightsEnabled = !_l19dWorldLightsEnabled;
+                _l19bMaterialPreset = -1;
                 break;
             case LightingToolAction.NextPreset:
                 if (_lightingCatalog is not null)
@@ -2030,6 +2279,12 @@ public sealed class Game1 : Game
                 break;
             case LightingToolAction.ToggleToolsPage:
                 break; // The panel owns its page state.
+            case LightingToolAction.CycleMaterialValidationPreset:
+                ApplyMaterialShowcasePreset((_l19bMaterialPreset + 1 + 7) % 7);
+                break;
+            case LightingToolAction.CycleShowcaseFocus:
+                _l19ShowcaseFocus = (_l19ShowcaseFocus + 1) % 5;
+                break;
             case LightingToolAction.ToggleHdr:
                 _l19Hdr = !_l19Hdr;
                 break;
@@ -2050,6 +2305,22 @@ public sealed class Game1 : Game
             case LightingToolAction.CycleBloomStrength:
                 _l19BloomStrength = _l19BloomStrength < 0.4f ? 0.45f :
                     _l19BloomStrength < 0.9f ? 1.0f : 0.25f;
+                break;
+            case LightingToolAction.CycleLightTypeFilter:
+                if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab)
+                {
+                    _l20LightFilter = (_l20LightFilter + 1) % 6;
+                    _l19dWorldLightsEnabled = true;
+                }
+                break;
+            case LightingToolAction.CycleBloomScatter:
+                _l20BloomScatter = _l20BloomScatter < .30f ? .55f :
+                    _l20BloomScatter < .70f ? .85f :
+                    _l20BloomScatter < .98f ? 1.0f : 0.15f;
+                break;
+            case LightingToolAction.ToggleBloomOnly:
+                _l20BloomOnly = !_l20BloomOnly;
+                if (_l20BloomOnly) _l19Bloom = true;
                 break;
             case LightingToolAction.CycleShadowEdges:
                 _shadowEdgePreset = ShadowEdgeSettings.Next(_shadowEdgePreset);
