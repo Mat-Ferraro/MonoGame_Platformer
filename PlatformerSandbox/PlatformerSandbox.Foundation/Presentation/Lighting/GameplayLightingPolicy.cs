@@ -38,6 +38,10 @@ public sealed record LightingSurfaceOptions
     public LightRgb EmissionColor { get; init; } = LightRgb.White;
     public double EmissionIntensity { get; init; }
     public string? EmissionMap { get; init; }
+    // Zero radius is explicit glow-only. Light energy is independent of surface radiance.
+    public double EmissiveLightRadius { get; init; }
+    public double EmissiveLightIntensity { get; init; } = 1;
+    public bool EmissiveLightCastsShadows { get; init; } = true;
     /// <summary>Do not multiply receiver pixels by backdrop shadow masks when this
     /// surface is unlit, a shadow caster, explicitly refuses cast shadows,
     /// or has an authored contact-shadow decoration drawn beneath it.</summary>
@@ -47,6 +51,9 @@ public sealed record LightingSurfaceOptions
     public void Validate()
     {
         Receiver.Validate();
+        if (!double.IsFinite(EmissiveLightRadius) || EmissiveLightRadius is < 0 or > 40 ||
+            !double.IsFinite(EmissiveLightIntensity) || EmissiveLightIntensity is < 0 or > 4)
+            throw new ArgumentOutOfRangeException(nameof(EmissiveLightRadius));
         if (Receiver.Active && (MaterialShading != ProductionSurfaceShading.Flat || CastsShadows ||
             NormalMap is not null || EdgeMap is not null))
             throw new NotSupportedException("Oriented receivers require non-casting Flat artwork without tangent maps.");
@@ -347,7 +354,7 @@ public static class LightingFramePlanner
             // that has no remaining mask must be omitted rather than allowed
             // to shine through blockers and erase existing level shadows.
             // Low quality (0 masks) deliberately disables all shadowing.
-            if (light.Owner == "flash" && light.CastShadows && !shadow &&
+            if ((light.Owner is "flash" or "emissive") && light.CastShadows && !shadow &&
                 budget.MaxShadowLights > 0)
                 continue;
 

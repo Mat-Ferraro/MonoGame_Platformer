@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -87,7 +88,7 @@ public sealed class Game1 : Game
     private bool _l20BloomOnly;
     private bool _l20ReceiverNormals = true, _l20PolygonRims = true;
     private ReceiverProjectionMode _l20ReceiverMode = ReceiverProjectionMode.Clipped;
-    private int _l20LightFilter; // 0 all, 1 sun, 2 moon, 3 point, 4 spot, 5 tube
+    private int _l20LightFilter; // 0 all, 1 sun, 2 moon, 3 point, 4 spot, 5 tube, 6 emissive
     private ShadowEdgePreset _shadowEdgePreset = ShadowEdgePreset.Hard;
     private ShadowFilterMode _shadowFilterMode = ShadowFilterMode.UniformGaussian;
     private ShadowQualityPolicy _shadowQualityPolicy = ShadowQualityPolicy.Manual;
@@ -377,7 +378,8 @@ public sealed class Game1 : Game
                 // The effect remains owned by the host ContentManager.
                 _gameLighting = new GameplayLightingRenderer(GraphicsDevice,
                     Content.Load<Effect>("Effects/L_BASIC_SurfaceLighting"),
-                    Content.Load<Effect>("Effects/L20_PolygonRim"));
+                    Content.Load<Effect>("Effects/L20_PolygonRim"),
+                    Content.Load<Effect>("Effects/L21_TangentTransform"));
                 _lightingEvents = new GameplayLightingPresenter();
                 ActivateLightingWorld();
             }
@@ -452,7 +454,7 @@ public sealed class Game1 : Game
         for (int i = 0; i < 120; i++)
             yield return new RadialLight
             {
-                Id = "stress_" + i, Owner = "stress",
+                Id = "stress_" + i, Owner = "stress", Tag = "STRESS",
                 Position = new LightPoint(camera.Left + (i % 12 + .5) *
                     camera.VisibleWidth / 12,
                     camera.Bottom + (i / 12 + .5) * camera.VisibleHeight / 10),
@@ -566,6 +568,19 @@ public sealed class Game1 : Game
     }
 
     protected override void Update(GameTime gameTime)
+    {
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        var perfKeys = Keyboard.GetState();
+        bool toggle = perfKeys.IsKeyDown(Keys.F) &&
+            (perfKeys.IsKeyDown(Keys.LeftControl) || perfKeys.IsKeyDown(Keys.RightControl)) &&
+            (perfKeys.IsKeyDown(Keys.LeftShift) || perfKeys.IsKeyDown(Keys.RightShift));
+        if (toggle && !_perfToggleDown) _perfOverlay = !_perfOverlay;
+        _perfToggleDown = toggle;
+        try { UpdateFrame(gameTime); }
+        finally { _perfUpdateMs += PerfElapsed(started); _perfUpdates++; }
+    }
+
+    private void UpdateFrame(GameTime gameTime)
     {
         using var diagnosticUpdateScope = _diagnostics?.MonitorOperation("Game1.Update");
         MouseState uiMouse = Mouse.GetState();
@@ -784,6 +799,7 @@ public sealed class Game1 : Game
         }
         if (changedScene)
         {
+            CancelPerfCapture();
             _lightingTools.Close();
             _lastLightingView = null;
             _lastSelectedLights = Array.Empty<RadialLight>();
@@ -797,7 +813,7 @@ public sealed class Game1 : Game
         // UI cosmetic clock continues during menus/covered scene transitions.
         // World cosmetics freeze whenever the authoritative world is suspended.
         _particleVfx?.Presenter.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused);
-        _lightingEvents?.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused);
+        _lightingEvents?.Update(gameTime.ElapsedGameTime.TotalSeconds, _paused || (IsPerformanceLab && _perfFreeze));
         // Use committed player location for cosmetic culling; no world mutation.
         if (_particleVfx is not null && _worldClockTest is WorldSession particleWorld &&
             particleWorld.HasPlayer(1))
@@ -842,6 +858,61 @@ public sealed class Game1 : Game
             !(keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl) ||
               keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt) ||
               keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift));
+        // Dedicated lab: direct, discoverable comparison keys, no settings panel.
+        if (unmodifiedLevelDigit && _ldtkLighting?.LevelId == GameLevelIds.EmissiveLightingLab)
+        {
+            int preset = JustPressed(keys, Keys.D1) ? 1 : JustPressed(keys, Keys.D2) ? 2 :
+                JustPressed(keys, Keys.D3) ? 3 : JustPressed(keys, Keys.D4) ? 4 :
+                JustPressed(keys, Keys.D5) ? 5 : 0;
+            if (preset != 0) ApplyEmissionLabPreset(preset);
+        }
+        if (unmodifiedLevelDigit && !_flow.IsMenuOpen && IsPhase21Lab)
+        {
+            int preset = JustPressed(keys, Keys.D1) ? 1 : JustPressed(keys, Keys.D2) ? 2 :
+                JustPressed(keys, Keys.D3) ? 3 : JustPressed(keys, Keys.D4) ? 4 :
+                JustPressed(keys, Keys.D5) ? 5 : JustPressed(keys, Keys.D6) ? 6 : 0;
+            if (preset != 0) ApplyPhase21LabPreset(preset);
+            if (JustPressed(keys, Keys.D0))
+            {
+                if (IsPerformanceLab) { _perfIsolation = (_perfIsolation + 1) % 6; CancelPerfCapture(); }
+            }
+            if (JustPressed(keys, Keys.D7)) { _phase21HullOverlay = !_phase21HullOverlay; CancelPerfCapture(); }
+            if (JustPressed(keys, Keys.D8))
+            {
+                _lightingQuality = _lightingQuality switch { LightingQuality.High => LightingQuality.Balanced,
+                    LightingQuality.Balanced => LightingQuality.Low, _ => LightingQuality.High };
+                if (_lightingEvents is not null) _lightingEvents.Quality = _lightingQuality;
+                _perfAutoSweep = false;
+                ResetPerfWindow(); _phase21BenchmarkFrame = -1;
+                _phase21BenchmarkStatus = "9 BENCHMARK: 120 WARMUP + 300 FRAMES";
+            }
+            if (JustPressed(keys, Keys.D9))
+            {
+                _perfAutoSweep = false;
+                _perfRunId = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
+                _phase21Benchmark.Clear(); _phase21BenchmarkFrame = 0;
+                _phase21BenchmarkStatus = "WARMUP 120 FRAMES";
+            }
+        }
+        if (!_flow.IsMenuOpen && IsPerformanceLab &&
+            (keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift)) &&
+            !(keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl) ||
+              keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt)))
+        {
+            int flag = JustPressed(keys, Keys.D1) ? 1 : JustPressed(keys, Keys.D2) ? 2 :
+                JustPressed(keys, Keys.D3) ? 4 : JustPressed(keys, Keys.D4) ? 8 :
+                JustPressed(keys, Keys.D5) ? 16 : 0;
+            if (flag != 0) { _perfMask ^= flag; CancelPerfCapture(); }
+            if (JustPressed(keys, Keys.D0))
+            { _perfMask = _perfMask == AllPerfOptimizations ? 0 : AllPerfOptimizations; _perfIsolation = 0; CancelPerfCapture(); }
+            if (JustPressed(keys, Keys.D7)) { _perfFreeze = !_perfFreeze; CancelPerfCapture(); }
+            if (JustPressed(keys, Keys.D9))
+            {
+                _perfAutoSweep = true; _phase21HullOverlay = false;
+                _perfRunId = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
+                StartPerfCase(0);
+            }
+        }
         // Direct route-debug shortcuts still use the real, validated exit
         // mapping. One changes level only at this safe game-loop boundary.
         if (_routeLabMode && _flow.Scenes.ActiveDestination is SceneDestination currentRoute)
@@ -1284,7 +1355,83 @@ public sealed class Game1 : Game
         base.Update(gameTime);
     }
 
+    // Wall-clock draw cadence includes waiting/present and update catch-up.
+    // It is deliberately independent of GameTime's fixed simulation timestep.
+    private readonly LightingCpuTimeWindow _frameIntervals = new(120);
+    private long _perfLastDrawStart;
+    private double _perfUpdateMs, _perfLastUpdateMs, _perfLastDrawMs;
+    private int _perfUpdates, _perfLastUpdates;
+    private double _perfIntervalMs;
+    private bool _perfOverlay = true, _perfToggleDown;
+    private bool IsPerformanceLab => _ldtkLighting?.LevelId == GameLevelIds.LightingPerformanceLab;
+    private bool IsPhase21Lab => _ldtkLighting?.LevelId is GameLevelIds.Phase21LightingLab or GameLevelIds.LightingPerformanceLab;
+    private const int AllPerfOptimizations = 31;
+    private int _perfMask;
+    private bool _perfFreeze;
+    private int _perfSweepIndex;
+    private string _perfRunId = "manual";
+    private static readonly (int Mask, int Isolation)[] PerfSweep =
+        { (0,0), (1,0), (2,0), (4,0), (8,0), (16,0), (31,0),
+          (31,1), (31,2), (31,3), (31,4), (31,5) };
+    private bool PerfEnabled(int flag) => IsPerformanceLab && (_perfMask & flag) != 0;
+    private string PerfToggle(int flag) => PerfEnabled(flag) ? "ON" : "OFF";
+    private void CancelPerfCapture()
+    {
+        _perfAutoSweep = false; _phase21BenchmarkFrame = -1;
+        ResetPerfWindow(); _phase21BenchmarkStatus = "9 CAPTURE / SHIFT+9 SWEEP";
+    }
+    private void StartPerfCase(int index)
+    {
+        _perfSweepIndex = index;
+        (_perfMask, _perfIsolation) = PerfSweep[index];
+        ResetPerfWindow(); _phase21Benchmark.Clear(); _phase21BenchmarkFrame = 0;
+        _phase21BenchmarkStatus = $"SWEEP {index+1}/{PerfSweep.Length} - WARMUP";
+    }
+    private int _perfIsolation;
+    private string PerfIsolationLabel => _perfIsolation switch
+    {
+        1 => "LIGHTING OFF", 2 => "SHADOWS OFF", 3 => "BLOOM OFF",
+        4 => "WORLD PARTICLE DRAW OFF", 5 => "AREA 1 SAMPLE (QUALITY TRADEOFF)",
+        _ => "FULL VISUAL QUALITY"
+    };
+    private static double PerfElapsed(long start) =>
+        (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+    private void ResetPerfWindow()
+    {
+        _frameIntervals.Clear(); _perfLastDrawStart = 0; _perfIntervalMs = 0;
+        _gameLighting?.CpuSubmitWindow.Clear();
+    }
     protected override void Draw(GameTime gameTime)
+    {
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_perfLastDrawStart != 0)
+        {
+            _perfIntervalMs = (now - _perfLastDrawStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            if (_perfIntervalMs > 0) _frameIntervals.Add(_perfIntervalMs);
+        }
+        _perfLastDrawStart = now;
+        _perfLastUpdateMs = _perfUpdateMs; _perfLastUpdates = _perfUpdates;
+        _perfUpdateMs = 0; _perfUpdates = 0;
+        DrawFrame(gameTime);
+        if (_perfOverlay && _spriteBatch is not null && _pixel is not null)
+        {
+            int w = GraphicsDevice.Viewport.Width, h = GraphicsDevice.Viewport.Height;
+            int x = Math.Max(4, w - 440), y = Math.Max(4, h - 68);
+            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            _spriteBatch.Draw(_pixel, new Rectangle(x,y,Math.Min(434,w-x),46),new Color(15,19,24,235));
+            double fps = _frameIntervals.Mean > 0 ? 1000 / _frameIntervals.Mean : 0;
+            GymDebugText.Draw(_spriteBatch,_pixel,x+5,y+5,
+                $"FPS {fps:F1} / FRAME {_frameIntervals.Mean:F2} MS / P95 {_frameIntervals.P95:F2}",Color.White,1);
+            GymDebugText.Draw(_spriteBatch,_pixel,x+5,y+18,
+                $"UPDATE {_perfLastUpdateMs:F2} MS ({_perfLastUpdates}) / DRAW PREV {_perfLastDrawMs:F2} MS",Color.LightGray,1);
+            GymDebugText.Draw(_spriteBatch,_pixel,x+5,y+31,
+                "CPU WALL TIME / CTRL+SHIFT+F TOGGLE",Color.LightGray,1);
+            _spriteBatch.End();
+        }
+        _perfLastDrawMs = PerfElapsed(now);
+    }
+
+    private void DrawFrame(GameTime gameTime)
     {
         using var diagnosticDrawScope = _diagnostics?.MonitorOperation("Game1.Draw");
         GraphicsDevice.Clear(new Color(18, 23, 35));
@@ -1329,7 +1476,8 @@ public sealed class Game1 : Game
         if (_spriteBatch is not null && _pixel is not null)
         {
             _particleVfx?.BeginFrame();
-            bool lightingWorldActive = _gameLighting is not null &&
+            int perfIsolation = IsPerformanceLab ? _perfIsolation : 0;
+            bool lightingWorldActive = perfIsolation != 1 && _gameLighting is not null &&
                 _lightingCatalog is not null && _lightingEvents?.Scene is not null &&
                 _lightingEnabled && _ldtkLevelMode && _ldtkLevel is not null &&
                 _worldClockTest is not null && _flow.ActiveScene == MajorSceneKind.Gameplay;
@@ -1357,26 +1505,23 @@ public sealed class Game1 : Game
                         // over the character or beneath the level background.
                         ParticleViewport particleView =
                             ParticleViewportAdapters.FromLdtkCamera(camera);
-                        Action<ParticleVisualLayer>? layerHook = _particleVfx is null
-                            ? null : layer => _particleVfx.DrawLayer(_spriteBatch, particleView, layer);
                         LightingArtPreset? art = lightingWorldActive
                             ? _lightingCatalog!.GetPreset(_lightingPresetId) : null;
-                        IReadOnlyList<RadialLight> lights = lightingWorldActive &&
-                            _l19dWorldLightsEnabled
-                            ? _lightingEvents!.BuildVisible(
-                                GameplayLightingRenderer.View(camera), EnumerateParticleLights(),
-                                LightingStressCandidates(camera))
+                        string? filterTag = IsPhase21Lab
+                            ? Phase21LabTag()
+                            : _ldtkLighting?.LevelId == GameLevelIds.EmissiveLightingLab
+                            ? "EMISSIVE"
+                            : _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab
+                            ? _l20LightFilter switch { 1 => "SUN", 2 => "MOON", 3 => "POINT", 4 => "SPOT", 5 => "TUBE", 6 => "EMISSIVE", _ => null }
+                            : null;
+                        IReadOnlyList<RadialLight> lights = lightingWorldActive && _l19dWorldLightsEnabled
+                            ? _lightingEvents!.BuildVisible(GameplayLightingRenderer.View(camera),
+                                EnumerateParticleLights(), LightingStressCandidates(camera), filterTag)
                             : Array.Empty<RadialLight>();
-                        if (_ldtkLighting?.LevelId == GameLevelIds.LightTypesLab &&
-                            _l20LightFilter != 0)
-                        {
-                            string selectedTag = _l20LightFilter switch
-                            {
-                                1 => "SUN", 2 => "MOON", 3 => "POINT", 4 => "SPOT", _ => "TUBE"
-                            };
-                            lights = new List<RadialLight>(lights).FindAll(l =>
-                                string.Equals(l.Tag, selectedTag, StringComparison.Ordinal));
-                        }
+                        if (_ldtkLighting?.LevelId == GameLevelIds.EmissiveLightingLab && _emissionLabDarkWall)
+                            lights = lights.Select(light => light with { VirtualZ = -1 }).ToArray();
+                        if (perfIsolation == 2)
+                            lights = lights.Select(light => light with { CastShadows = false }).ToArray();
                         if (lightingWorldActive)
                         {
                             _lastLightingView = GameplayLightingRenderer.View(camera);
@@ -1391,7 +1536,13 @@ public sealed class Game1 : Game
                                 _shadowQualityPolicy == ShadowQualityPolicy.FollowLightingQuality
                                     ? ShadowContactControls.QualityPreset(_lightingQuality)
                                     : _shadowEdgePreset;
-                            _gameLighting!.ReceiverComparisonOverride = _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab ? _l20ReceiverMode : null;
+                            _gameLighting!.ReuseGeometry = PerfEnabled(1);
+                            _gameLighting.ReuseLayerFields = PerfEnabled(2);
+                            _gameLighting.PruneAreaSamples = PerfEnabled(4);
+                            _gameLighting.CacheAcrossFrames = PerfEnabled(8);
+                            _gameLighting.ReuseHardMasks = PerfEnabled(16);
+                            _gameLighting.AreaSampleOverride = perfIsolation == 5 ? 1 : null;
+                            _gameLighting.ReceiverComparisonOverride = _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab ? _l20ReceiverMode : null;
                             _gameLighting.ReceiverOrientationEnabled = _ldtkLighting?.LevelId != GameLevelIds.LightTypesLab || _l20ReceiverNormals;
                             _gameLighting.PolygonRimsEnabled = _ldtkLighting?.LevelId != GameLevelIds.LightTypesLab || _l20PolygonRims;
                             _gameLighting.ShadowSoftnessPixels =
@@ -1400,7 +1551,7 @@ public sealed class Game1 : Game
                             _gameLighting.MaterialLightMode = _materialLightMode;
                             _gameLighting.HdrEnabled = _l19Hdr;
                             _gameLighting.EmissionEnabled = _l19Emission;
-                            _gameLighting.BloomEnabled = _l19Bloom;
+                            _gameLighting.BloomEnabled = _l19Bloom && perfIsolation != 3;
                             _gameLighting.PostExposure = _l19Exposure;
                             _gameLighting.BloomThreshold = _l19BloomThreshold;
                             _gameLighting.BloomStrength = _l19BloomStrength;
@@ -1409,6 +1560,23 @@ public sealed class Game1 : Game
                             _gameLighting.ShadowEmitterOverrides = _shadowEmitterOverrides;
                             _gameLighting.BeginLayeredFrame(lights, shadowBudget);
                         }
+                        // Visual layer controls draw order, not a particle's
+                        // lighting depth. All world-space effect parts default to
+                        // the gameplay receiver layer (including landing dust
+                        // drawn behind or in front of the player).
+                        Action<ParticleVisualLayer>? layerHook = _particleVfx is null || perfIsolation == 4 ? null : layer =>
+                        {
+                            if (lightingWorldActive && frameLighting is not null &&
+                                frameLighting.Layers.Gameplay.Mode != RenderLayerLightingMode.Unlit)
+                                _particleVfx.DrawSceneLitLayer(_spriteBatch, particleView, layer,
+                                    () => _gameLighting!.BeginLayer(),
+                                    additive => _gameLighting!.ComposeLayer(_spriteBatch, camera,
+                                        lights, frameLighting.Occluders, art!,
+                                        LightingFrameBudget.For(_lightingQuality),
+                                        frameLighting.Layers.Gameplay, additive));
+                            else
+                                _particleVfx.DrawLayer(_spriteBatch, particleView, layer);
+                        };
                         LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
@@ -1427,7 +1595,9 @@ public sealed class Game1 : Game
                             lightingWorldActive ? () => _gameLighting!.EndLayeredFrame(_spriteBatch) : null,
                             lightingWorldActive ? (submission, region, albedo, normals, edges, emission) =>
                                 _gameLighting!.DrawProductionMaterialSurface(_spriteBatch,
-                                    GameplayLightingRenderer.View(camera), submission, region, lights,
+                                    GameplayLightingRenderer.View(camera),
+                                    submission.Channel == LightChannel.Hero ? submission with
+                                        { MinimumAmbient = art!.HeroMinimumBrightness } : submission, region, lights,
                                     frameLighting!.Occluders, art!,
                                     frameLighting.Layers.Get(submission.LayerId),
                                     albedo, normals, edges, emission) : null,
@@ -1516,6 +1686,27 @@ public sealed class Game1 : Game
                     CurrentLightTypeFilterLabel(), _l20BloomScatter.ToString("F2"),
                     _l20BloomOnly, CurrentLightTypeNotes(), _ldtkLighting?.LevelId == GameLevelIds.LightTypesLab ? _l20ReceiverMode.ToString().ToUpperInvariant() : "LAB ONLY", _l20ReceiverNormals, _l20PolygonRims);
             }
+            if (_ldtkLighting?.LevelId == GameLevelIds.EmissiveLightingLab && !_flow.IsMenuOpen)
+            {
+                const int y = 42;
+                _spriteBatch.Draw(_pixel, new Rectangle(12, y, Math.Min(680, GraphicsDevice.Viewport.Width - 24), 60), new Color(15, 19, 24, 235));
+                GymDebugText.Draw(_spriteBatch, _pixel, 20, y + 7,
+                    "1 BASELINE / 2 SELF GLOW / 3 COMPARE WALLS / 4 ALL / 5 ALL DARK", Color.White, 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 20, y + 22,
+                    "WORLD " + (_l19dWorldLightsEnabled ? "ON" : "OFF") + "  EMISSION " + (_l19Emission ? "ON" : "OFF") +
+                    "  BLOOM " + (_l19Bloom ? "ON" : "OFF") + "  ACTIVE LIGHTS " +
+                    (lightingWorldActive ? _lastSelectedLights.Count : 0), new Color(167, 232, 235), 1);
+                GymDebugText.Draw(_spriteBatch, _pixel, 20, y + 37,
+                    (_emissionLabDarkWall
+                        ? "LEFT WALL: DARK / RIGHT WALL: DARK / CYAN LEFT / MAGENTA RIGHT"
+                        : "LEFT WALL: FRONT-LIT / RIGHT WALL: DARK-FACE / CYAN LEFT / MAGENTA RIGHT"),
+                    Color.LightGray, 1);
+                if (!lightingWorldActive || (_l19dWorldLightsEnabled && _lastSelectedLights.Count != 2))
+                    GymDebugText.Draw(_spriteBatch, _pixel, 20, y + 49,
+                        "CHECK: EXPECT TWO LIGHTS IN WORLD COLOR MODE", new Color(255, 180, 100), 1);
+            }
+            if (IsPhase21Lab && !_flow.IsMenuOpen)
+                DrawPhase21LabHud(lightingWorldActive);
             if (_flow.IsMenuOpen)
                 DrawFlowMenu(_spriteBatch, _pixel);
             // Screen-space UI effects are drawn above menus, but below the
@@ -1823,6 +2014,18 @@ public sealed class Game1 : Game
             ApplyMaterialShowcasePreset(6);
             _lightingEnabled = true;
         }
+        else if (levelId is GameLevelIds.Phase21LightingLab or GameLevelIds.LightingPerformanceLab)
+        {
+            if (levelId == GameLevelIds.LightingPerformanceLab) ApplyPhase21LabPreset(5);
+            else ApplyPhase21LabPreset(2);
+            _phase21HullOverlay = false;
+            _perfMask = 0;
+            _perfFreeze = levelId == GameLevelIds.LightingPerformanceLab;
+        }
+        else if (levelId == GameLevelIds.EmissiveLightingLab)
+        {
+            ApplyEmissionLabPreset(3); // Direct colored world illumination, no glow or bloom.
+        }
         else if (levelId == GameLevelIds.LightTypesLab)
         {
             _lightingQuality = LightingQuality.High;
@@ -2077,6 +2280,7 @@ public sealed class Game1 : Game
         3 => "POINT / TORCH",
         4 => "SPOT / SEARCHLIGHT",
         5 => "TUBE / EXTENDED",
+        6 => "EMISSIVE / WORLD LIGHT",
         _ => "ALL"
     };
 
@@ -2097,6 +2301,9 @@ public sealed class Game1 : Game
         5 => ["TUBE: capsule-shaped lighting extending along a fixture.",
               "EXPECT: wide elongated environmental illumination.",
               "SHADOWS: midpoint approximation; not true multisample area shadows."],
+        6 => ["EMISSIVE: test bay near spawn; cyan LEFT, magenta RIGHT.",
+              "Gray strip/item and PLAYER should pick up each hue; low blocker cuts cyan.",
+              "Toggle WORLD LIGHTS for A/B; EMISSION and BLOOM are independent."],
         _ => ["ALL: performance / integration stress case.",
               "Watch the WALL, ground, blocker and PLAYER together.",
               "BLOOM ONLY shows glow separately from illumination."]
@@ -2149,6 +2356,170 @@ public sealed class Game1 : Game
             "NEXT: sunlight and spot light types."
         ]
     };
+
+    private int _phase21LabMode = 2;
+    private bool _phase21HullOverlay;
+    private int _phase21BenchmarkFrame = -1;
+    private bool _perfAutoSweep;
+    private readonly List<string> _phase21Benchmark = new();
+    private string _phase21BenchmarkStatus = "9 BENCHMARK: 120 WARMUP + 300 FRAMES";
+
+    private string Phase21LabTag() => _phase21LabMode switch
+    {
+        1 => "AREA_POINT", 2 => "AREA_LINE", 3 => "AREA_DISC", 4 => "AREA_RECT",
+        5 => "AREA_RECT|SHOWCASE|EMISSIVE", _ => "AREA_RECT|SHOWCASE|EMISSIVE|STRESS"
+    };
+
+    private void ApplyPhase21LabPreset(int preset)
+    {
+        ApplyEmissionLabPreset(3);
+        _phase21LabMode = preset;
+        _perfIsolation = 0;
+        _perfAutoSweep = false;
+        ResetPerfWindow();
+        _lightingPresetId = "Phase21LabNeutral";
+        _lightingStress = preset == 6;
+        _l19Emission = _l19Bloom = preset >= 5;
+        _phase21BenchmarkFrame = -1;
+        _phase21BenchmarkStatus = "9 BENCHMARK: 120 WARMUP + 300 FRAMES";
+        _gameLighting?.CpuSubmitWindow.Clear();
+    }
+
+    private void DrawPhase21LabHud(bool lightingActive)
+    {
+        if (lightingActive && _phase21HullOverlay && _lastLightingView is LightingViewport view && _lightingEvents?.CurrentScene() is LdtkLightingScene scene)
+        {
+            void Line(LightPoint a, LightPoint b, Color color)
+            {
+                Vector2 p = new((float)a.X, (float)a.Y), q = new((float)b.X, (float)b.Y);
+                Vector2 delta = q-p;
+                _spriteBatch.Draw(_pixel,p,null,color,(float)Math.Atan2(delta.Y,delta.X),Vector2.Zero,
+                    new Vector2(delta.Length(),2),SpriteEffects.None,0);
+            }
+            foreach (LightingOccluder hull in scene.Occluders)
+                for (int i=0;i<hull.Vertices.Length;i++) Line(view.Project(hull.Vertices[i]),
+                    view.Project(hull.Vertices[(i+1)%hull.Vertices.Length]),hull.LitFaceDepthZ>0?Color.Orange:Color.LimeGreen);
+            foreach (RadialLight light in _lastSelectedLights)
+            {
+                foreach (RadialLight sample in AreaEmitterSampling.Samples(light,
+                    _perfIsolation == 5 ? 1 : AreaEmitterSampling.CountForRadialBudget(LightingFrameBudget.For(_lightingQuality).ShadowRadialSamples)))
+                {
+                    LightPoint p = view.Project(sample.Position);
+                    _spriteBatch.Draw(_pixel,new Rectangle((int)p.X-3,(int)p.Y-3,6,6),Color.Yellow);
+                }
+                if (light.Shape == LightShape.Directional) continue;
+                double radius = (light.Radius+AreaEmitterSampling.Extent(light))*view.PixelsPerUnit;
+                LightPoint center = view.Project(light.Position);
+                for(int i=0;i<32;i++)
+                {
+                    double a=i*Math.PI/16, b=(i+1)*Math.PI/16;
+                    Line(center+new LightPoint(Math.Cos(a)*radius,Math.Sin(a)*radius),
+                        center+new LightPoint(Math.Cos(b)*radius,Math.Sin(b)*radius),new Color(170,170,100,150));
+                }
+            }
+        }
+        if (_phase21BenchmarkFrame >= 0)
+        {
+            int warmup = _perfAutoSweep ? 30 : 120;
+            int total = warmup + (_perfAutoSweep ? 120 : 300);
+            if (_phase21BenchmarkFrame >= warmup)
+            {
+                var invariant = System.Globalization.CultureInfo.InvariantCulture;
+                var r = lightingActive ? _gameLighting : null;
+                string F(double value) => value.ToString("F4", invariant);
+                _phase21Benchmark.Add(string.Join(",", _phase21BenchmarkFrame-warmup+1,
+                    F(_perfIntervalMs), F(_perfLastUpdateMs), F(_perfLastDrawMs), _perfLastUpdates,
+                    F(r?.LastSubmitMilliseconds ?? 0), r?.LastLights ?? 0,
+                    r?.LastAreaSampleEvaluations ?? 0, r?.LastShadowTriangles ?? 0,
+                    r?.LastMaterialVisibilityMasks ?? 0, r?.LastLegacyVisibilityMasks ?? 0,
+                    F(r?.EstimatedTargetsMegabytes ?? 0), F(r?.LastLayerCpuMilliseconds ?? 0),
+                    F(r?.LastMaterialCpuMilliseconds ?? 0), F(r?.LastMaterialMaskGeometryCpuMilliseconds ?? 0),
+                    F(r?.LastLayerMaskGeometryCpuMilliseconds ?? 0), F(r?.LastPostProcessCpuMilliseconds ?? 0),
+                    r?.LastLayerFieldBuilds ?? 0, r?.LastLayerFieldReuses ?? 0,
+                    r?.LastVisibilityGeometryBuilds ?? 0, r?.LastVisibilityGeometryReuses ?? 0,
+                    r?.LastAreaSamplesPruned ?? 0, r?.LastMaterialLightPasses ?? 0,
+                    r?.LastBloomPasses ?? 0, GraphicsDevice.PresentationParameters.BackBufferWidth, GraphicsDevice.PresentationParameters.BackBufferHeight,
+                    IsPerformanceLab ? _perfMask : 0, IsPerformanceLab ? _perfIsolation : 0, r?.LastPersistentGeometryHits ?? 0, r?.LastHardMaskHits ?? 0, IsPerformanceLab && _perfFreeze ? 1 : 0));
+            }
+            _phase21BenchmarkFrame++;
+            _phase21BenchmarkStatus = (_perfAutoSweep ? $"SWEEP {_perfSweepIndex+1}/{PerfSweep.Length} " : "BENCHMARK ") + _phase21BenchmarkFrame + "/" + total;
+            if (_phase21BenchmarkFrame >= total)
+            {
+                _phase21BenchmarkFrame = -1;
+                try
+                {
+                    string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"PlatformerSandbox","LightingBenchmarks");
+                    Directory.CreateDirectory(folder);
+                    string name=_perfRunId+"-mode"+_phase21LabMode+"-"+_lightingQuality+"-mask"+(IsPerformanceLab ? _perfMask : 0)+"-isolation"+(IsPerformanceLab ? _perfIsolation : 0)+".csv";
+                    File.WriteAllLines(Path.Combine(folder,name),new[]{"frame,preceding_frame_ms,update_cpu_ms,previous_draw_cpu_ms,updates,cpu_submit_ms,logical_lights,area_sample_evaluations,triangles,material_masks,layer_masks,estimated_target_mb,layer_cpu_ms,material_cpu_ms,material_geometry_cpu_ms,layer_geometry_cpu_ms,post_cpu_ms,layer_builds,layer_reuses,geometry_builds,geometry_reuses,pruned_samples,material_passes,bloom_passes,width,height,optimization_mask,isolation,persistent_hits,hard_mask_hits,freeze_lights"}.Concat(_phase21Benchmark));
+                    _phase21BenchmarkStatus="SAVED: " + name;
+                    if (_perfAutoSweep)
+                    {
+                        if (_perfSweepIndex + 1 < PerfSweep.Length) StartPerfCase(_perfSweepIndex + 1);
+                        else
+                        {
+                            _perfAutoSweep = false; _perfIsolation = 0; _perfMask = AllPerfOptimizations;
+                            ResetPerfWindow();
+                            _phase21BenchmarkStatus = $"SWEEP COMPLETE - {PerfSweep.Length} CSV FILES SAVED";
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { _perfAutoSweep = false; _phase21BenchmarkStatus="BENCHMARK SAVE FAILED"; }
+            }
+        }
+        const int y=42;
+        _spriteBatch.Draw(_pixel,new Rectangle(12,y,Math.Min(850,GraphicsDevice.Viewport.Width-24),IsPerformanceLab ? 164 : 86),new Color(15,19,24,235));
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+7,"1 POINT / 2 LINE / 3 DISC / 4 RECT / 5 SHOWCASE / 6 STRESS",Color.White,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+21,IsPerformanceLab ? "7 HULLS / 8 QUALITY / 9 CAPTURE / SHIFT+9 SWEEP" : "7 HULLS / 8 QUALITY / 9 CAPTURE",Color.LightGray,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+35,"MODE " + _phase21LabMode + " / " + _lightingQuality.ToString().ToUpperInvariant() + " / LIGHTS " + (lightingActive ? _lastSelectedLights.Count : 0) + " / SAMPLE WORK " + (lightingActive ? _gameLighting?.LastAreaSampleEvaluations ?? 0 : 0),new Color(167,232,235),1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+49,"CPU MS AVG " + (lightingActive ? _gameLighting?.CpuSubmitWindow.Mean ?? 0 : 0).ToString("F2") + " P95 " + (lightingActive ? _gameLighting?.CpuSubmitWindow.P95 ?? 0 : 0).ToString("F2") + " (NOT GPU TIME)",Color.LightGray,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+63,_phase21BenchmarkStatus,Color.LightGray,1);
+        if (!IsPerformanceLab) return;
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+77,"0 DIAGNOSTIC: " + PerfIsolationLabel,Color.Yellow,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+105,
+            $"SHIFT+1 FRAME GEO {PerfToggle(1)} / 2 LAYER FIELD {PerfToggle(2)} / 3 SAMPLE CULL {PerfToggle(4)}",Color.White,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+119,
+            $"SHIFT+4 PERSIST GEO {PerfToggle(8)} / 5 HARD GPU MASK {PerfToggle(16)} / 0 ALL",Color.White,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+133,
+            $"SHIFT+7 FREEZE LIGHT MOTION {(_perfFreeze ? "ON" : "OFF")}  MASK {_perfMask}/31",Color.LightGray,1);
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+147,
+            $"PERSIST HITS {(_gameLighting?.LastPersistentGeometryHits ?? 0)} / GPU MASK HITS {(_gameLighting?.LastHardMaskHits ?? 0)}",Color.LightGray,1);
+        var perf = lightingActive ? _gameLighting : null;
+        GymDebugText.Draw(_spriteBatch,_pixel,20,y+91,
+            $"FIELD BUILD/REUSE {perf?.LastLayerFieldBuilds ?? 0}/{perf?.LastLayerFieldReuses ?? 0}  GEO BUILD/REUSE {perf?.LastVisibilityGeometryBuilds ?? 0}/{perf?.LastVisibilityGeometryReuses ?? 0}  PRUNE {perf?.LastAreaSamplesPruned ?? 0}",Color.LightGray,1);
+    }
+
+    private bool _emissionLabDarkWall;
+
+    private void ApplyEmissionLabPreset(int preset)
+    {
+        _emissionLabDarkWall = preset == 5;
+        _lightingPresetId = "EmissiveLabNeutral";
+        _lightingEnabled = true;
+        _lightingQuality = LightingQuality.High;
+        _lightingStress = _lightingInspectionLight = false;
+        _materialLightMode = ProductionMaterialLightMode.AllEligible;
+        _l19bMaterialPreset = -1;
+        _l20LightFilter = 6;
+        _l19dWorldLightsEnabled = preset is 3 or 4 or 5;
+        _l19Emission = preset is 2 or 4;
+        _l19Bloom = preset == 4;
+        _l20BloomOnly = false;
+        _l19Hdr = true;
+        _l19Exposure = 1f;
+        _l19BloomStrength = .45f;
+        _l19BloomThreshold = 1.15f;
+        _l20BloomScatter = .55f;
+        _shadowEdgePreset = ShadowEdgePreset.Hard;
+        _shadowQualityPolicy = ShadowQualityPolicy.Manual;
+        _shadowFilterMode = ShadowFilterMode.UniformGaussian;
+        if (_lightingEvents is not null)
+        {
+            _lightingEvents.Enabled = true;
+            _lightingEvents.Quality = _lightingQuality;
+        }
+    }
 
     private void ApplyMaterialShowcasePreset(int preset)
     {

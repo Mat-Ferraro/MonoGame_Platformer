@@ -16,7 +16,7 @@ public static class LightingWorldSampler
         ArgumentNullException.ThrowIfNull(blockers);
         LightRgb total = art.Ambient * (1 - art.AtmosphericDarkness) *
             (layer?.AmbientScale ?? 1) * art.AmbientScaleFor(layer?.Id);
-        foreach (RadialLight light in lights)
+        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
         {
             if (layer is null ? (light.Channels & channel) == 0 :
                 !LightLayerRouting.Illuminates(light, layer)) continue;
@@ -48,7 +48,7 @@ public static class LightingWorldSampler
         ArgumentNullException.ThrowIfNull(layer);
         layer.Validate();
         LightRgb total = LightRgb.Black;
-        foreach (RadialLight light in lights)
+        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
         {
             if (!light.RevealsSilhouettes || !LightLayerRouting.Illuminates(light, layer))
                 continue;
@@ -80,6 +80,22 @@ public static class LightingWorldSampler
                     point.X - light.Direction.X / directionLength * light.DirectionalShadowLength,
                     point.Y - light.Direction.Y / directionLength * light.DirectionalShadowLength)
                 : light.Position;
+            if (ReceiverWallShadowPolicy.StartsAtExit(light, blocker))
+            {
+                // Use the same downstream-edge rule as the production mask.
+                double reach = Math.Sqrt(ShadowGeometry.DistanceSquared(rayOrigin, point));
+                if (reach <= 1e-9) continue;
+                double dx = (point.X-rayOrigin.X)/reach, dy = (point.Y-rayOrigin.Y)/reach;
+                double winding = Math.Sign(ShadowGeometry.SignedDoubleArea(blocker.Vertices));
+                for (int i=0; i<blocker.Vertices.Length; i++)
+                {
+                    LightPoint a = blocker.Vertices[i], b = blocker.Vertices[(i+1)%blocker.Vertices.Length];
+                    if (ReceiverWallShadowPolicy.IsExitEdge(a,b,dx,dy,winding) &&
+                        ShadowVisibility.RaySegmentIntersection(rayOrigin,dx,dy,a,b,out double hit) &&
+                        hit <= reach - 1e-9) return true;
+                }
+                continue;
+            }
             if (light.Shape == LightShape.Directional)
             {
                 // GPU sweeps the closed polygon over the finite segment. Match

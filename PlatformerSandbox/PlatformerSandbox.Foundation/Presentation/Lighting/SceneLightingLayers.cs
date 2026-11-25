@@ -169,8 +169,8 @@ public static class LightLayerRouting
         return (light.Channels & channel) != 0;
     }
     public static bool Occludes(RadialLight light, LightingOccluder blocker)
-        => light.OccluderLayers is null ||
-            light.OccluderLayers.Contains(blocker.LayerId, StringComparer.Ordinal);
+        => (light.EmitterCasterId is null || blocker.Owner != light.EmitterCasterId) &&
+            (light.OccluderLayers is null || light.OccluderLayers.Contains(blocker.LayerId, StringComparer.Ordinal));
     public static void ValidateRouting(RadialLight light, SceneLightingLayerSet layers)
     {
         foreach (var list in new[] { light.AffectsLayers, light.OccluderLayers })

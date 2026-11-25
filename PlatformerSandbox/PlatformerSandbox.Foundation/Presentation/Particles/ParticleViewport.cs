@@ -11,6 +11,16 @@ public enum ParticleCoordinateSpace { World, Screen }
 /// <summary>All particle textures and tint colors use premultiplied alpha.</summary>
 public enum ParticleBlendMode { Alpha, Additive }
 
+/// <summary>World particles receive scene illumination by default, independent
+/// of blend mode. Unlit is an explicit artistic opt-out, not a light emitter.</summary>
+public enum ParticleLightingMode { Scene, Unlit }
+
+public static class ParticleLightingPolicy
+{
+    public static bool ReceivesSceneLight(ParticleCoordinateSpace space, ParticleLightingMode mode) =>
+        space == ParticleCoordinateSpace.World && mode == ParticleLightingMode.Scene;
+}
+
 /// <summary>Shared procedural sprites; no per-particle texture allocations.</summary>
 public enum ParticleSpriteShape { SoftDisc, SolidDisc, Spark, Square }
 

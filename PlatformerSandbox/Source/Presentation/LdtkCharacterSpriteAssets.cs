@@ -92,15 +92,19 @@ internal sealed class LdtkCharacterSpriteAssets : IDisposable
             region.Width, region.Height);
         // Anchor the visual at the collider's feet, without feeding animation
         // offsets back into the authoritative character physics.
-        int height = Math.Max(1, collision.Height);
-        int width = Math.Max(1, (int)Math.Round(height *
-            (double)Definition.FrameWidth / Definition.FrameHeight));
-        var destination = new Rectangle(collision.Center.X - width / 2,
-            collision.Bottom - height, width, height);
+        var destination = Destination(collision);
         SpriteEffects flip = pose.Facing < 0
             ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
         batch.Draw(_texture, destination, source, tint,
             0f, Vector2.Zero, flip, 0f);
+    }
+
+    public Rectangle Destination(Rectangle collision)
+    {
+        int height = Math.Max(1, collision.Height);
+        int width = Math.Max(1, (int)Math.Round(height *
+            (double)Definition.FrameWidth / Definition.FrameHeight));
+        return new Rectangle(collision.Center.X - width / 2, collision.Bottom - height, width, height);
     }
 
     public void Dispose()

@@ -119,6 +119,13 @@ public static class LdtkLightingImporter
                         ConeAngleDegrees = Number(fields, "ConeAngleDegrees", 55, 5, 170),
                         ConeSoftness = Number(fields, "ConeSoftness", .15, 0, .95),
                         TubeLength = Number(fields, "TubeLengthWorld", 3, .1, 40),
+                        EmitterFootprint = Enum.TryParse<AreaEmitterFootprint>(Text(fields, "EmitterFootprint", "Line"), false, out var footprint) && Enum.IsDefined(footprint)
+                            ? footprint : throw new ArgumentException("EmitterFootprint must be Line, Disc or Rectangle."),
+                        EmitterWidth = Number(fields, "EmitterWidthWorld", 2, .1, 40),
+                        PulseDepth = Number(fields, "LightPulseDepth", 0, 0, 1),
+                        PulseHz = Number(fields, "LightPulseHz", 1, .01, 5),
+                        PulseTint = fields.TryGetValue("LightPulseTint", out var pulseTint) && pulseTint.ValueKind != JsonValueKind.Null
+                            ? ReadColor(fields, "LightPulseTint", LightRgb.White) : null,
                         DirectionalShadowLength = Number(fields, "ShadowLengthWorld", 6, .25, 30),
                         Priority = (int)Number(fields, "Priority", 1, -100, 100),
                         CastShadows = Bool(fields, "CastShadows", true),
@@ -209,10 +216,14 @@ public static class LdtkLightingImporter
                         BackRimIntensity = Number(fields, "BackRimIntensity", 1.25, 0, 4),
                         EmissionColor = ReadColor(fields, "EmissionColor", LightRgb.White),
                         EmissionIntensity = Number(fields, "EmissionIntensity", 0, 0, 8),
-                        EmissionMap = OptionalMap(fields, "EmissionMap")
+                        EmissionMap = OptionalMap(fields, "EmissionMap"),
+                        EmissiveLightRadius = Number(fields, "EmissiveLightRadius", 0, 0, 40),
+                        EmissiveLightIntensity = Number(fields, "EmissiveLightIntensity", 1, 0, 4),
+                        EmissiveLightCastsShadows = Bool(fields, "EmissiveLightCastsShadows", true)
                     };
                     options.Validate();
                     if (options.MaterialShading != ProductionSurfaceShading.Legacy &&
+                        options.LightingMode != LightingSurfaceMode.Lit &&
                         sceneLayers.Get(options.LayerId).Mode == RenderLayerLightingMode.Unlit)
                         throw new NotSupportedException(
                             "Stage 15B GPU material opt-in requires a lit scene layer.");
@@ -233,11 +244,6 @@ public static class LdtkLightingImporter
                                 "Animated shadow casters must use world parallax (0% authoring offset).");
                         if (!options.CastsShadows)
                             throw new ArgumentException("Animated TerrainArtwork must cast shadows.");
-                        // The current production tangent-space maps are not rotated with the sprite.
-                        if (blockerMotion.Rotation != PresentationOccluderRotationMode.Static &&
-                            (options.NormalMap is not null || options.EdgeMap is not null))
-                            throw new NotSupportedException(
-                                "Rotating mapped artwork requires transformed tangent maps; use an unmapped material.");
                         occluderMotions.Add(iid, blockerMotion);
                     }
                     surfaces.Add(iid, options);
@@ -256,7 +262,16 @@ public static class LdtkLightingImporter
                         var hulls = FromArtworkBounds(entity, fields, width, height, iid, options.LayerId);
                         if (occluders.Count + hulls.Count > 96)
                             throw new ArgumentException("Too many lighting blocker contours.");
-                        occluders.AddRange(hulls);
+                        bool litFace = options.ReceivesLight &&
+                            (options.LightingMode == LightingSurfaceMode.Lit ||
+                             options.LightingMode == LightingSurfaceMode.Inherit &&
+                             layerDefaults.Mode != RenderLayerLightingMode.Unlit);
+                        foreach (var hull in hulls)
+                            occluders.Add(litFace ? hull with
+                            {
+                                LitFaceLayer = layerDefaults,
+                                LitFaceDepthZ = options.MaterialDepthZ
+                            } : hull);
                     }
                 }
             }

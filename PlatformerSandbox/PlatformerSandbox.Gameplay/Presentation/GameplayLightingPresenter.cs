@@ -232,28 +232,28 @@ public sealed class GameplayLightingPresenter
         if (_scene is null) return Array.Empty<RadialLight>();
         var result = new List<RadialLight>(_scene.Lights.Count);
         foreach (RadialLight light in _scene.Lights)
-            result.Add(_scene.LightMotions.TryGetValue(light.Id, out PresentationLightMotion motion)
+            result.Add(PresentationLightPulse.At(_scene.LightMotions.TryGetValue(light.Id, out PresentationLightMotion motion)
                 ? light with { Position = motion.At(light.Position, _presentationLightClock) }
-                : light);
+                : light, _presentationLightClock));
         return result;
     }
 
     public IReadOnlyList<RadialLight> BuildVisible(LightingViewport viewport,
         IEnumerable<RadialLight>? particleLights = null,
-        IEnumerable<RadialLight>? debugLights = null)
+        IEnumerable<RadialLight>? debugLights = null, string? filterTag = null)
     {
         if (!Enabled || _scene is null) return Array.Empty<RadialLight>();
         LightingFrameBudget budget = LightingFrameBudget.For(Quality);
         var all = new List<RadialLight>(_scene.Lights.Count + _flashes.Count + 6);
-        foreach (RadialLight light in _scene.Lights)
-        {
-            if (_scene.LightMotions.TryGetValue(light.Id, out PresentationLightMotion motion))
-                all.Add(light with { Position = motion.At(light.Position, _presentationLightClock) });
-            else
-                all.Add(light);
-        }
+        all.AddRange(CurrentAuthoredLights());
         foreach (Flash flash in _flashes)
             all.Add(flash.Light);
+        // Use the same animated snapshot as artwork and shadow hulls.
+        var current = CurrentScene()!;
+        foreach (var (id, surface) in current.Surfaces)
+            if (surface.EmissiveLightRadius > 0 && current.SurfaceCenters.TryGetValue(id, out var position) &&
+                EmissiveWorldLighting.Create(id, position, surface) is RadialLight emitter)
+                all.Add(emitter);
         if (particleLights is not null)
         {
             int added = 0;
@@ -274,6 +274,8 @@ public sealed class GameplayLightingPresenter
                 all.Add(light);
                 if (all.Count > 256) break;
             }
-        return LightingFramePlanner.Select(all, viewport, budget, ReducedFlashes);
+        string[]? tags = filterTag?.Split('|');
+        return LightingFramePlanner.Select(tags is null ? all : all.Where(l => tags.Contains(l.Tag, StringComparer.Ordinal)),
+            viewport, budget, ReducedFlashes);
     }
 }

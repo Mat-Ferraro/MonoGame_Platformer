@@ -13,12 +13,23 @@ public sealed record LightingOccluder
     public string Owner => OwnerId ?? Id;
     /// <summary>Presentation depth plane that owns this occluder.</summary>
     public string LayerId { get; init; } = "PLAYER";
+    // Only visible, lit artwork supplies face metadata. Geometry-only blockers
+    // retain strict solid occlusion; motion/compound copies preserve metadata.
+    public SceneLightingLayer? LitFaceLayer { get; init; }
+    public double LitFaceDepthZ { get; init; }
     public LightPoint[] Vertices { get; init; } = Array.Empty<LightPoint>();
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(Id) || (OwnerId is not null && string.IsNullOrWhiteSpace(OwnerId)) || !SceneLightingLayer.IsId(LayerId) ||
             Vertices is null || Vertices.Length is < 3 or > MaxVertices)
             throw new ArgumentException("An occluder requires a name and 3–64 polygon vertices.");
+        if (LitFaceLayer is not null)
+        {
+            LitFaceLayer.Validate();
+            if (LitFaceLayer.Id != LayerId || !double.IsFinite(LitFaceDepthZ) ||
+                LitFaceDepthZ is < -100 or > 100)
+                throw new ArgumentException("Invalid occluder face routing metadata.");
+        }
         foreach (LightPoint p in Vertices) p.Validate();
         if (Math.Abs(ShadowGeometry.SignedDoubleArea(Vertices)) < 1e-9)
             throw new ArgumentException("Occluder polygon has zero area.");

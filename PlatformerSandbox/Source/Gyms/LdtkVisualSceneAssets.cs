@@ -80,20 +80,15 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                 foreach (var (iid, surface) in lighting.Surfaces)
                     if (surface.MaterialShading != ProductionSurfaceShading.Legacy)
                     {
-                        // The initial production GPU bridge intentionally does
-                        // not rotate/flip tangent-space vectors. Reject that
-                        // authoring combination rather than shade with a wrong
-                        // edge direction (the lab retains rotation support).
+                        // Scene preparation verifies the map has corresponding artwork.
+                        // Tangent vectors are transformed during map capture.
                         bool found = false;
                         if (Terrain is not null)
                             foreach (LdtkTerrainArtwork art in Terrain.Artworks)
                                 if (art.InstanceId == iid)
                                 {
                                     found = true;
-                                    if (surface.MaterialShading != ProductionSurfaceShading.Flat &&
-                                        (Math.Abs(art.RotationDegrees) > 1e-6 || art.FlipX || art.FlipY))
-                                        throw new NotSupportedException(
-                                            "Stage 15B advanced maps require unrotated, unflipped artwork.");
+
                                 }
                         if (!found)
                             throw new NotSupportedException(
@@ -183,10 +178,26 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                     lighting.Layers.Get(settings.LayerId).Mode == RenderLayerLightingMode.Unlit;
                 bool post = settings.NeedsIndependentPass || layerUnlit;
                 if (onlyPostLighting is null || onlyPostLighting.Value == post)
-                    DrawScenery(batch, sprite, cameraLeftPx * parallaxMultiplier,
-                        cameraTopPx * parallaxMultiplier, view,
+                {
+                    double cx = cameraLeftPx * parallaxMultiplier, cy = cameraTopPx * parallaxMultiplier;
+                    if (post && drawMaterial is not null && lighting is not null &&
+                        SpatialSurfaceLighting.CanPromote(settings, lighting.Layers.Get(settings.LayerId)))
+                    {
+                        var submission = SpatialSurfaceLighting.Promote(sprite.InstanceId, settings)
+                            with { VisualOpacity = sprite.Opacity };
+                        var (x,y,w,h) = LdtkSceneryTransform.Project(sprite,cx,cy);
+                        var region = ProductionMaterialRegionPlanner.ForSprite(x,y,w,h,sprite.PivotX,
+                            sprite.PivotY,sprite.RotationDegrees,view.Width,view.Height);
+                        if (settings.ContactShadow && contactShadow is not null && !region.IsEmpty)
+                            DrawContactDecoration(batch, contactShadow, x,y,w,h,sprite.PivotX,sprite.PivotY);
+                        batch.End();
+                        drawMaterial(submission,region,sb => DrawScenery(sb,sprite,cx,cy,view,Color.White,null),null,null,null);
+                        batch.Begin(samplerState: SamplerState.PointClamp);
+                    }
+                    else DrawScenery(batch, sprite, cx, cy, view,
                         lightTint?.Invoke(sprite.InstanceId) ?? Color.White,
                         post && settings.ContactShadow ? contactShadow : null);
+                }
             }
             else
             {
@@ -214,18 +225,22 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                     double cameraX = cameraLeftPx * parallaxMultiplier;
                     double cameraY = cameraTopPx * parallaxMultiplier;
                     if (post && drawMaterial is not null &&
-                        settings.MaterialShading != ProductionSurfaceShading.Legacy &&
-                        !layerUnlit)
+                        (!layerUnlit || settings.LightingMode == LightingSurfaceMode.Lit) &&
+                        (settings.MaterialShading != ProductionSurfaceShading.Legacy ||
+                            (lighting is not null && SpatialSurfaceLighting.CanPromote(settings, lighting.Layers.Get(settings.LayerId)))))
                     {
                         ProductionSurfaceSubmission submission =
-                            ProductionSurfaceSubmission.From(art.InstanceId, settings);
+                            settings.MaterialShading == ProductionSurfaceShading.Legacy
+                                ? SpatialSurfaceLighting.Promote(art.InstanceId, settings)
+                                : ProductionSurfaceSubmission.From(art.InstanceId, settings);
                         if (lighting is not null &&
                             lighting.SurfaceCenters.TryGetValue(art.InstanceId, out LightPoint center))
                             submission = submission with { Center = center };
                         // Capture the actual artwork opacity in the production contract.
                         // The draw callback already applies it to the source alpha.
                         // This remains independent of CastsShadows.
-                        submission = submission with { VisualOpacity = art.Opacity };
+                        submission = submission with { VisualOpacity = art.Opacity, MapRotationDegrees = art.RotationDegrees,
+                            MapFlipX = art.FlipX, MapFlipY = art.FlipY };
                         submission.Validate();
                         Action<SpriteBatch> albedo = sb => DrawArtwork(sb, art,
                             cameraX, cameraY, view, Color.White, null);
@@ -251,6 +266,8 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                                 spriteX, spriteY, spriteW, spriteH,
                                 art.PivotX, art.PivotY, art.RotationDegrees,
                                 view.Width, view.Height);
+                        if (settings.ContactShadow && contactShadow is not null && !region.IsEmpty)
+                            DrawContactDecoration(batch, contactShadow, spriteX,spriteY,spriteW,spriteH,art.PivotX,art.PivotY);
                         batch.End();
                         drawMaterial(submission, region, albedo, normals, edges, emission);
                         batch.Begin(samplerState: SamplerState.PointClamp);
@@ -274,6 +291,14 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
             foreach (LdtkTerrainArtwork art in Terrain.Artworks)
                 if (scene.GetSurface(art.InstanceId).LayerId == layerId) return true;
         return false;
+    }
+
+    private static void DrawContactDecoration(SpriteBatch batch, Texture2D texture,
+        double x,double y,double w,double h,double pivotX,double pivotY)
+    {
+        int cx = (int)(x + (.5-pivotX)*w), cy = (int)(y + (1-pivotY)*h);
+        batch.Draw(texture, new Rectangle(cx-(int)(w*.43), cy-3,
+            Math.Max(1,(int)(w*.86)), Math.Max(2,(int)(h*.12))),Color.White);
     }
 
     private void DrawScenery(SpriteBatch batch, LdtkScenerySprite sprite,

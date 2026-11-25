@@ -55,8 +55,13 @@ public sealed record RadialLight
     public double ConeAngleDegrees { get; init; } = 55;
     /// <summary>Fraction of the half-angle reserved for the soft spotlight edge.</summary>
     public double ConeSoftness { get; init; } = 0.15;
-    /// <summary>Full tube length in world units; tube only. Shadows use midpoint approximation.</summary>
+    /// <summary>Emitter length/diameter in world units. Production integrates weighted samples.</summary>
     public double TubeLength { get; init; } = 3;
+    public AreaEmitterFootprint EmitterFootprint { get; init; } = AreaEmitterFootprint.Line;
+    public double EmitterWidth { get; init; } = 2;
+    public double PulseDepth { get; init; }
+    public double PulseHz { get; init; } = 1;
+    public LightRgb? PulseTint { get; init; }
     /// <summary>How far a directional caster projects its 2D silhouette, in world
     /// units. This is a finite artistic control, not the local light radius.
     /// Point/spot/tube lighting ignores this property.</summary>
@@ -74,6 +79,8 @@ public sealed record RadialLight
     public int Priority { get; init; } = 0;
     public LightChannel Channels { get; init; } = LightChannel.All;
     public string Owner { get; init; } = "scene";
+    /// <summary>Only the emitting artwork is exempt from blocking its own light.</summary>
+    public string? EmitterCasterId { get; init; }
     /// <summary>Optional art/test designation (SUN, MOON, POINT, SPOT, TUBE).
     /// Never changes physics or collision and remains empty in legacy scenes.</summary>
     public string Tag { get; init; } = "";
@@ -87,6 +94,8 @@ public sealed record RadialLight
         if (string.IsNullOrWhiteSpace(Id) || Id.Length > 80 ||
             string.IsNullOrWhiteSpace(Owner) || Owner.Length > 80 || Tag is null || Tag.Length > 32)
             throw new ArgumentException("Light ID and owner must be nonempty (at most 80 characters).");
+        if (EmitterCasterId is not null && (string.IsNullOrWhiteSpace(EmitterCasterId) || EmitterCasterId.Length > 100))
+            throw new ArgumentException("Invalid emissive caster owner.", nameof(EmitterCasterId));
         Position.Validate();
         Direction.Validate();
         if (!Enum.IsDefined(Shape) ||
@@ -96,6 +105,11 @@ public sealed record RadialLight
             !double.IsFinite(TubeLength) || TubeLength is < 0.1 or > 40 ||
             !double.IsFinite(DirectionalShadowLength) || DirectionalShadowLength is < 0.25 or > 30)
             throw new ArgumentOutOfRangeException(nameof(Shape), "Invalid bounded light shape parameters.");
+        if (!Enum.IsDefined(EmitterFootprint) || !double.IsFinite(EmitterWidth) || EmitterWidth is < .1 or > 40 ||
+            !double.IsFinite(PulseDepth) || PulseDepth is < 0 or > 1 ||
+            !double.IsFinite(PulseHz) || PulseHz is < .01 or > 5)
+            throw new ArgumentOutOfRangeException(nameof(EmitterFootprint));
+        PulseTint?.Validate(nameof(PulseTint));
         if (!double.IsFinite(ReceiverDirectionalDepth) || ReceiverDirectionalDepth is < -4 or > 4)
             throw new ArgumentOutOfRangeException(nameof(ReceiverDirectionalDepth));
         if (!double.IsFinite(VirtualZ) || VirtualZ is < -100 or > 100)
@@ -145,7 +159,7 @@ public readonly record struct LightingViewport(int Width, int Height, LightPoint
         Validate(); light.Validate();
         if (light.Shape == LightShape.Directional) return true; // no local radius
         LightPoint c = Project(light.Position);
-        double r = (light.Radius + (light.Shape == LightShape.Tube ? light.TubeLength * .5 : 0)) * PixelsPerUnit;
+        double r = (light.Radius + AreaEmitterSampling.Extent(light)) * PixelsPerUnit;
         return c.X + r >= 0 && c.X - r <= Width &&
             c.Y + r >= 0 && c.Y - r <= Height;
     }
@@ -165,7 +179,7 @@ public static class RadialLighting
         double dirX = light.Direction.X / magnitude, dirY = light.Direction.Y / magnitude;
         if (light.Shape == LightShape.Tube)
         {
-            // Uniform capsule-shaped emitter; shadows approximate its midpoint.
+            // Legacy analytic capsule approximation (production expands finite emitters).
             double projection = Math.Clamp(dx * dirX + dy * dirY,
                 -light.TubeLength * .5, light.TubeLength * .5);
             dx -= dirX * projection;

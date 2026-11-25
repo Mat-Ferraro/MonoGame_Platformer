@@ -25,6 +25,10 @@ public sealed record ProductionSurfaceSubmission
     public bool CastsShadows { get; init; }
     public string? NormalMap { get; init; }
     public string? EdgeMap { get; init; }
+    public double MapRotationDegrees { get; init; }
+    public bool MapFlipX { get; init; }
+    public bool MapFlipY { get; init; }
+    public bool ExplicitLitOverride { get; init; }
     public double NormalStrength { get; init; } = 1;
     public double RimStrength { get; init; } = 1;
     public double MaterialDepthZ { get; init; }
@@ -36,6 +40,8 @@ public sealed record ProductionSurfaceSubmission
     public string? EmissionMap { get; init; }
     /// <summary>Authored artwork alpha multiplier, independent of shadow-casting.</summary>
     public double VisualOpacity { get; init; } = 1;
+    /// <summary>Optional ambient readability floor, not a post-light clamp.</summary>
+    public double MinimumAmbient { get; init; }
 
     public static ProductionSurfaceSubmission From(string instanceId, LightingSurfaceOptions options)
     {
@@ -48,6 +54,7 @@ public sealed record ProductionSurfaceSubmission
             Channel = options.Channel,
             CasterId = options.CastsShadows ? instanceId : null,
             Shading = options.MaterialShading,
+            ExplicitLitOverride = options.LightingMode == LightingSurfaceMode.Lit,
             ReceivesShadows = options.ReceivesShadows,
             Receiver = options.Receiver,
             CastsShadows = options.CastsShadows,
@@ -81,11 +88,14 @@ public sealed record ProductionSurfaceSubmission
             !double.IsFinite(RimStrength) || RimStrength is < 0 or > 2)
             throw new ArgumentOutOfRangeException(nameof(NormalStrength));
         if (Center is LightPoint point) point.Validate();
+        if (!double.IsFinite(MapRotationDegrees)) throw new ArgumentOutOfRangeException(nameof(MapRotationDegrees));
         ValidateMap(NormalMap);
         ValidateMap(EdgeMap);
         ValidateMap(EmissionMap);
         if (!double.IsFinite(VisualOpacity) || VisualOpacity is < 0 or > 1)
             throw new ArgumentOutOfRangeException(nameof(VisualOpacity));
+        if (!double.IsFinite(MinimumAmbient) || MinimumAmbient is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(MinimumAmbient));
         EmissionColor.Validate(nameof(EmissionColor));
         if (!double.IsFinite(EmissionIntensity) || EmissionIntensity is < 0 or > 8)
             throw new ArgumentOutOfRangeException(nameof(EmissionIntensity));

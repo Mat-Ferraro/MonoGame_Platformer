@@ -24,7 +24,7 @@ public static class ShadowVisibility
     /// </summary>
     public static IReadOnlyList<LightPoint> BuildPolygon(
         RadialLight light, IReadOnlyList<LightingOccluder> occluders,
-        int radialSamples = 192)
+        int radialSamples = 192, bool respectLitFaces = false)
     {
         ArgumentNullException.ThrowIfNull(light);
         ArgumentNullException.ThrowIfNull(occluders);
@@ -35,7 +35,7 @@ public static class ShadowVisibility
         // Keep the mask slightly outside the light's actual falloff texture,
         // preventing the visibility polygon itself from clipping the soft rim.
         double radius = light.Radius * 1.02;
-        var relevant = new List<LightingOccluder>();
+        var relevant = new List<(LightingOccluder Hull, bool ExitOnly, double Winding)>();
         var angles = new List<double>(radialSamples + 192);
         for (int i = 0; i < radialSamples; i++)
             angles.Add(i * (Math.PI * 2 / radialSamples));
@@ -50,7 +50,8 @@ public static class ShadowVisibility
             // otherwise the light suddenly shines through the entire object
             // as soon as the source crosses its silhouette.
             if (!WithinLightBounds(hull, light.Position, radius)) continue;
-            relevant.Add(hull);
+            relevant.Add((hull, respectLitFaces && ReceiverWallShadowPolicy.StartsAtExit(light, hull),
+                Math.Sign(ShadowGeometry.SignedDoubleArea(hull.Vertices))));
             // Bounded adaptive corner refinement: very complex scenes still have
             // a predictable cost and can use the radial samples as a fallback.
             foreach (LightPoint vertex in hull.Vertices)
@@ -74,13 +75,15 @@ public static class ShadowVisibility
             previous = angle;
             double dx = Math.Cos(angle), dy = Math.Sin(angle);
             double reach = radius;
-            foreach (LightingOccluder hull in relevant)
+            foreach (var entry in relevant)
             {
-                LightPoint[] vertices = hull.Vertices;
+                LightPoint[] vertices = entry.Hull.Vertices;
                 for (int i = 0; i < vertices.Length; i++)
                 {
                     LightPoint a = vertices[i];
                     LightPoint b = vertices[(i + 1) % vertices.Length];
+                    if (entry.ExitOnly && !ReceiverWallShadowPolicy.IsExitEdge(a, b, dx, dy, entry.Winding))
+                        continue;
                     if (RaySegmentIntersection(light.Position, dx, dy, a, b,
                         out double hit) && hit < reach)
                         reach = hit;
@@ -94,7 +97,7 @@ public static class ShadowVisibility
 
     /// <summary>Returns whether the straight line from the light to the sample is clear.</summary>
     public static bool CanIlluminate(RadialLight light, LightPoint sample,
-        IReadOnlyList<LightingOccluder> occluders)
+        IReadOnlyList<LightingOccluder> occluders, bool respectLitFaces = false)
     {
         ArgumentNullException.ThrowIfNull(light);
         ArgumentNullException.ThrowIfNull(occluders);
@@ -112,19 +115,23 @@ public static class ShadowVisibility
             // Samples inside a solid cannot be reached from outside it, but a
             // ray originating inside can travel within that solid until it
             // crosses an edge. The same rule is used by the visibility fan.
-            if (!SourceInsideOrOnBoundary(hull, light.Position) &&
+            bool exitOnly = respectLitFaces && ReceiverWallShadowPolicy.StartsAtExit(light, hull);
+            if (!exitOnly && !SourceInsideOrOnBoundary(hull, light.Position) &&
                 ShadowGeometry.Contains(hull, sample)) return false;
             LightPoint[] vertices = hull.Vertices;
+            double winding = Math.Sign(ShadowGeometry.SignedDoubleArea(vertices));
             for (int i = 0; i < vertices.Length; i++)
-                if (RaySegmentIntersection(light.Position, dx, dy, vertices[i],
-                    vertices[(i + 1) % vertices.Length], out double hit) &&
-                    hit <= reach - IntersectionEpsilon)
-                    return false;
+            {
+                LightPoint a = vertices[i], b = vertices[(i + 1) % vertices.Length];
+                if (exitOnly && !ReceiverWallShadowPolicy.IsExitEdge(a, b, dx, dy, winding)) continue;
+                if (RaySegmentIntersection(light.Position, dx, dy, a, b, out double hit) &&
+                    hit <= reach - IntersectionEpsilon) return false;
+            }
         }
         return true;
     }
 
-    private static bool RaySegmentIntersection(LightPoint origin, double dx, double dy,
+    internal static bool RaySegmentIntersection(LightPoint origin, double dx, double dy,
         LightPoint a, LightPoint b, out double distance)
     {
         double ex = b.X - a.X, ey = b.Y - a.Y;

@@ -31,9 +31,9 @@ public static class ProductionMaterialLightPlan
         _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
 
-    public static IReadOnlyList<ProductionMaterialLightBatch> Batches(int lightCount)
+    public static IReadOnlyList<ProductionMaterialLightBatch> Batches(int lightCount, bool expandedSamples = false)
     {
-        if (lightCount is < 0 or > MaximumLights)
+        if (lightCount < 0 || lightCount > MaximumLights * (expandedSamples ? AreaEmitterSampling.MaximumSamples : 1))
             throw new ArgumentOutOfRangeException(nameof(lightCount));
         var result = new List<ProductionMaterialLightBatch>((lightCount + 1) / 2);
         for (int start = 0; start < lightCount; start += ShaderLightsPerBatch)

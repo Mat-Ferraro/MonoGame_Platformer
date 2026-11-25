@@ -98,7 +98,7 @@ internal sealed class PlatformerParticleVfx : IDisposable
             if (part.Particles.ActiveCount == 0) continue;
             ParticleEffectPartDefinition def = part.Definition;
             _sources.Add(new ParticleDrawSource(part.Particles, def.Layer,
-                def.Space, def.Blend, def.Sprite));
+                def.Space, def.Blend, def.Sprite, def.Lighting));
         }
     }
 
@@ -107,6 +107,32 @@ internal sealed class PlatformerParticleVfx : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _renderer.DrawLayer(batch, view, CollectionsMarshal.AsSpan(_sources), layer);
+    }
+
+    /// <summary>Capture lit world particles before scene composition. The
+    /// supplied callbacks use the normal scene light map and visibility masks.
+    /// Alpha and additive particles must be captured separately: an additive
+    /// pass must never composite its black pixels over the scene as alpha art.
+    /// Unlit parts retain the direct draw path, and UI is always direct.</summary>
+    public int DrawSceneLitLayer(SpriteBatch batch, in ParticleViewport view,
+        ParticleVisualLayer layer, Action beginCapture, Action<bool> composeCapture)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (layer == ParticleVisualLayer.Ui) return DrawLayer(batch, view, layer);
+        var sources = CollectionsMarshal.AsSpan(_sources);
+        int drawn = 0;
+        for (int pass = 0; pass < 2; pass++)
+        {
+            var blend = (ParticleBlendMode)pass;
+            if (MonoGameParticleRenderer.HasVisibleLit(view, sources, layer, blend))
+            {
+                beginCapture();
+                drawn += _renderer.DrawLayer(batch, view, sources, layer, blend, true);
+                composeCapture(blend == ParticleBlendMode.Additive);
+            }
+            drawn += _renderer.DrawLayer(batch, view, sources, layer, blend, false);
+        }
+        return drawn;
     }
 
     public void Dispose()

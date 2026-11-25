@@ -37,7 +37,7 @@ public static class DirectionalShadowProjection
     /// <summary>Returns world-space triangles; every successive triple is one triangle.
     /// The input polygon must already be the authored simple shadow hull.</summary>
     public static IReadOnlyList<LightPoint> Triangles(
-        LightingOccluder caster, LightPoint direction, double reachWorld)
+        LightingOccluder caster, LightPoint direction, double reachWorld, bool exitOnly = false)
     {
         ArgumentNullException.ThrowIfNull(caster);
         direction.Validate();
@@ -49,17 +49,23 @@ public static class DirectionalShadowProjection
         var output = new List<LightPoint>(3 * (vertices.Length - 2) + 6 * vertices.Length);
         // Preserve the source hull so its immediate-contact shadow follows its
         // authored silhouette, including non-rectangular polygon tops.
-        foreach (LightTriangle triangle in ShadowGeometry.Triangulate(caster))
+        if (!exitOnly)
         {
-            output.Add(triangle.A); output.Add(triangle.B); output.Add(triangle.C);
+            foreach (LightTriangle triangle in ShadowGeometry.Triangulate(caster))
+            {
+                output.Add(triangle.A); output.Add(triangle.B); output.Add(triangle.C);
+            }
         }
         // Extrusion is finite. Drawing all edge quads is deliberately safe for
         // simple silhouettes: the union of the source and swept boundary is the
         // finite extrusion, including any genuinely unoccluded concave opening.
+        double winding = Math.Sign(ShadowGeometry.SignedDoubleArea(vertices));
         for (int i = 0; i < vertices.Length; i++)
         {
             LightPoint a = vertices[i];
             LightPoint b = vertices[(i + 1) % vertices.Length];
+            if (exitOnly && !ReceiverWallShadowPolicy.IsExitEdge(a, b,
+                travel.X/reachWorld, travel.Y/reachWorld, winding)) continue;
             LightPoint c = a + travel;
             LightPoint d = b + travel;
             output.Add(a); output.Add(b); output.Add(c);

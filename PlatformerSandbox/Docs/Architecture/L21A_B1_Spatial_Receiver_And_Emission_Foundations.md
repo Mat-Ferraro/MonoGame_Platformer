@@ -1,0 +1,23 @@
+# Phase 21A / 21B1: spatial receivers and emissive world-light foundations
+
+Baseline: PlatformerSandbox(1).txt (612 exported files, Phase 20G–20J). Incremental, no shader/binary/project-file replacement. No older hotfix required.
+
+## Audit and scope
+
+LDtk layer receivers already shade pixels in ComposeLayer. Independent legacy artwork and animated players used center tints. Production material candidate selection discarded local lights missing a sprite center. Light type filter ran after the frame budget, so isolated lights could lose shadow quotas. Visible emission and bloom were separate from world emitters. Existing Phase 20 receiver, polygon rim, depth and contour behavior remains. No new effect is required for this slice.
+
+Players use the Flat production material path; animation frame and flip are captured with raw albedo, using actual sprite destination and a scissor region. F9 outlines and ID labels remain unlit. A configurable existing hero minimum is used as an ambient floor, not the old final-color clamp; its visual effect must be evaluated. Independent legacy lit artwork and scenery on Lit layers are promoted at presentation time; existing contact decoration is drawn separately. Explicit silhouettes and unlit layers retain prior policy and center-tint fallback; these are not yet fully spatial. Layered terrain/tiles/platforms keep the efficient shared receiver path. No new player or platform shadow caster is introduced. RuntimeSprite is a reusable contract for future items/NPCs, not proof they already exist. Existing particle drawing remains unchanged.
+
+Material region selection uses a conservative screen-space disk bound (tube adds half length), so edge-only lights are retained. Spot cone and exact tube contribution remain shader-evaluated; conservative candidates can overselect under limited budgets. Oriented receivers keep their existing candidate strategy. Frame-level radius-scale culling, precise CPU/GPU parity, SDR exposure parity, tangent map transforms and GPU timing remain audit items. No new arbitrary depth rule for noncasting objects.
+
+## World emission
+
+EmissiveLightRadius (0..40 world units, 0 disables), EmissiveLightIntensity (0..4), EmissiveLightCastsShadows (bool) control an optional point light proxy using EmissionColor. Created from the current presentation scene's surface center before light budget selection, following animated authored artwork. Only its own caster is exempted from blocking it; all other routed casters remain eligible. Emits independently of the self-emission and bloom toggles; WORLD LIGHTS controls actual world lights. If shadow budget is positive but exhausted, shadow-required emitters are omitted rather than leaking; Low quality intentionally has no shadows. Existing point/tube/spot/directional algorithms are unchanged. Authoring fields added to Light Types Lab, two enabled (cyan panel and magenta pillar); the third emitter remains glow-only. No existing Material Showcase content changed. Explicit runtime emitter factory also usable for future item systems, but attachment/lifecycle for gameplay pickups and particles is not wired here.
+
+## Test
+
+From root: py Tools/phase21_spatial_preflight.py; py Tools/phase20_receiver_preflight.py; dotnet build .\Platforms\DesktopGL\PlatformerSandbox.DesktopGL.csproj; dotnet test .\PlatformerSandbox.Tests\PlatformerSandbox.Tests.csproj. Existing Phase 20 asset preflights require original shader and PNG files. In LIGHT TYPES LAB start sun only, bloom/emission off: walk/jump across caster shadows; compare head vs legs, horizontal/diagonal/vertical transitions, soft modes, rotating casters and camera movement. Cycle LIGHT TYPE to EMISSIVE / WORLD LIGHT; verify cyan and magenta light affects player, terrain, independent art, and is occluded. Toggle emission and bloom independently; world lights remain unless WORLD LIGHTS off. Compare ALL and existing Phase 19D showcase / integration test; test two local players and atlas fallback. Monitor material masks and CPU stats. Existing terrain receiver comparison unchanged. Visual and GPU build acceptance is required before closing Phase 21B.
+
+## Boundaries
+
+This is Phase 21A source audit and first implementation slice of 21B, not Phase 21 completion. Shader sources and actual runtime assets were omitted from the snapshot and cannot be inspected here. Existing GPU pass reuse avoids speculative shader replacement but .NET and shader compilation, alpha behavior, energy consistency and visual output remain unverified. Advanced area lighting, rotating tangent maps, per-pixel explicit silhouettes/unlit overrides, VFX receivers, optional actor casters and optimized batching follow in subsequent slices. No simulation or gameplay state changed.

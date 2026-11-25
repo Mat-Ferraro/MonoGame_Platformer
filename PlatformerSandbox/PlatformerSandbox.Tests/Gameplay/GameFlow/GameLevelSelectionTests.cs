@@ -78,6 +78,9 @@ public sealed class GameLevelSelectionTests
             GameLevelMenuCatalog.LightingIntegrationTest,
             GameLevelIds.MaterialShowcaseTest,
             GameLevelIds.LightTypesLab,
+            GameLevelIds.EmissiveLightingLab,
+            GameLevelIds.Phase21LightingLab,
+            GameLevelIds.LightingPerformanceLab,
             GameLevelIds.LightingBasics,
             GameLevelIds.MovementGym
         ];

@@ -25,6 +25,7 @@ public sealed record ParticleEffectPartDefinition
     public ParticleVisualLayer Layer { get; init; } = ParticleVisualLayer.World;
     public ParticleBlendMode Blend { get; init; } = ParticleBlendMode.Alpha;
     public ParticleSpriteShape Sprite { get; init; } = ParticleSpriteShape.SoftDisc;
+    public ParticleLightingMode Lighting { get; init; } = ParticleLightingMode.Scene;
 
     public void Validate()
     {
@@ -39,7 +40,8 @@ public sealed record ParticleEffectPartDefinition
         if (Capacity < 1 || Capacity > 2048)
             throw new ArgumentOutOfRangeException(nameof(Capacity));
         if (!Enum.IsDefined(Anchor) || !Enum.IsDefined(Space) ||
-            !Enum.IsDefined(Layer) || !Enum.IsDefined(Blend) || !Enum.IsDefined(Sprite))
+            !Enum.IsDefined(Layer) || !Enum.IsDefined(Blend) || !Enum.IsDefined(Sprite) ||
+            !Enum.IsDefined(Lighting))
             throw new ArgumentOutOfRangeException(nameof(Layer), "Invalid visual style or anchor.");
         if ((Space == ParticleCoordinateSpace.Screen) != (Layer == ParticleVisualLayer.Ui))
             throw new ArgumentException("Screen-space parts must use Ui layer; world-space parts cannot use Ui.", nameof(Space));

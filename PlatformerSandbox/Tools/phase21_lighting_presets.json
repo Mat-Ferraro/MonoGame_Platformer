@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "presets": {
+    "soft_line": {
+      "entity": "LightSource",
+      "fields": {
+        "LightType": "Tube",
+        "EmitterFootprint": "Line",
+        "TubeLengthWorld": 6.0,
+        "RadiusWorld": 10.0,
+        "Intensity": 1.4,
+        "CastShadows": true
+      }
+    },
+    "soft_disc": {
+      "entity": "LightSource",
+      "fields": {
+        "LightType": "Tube",
+        "EmitterFootprint": "Disc",
+        "TubeLengthWorld": 5.0,
+        "RadiusWorld": 10.0,
+        "Intensity": 1.4,
+        "CastShadows": true
+      }
+    },
+    "glowing_crystal": {
+      "entity": "TerrainArtwork",
+      "fields": {
+        "MaterialShading": "Flat",
+        "EmissionColor": "#65E8FF",
+        "EmissionIntensity": 1.5,
+        "EmissiveLightRadius": 6.0,
+        "EmissiveLightIntensity": 1.2,
+        "EmissiveLightCastsShadows": true
+      }
+    },
+    "neutral_receiver": {
+      "entity": "TerrainArtwork",
+      "fields": {
+        "MaterialShading": "Flat",
+        "ReceivesLight": true,
+        "ReceivesShadows": true,
+        "CastsShadows": false,
+        "EmissionIntensity": 0.0,
+        "EmissiveLightRadius": 0.0
+      }
+    }
+  }
+}

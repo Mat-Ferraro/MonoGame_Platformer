@@ -340,7 +340,7 @@ internal static class LdtkLevelRenderer
                     worldParticlesDrawn = true;
                 }
                 DrawPlayers(batch, pixel, world, view, playerAnimations, characterSprites,
-                    showCollisionDebug, heroTint, scale);
+                    showCollisionDebug, heroTint, scale, layer, drawMaterialSurface);
             }
         }
         if (!backgroundParticlesDrawn) Particles(ParticleVisualLayer.Background);
@@ -389,7 +389,9 @@ internal static class LdtkLevelRenderer
     private static void DrawPlayers(SpriteBatch batch, Texture2D pixel, WorldSession world,
         Camera2DView view, LdtkGrayboxAnimator? playerAnimations,
         LdtkCharacterSpriteAssets? characterSprites, bool showCollisionDebug,
-        Func<LightPoint, Color>? heroTint, double scale)
+        Func<LightPoint, Color>? heroTint, double scale, SceneLightingLayer? layer = null,
+        Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
+            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterial = null)
     {
         foreach (WorldPlayerSnapshot entity in world.Snapshot().Players)
         {
@@ -407,51 +409,50 @@ internal static class LdtkLevelRenderer
                 "Falling" => new Color(127, 176, 230),
                 _ => new Color(68, 214, 177)
             };
-            if (characterSprites is not null && playerAnimations is not null)
+            bool atlas = characterSprites is not null && playerAnimations is not null;
+            var center = new LightPoint(entity.Bounds.Center.X, entity.Bounds.Center.Y);
+            void DrawBody(SpriteBatch sb, Color tint)
             {
-                // Draw the actual atlas frame, flipped by facing direction.
-                // The authoritative collider remains unchanged; a F9 outline
-                // provides a useful sprite-vs-collision visual check.
-                characterSprites.Draw(batch, rect, pose,
-                    Shade(entity.PlayerId == 1 ? Color.White : new Color(228, 204, 255),
-                        heroTint?.Invoke(new LightPoint(entity.Bounds.Center.X,
-                            entity.Bounds.Center.Y)) ?? Color.White));
-                if (showCollisionDebug)
+                if (atlas)
                 {
-                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
-                        Math.Max(1, rect.Width), 1), Color.Orange);
-                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Bottom - 1,
-                        Math.Max(1, rect.Width), 1), Color.Orange);
-                    batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
-                        1, Math.Max(1, rect.Height)), Color.Orange);
-                    batch.Draw(pixel, new Rectangle(rect.Right - 1, rect.Top,
-                        1, Math.Max(1, rect.Height)), Color.Orange);
+                    characterSprites!.Draw(sb, rect, pose, Shade(entity.PlayerId == 1
+                        ? Color.White : new Color(228, 204, 255), tint));
+                    return;
                 }
-            }
-            else
-            {
-                // Original C01 graybox fallback; remains available even when
-                // optional PNG/manifest files are missing or malformed.
-                batch.Draw(pixel, rect, Shade(body,
-                    heroTint?.Invoke(new LightPoint(entity.Bounds.Center.X,
-                        entity.Bounds.Center.Y)) ?? Color.White));
-                batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
-                    Math.Max(1, rect.Width), 2), Color.White);
+                sb.Draw(pixel, rect, Shade(body, tint));
+                sb.Draw(pixel, new Rectangle(rect.Left, rect.Top, Math.Max(1, rect.Width), 2), tint);
                 if (playerAnimations is not null)
                 {
                     int eyeSize = Math.Max(2, (int)Math.Round(3 * scale / 32.0));
                     int eyeX = pose.Facing >= 0 ? rect.Right - eyeSize - 4 : rect.Left + 4;
                     int eyeY = rect.Top + Math.Max(4, rect.Height / 4);
                     if (pose.Clip != "Idle" || pose.Frame != 1)
-                        batch.Draw(pixel, new Rectangle(eyeX, eyeY, eyeSize, eyeSize),
-                            new Color(20, 43, 56));
+                        sb.Draw(pixel, new Rectangle(eyeX, eyeY, eyeSize, eyeSize), Shade(new Color(20,43,56),tint));
                     if (pose.Clip is "Run" or "Dash")
                     {
                         int footX = rect.Left + ((pose.Frame % 2 == 0) ? 4 : rect.Width - 7);
-                        batch.Draw(pixel, new Rectangle(footX, rect.Bottom - 4, 3, 3),
-                            new Color(16, 61, 69));
+                        sb.Draw(pixel, new Rectangle(footX, rect.Bottom - 4, 3, 3), Shade(new Color(16,61,69),tint));
                     }
                 }
+            }
+            if (drawMaterial is not null && layer?.Mode == RenderLayerLightingMode.Lit)
+            {
+                Rectangle bounds = atlas ? characterSprites!.Destination(rect) : rect;
+                var region = ProductionMaterialRegionPlanner.ForSprite(bounds.X, bounds.Y,
+                    bounds.Width, bounds.Height, 0, 0, 0, view.ViewportWidth, view.ViewportHeight);
+                var surface = SpatialSurfaceLighting.RuntimeSprite("player_" + entity.PlayerId,
+                    layer, LightChannel.Hero, center);
+                batch.End();
+                drawMaterial(surface, region, sb => DrawBody(sb, Color.White), null, null, null);
+                batch.Begin(samplerState: SamplerState.PointClamp);
+            }
+            else DrawBody(batch, heroTint?.Invoke(center) ?? Color.White);
+            if (atlas && showCollisionDebug)
+            {
+                batch.Draw(pixel, new Rectangle(rect.Left, rect.Top, Math.Max(1,rect.Width),1), Color.Orange);
+                batch.Draw(pixel, new Rectangle(rect.Left, rect.Bottom-1, Math.Max(1,rect.Width),1), Color.Orange);
+                batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,1,Math.Max(1,rect.Height)), Color.Orange);
+                batch.Draw(pixel, new Rectangle(rect.Right-1, rect.Top,1,Math.Max(1,rect.Height)), Color.Orange);
             }
             GymDebugText.Draw(batch, pixel, rect.Left + 4, rect.Top + 5,
                 entity.PlayerId.ToString(), new Color(18, 23, 35));

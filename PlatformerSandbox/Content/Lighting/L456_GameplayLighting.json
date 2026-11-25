@@ -125,6 +125,36 @@
       "posterize": false,
       "heroMinimumBrightness": 0.25,
       "lightExposure": 1
+    },
+    {
+      "id": "EmissiveLabNeutral",
+      "ambient": {
+        "r": 0.14,
+        "g": 0.14,
+        "b": 0.14
+      },
+      "lightMultiplier": 1,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0,
+      "posterize": false,
+      "heroMinimumBrightness": 0.14,
+      "lightExposure": 1
+    },
+    {
+      "id": "Phase21LabNeutral",
+      "ambient": {
+        "r": 0.14,
+        "g": 0.14,
+        "b": 0.14
+      },
+      "lightMultiplier": 1,
+      "atmosphericDarkness": 0,
+      "bloom": false,
+      "bloomStrength": 0,
+      "posterize": false,
+      "heroMinimumBrightness": 0.14,
+      "lightExposure": 1
     }
   ],
   "particleLights": [
@@ -207,6 +237,27 @@
         "LightTypesNeutral",
         "Illustrated",
         "Moonlit"
+      ]
+    },
+    {
+      "sceneId": "EMISSIVE_LIGHTING_LAB",
+      "defaultPreset": "EmissiveLabNeutral",
+      "presetIds": [
+        "EmissiveLabNeutral"
+      ]
+    },
+    {
+      "sceneId": "PHASE21_LIGHTING_LAB",
+      "defaultPreset": "Phase21LabNeutral",
+      "presetIds": [
+        "Phase21LabNeutral"
+      ]
+    },
+    {
+      "sceneId": "LIGHTING_PERFORMANCE_LAB",
+      "defaultPreset": "Phase21LabNeutral",
+      "presetIds": [
+        "Phase21LabNeutral"
       ]
     }
   ]

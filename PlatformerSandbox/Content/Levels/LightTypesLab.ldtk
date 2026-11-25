@@ -11,7 +11,7 @@
   "iid": "b0b8285f-0856-5367-b0b3-54c261df057a",
   "jsonVersion": "1.5.3",
   "appBuildId": 473703,
-  "nextUid": 91018,
+  "nextUid": 91024,
   "identifierStyle": "Capitalize",
   "toc": [],
   "worldLayout": "Free",
@@ -1017,6 +1017,132 @@
             "defaultOverride": null,
             "tilesetUid": null,
             "doc": "Custom normalized x,y pairs separated by semicolons; | separates disjoint contours. Example: 0,0;1,0;1,1;0,1.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightRadius",
+            "uid": 91018,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 40,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                0.0
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World light radius in world units. Zero means glow-only.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightIntensity",
+            "uid": 91019,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 4,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                1.0
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World light energy independent of visible emission/bloom.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightCastsShadows",
+            "uid": 91020,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                true
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World emission respects other shadow casters.",
             "editorDisplayMode": "NameAndValue",
             "editorDisplayPos": "Beneath",
             "editorDisplayScale": 1,
@@ -2726,6 +2852,132 @@
             },
             "tilesetUid": null,
             "doc": "Phase 20: ReceiverNormalStrength (see receiver projection documentation).",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightRadius",
+            "uid": 91021,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 40,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                0.0
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World light radius in world units. Zero means glow-only.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightIntensity",
+            "uid": 91022,
+            "type": "F_Float",
+            "__type": "Float",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": 0,
+            "max": 4,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                1.0
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World light energy independent of visible emission/bloom.",
+            "editorDisplayMode": "NameAndValue",
+            "editorDisplayPos": "Beneath",
+            "editorDisplayScale": 1,
+            "editorShowInWorld": false,
+            "editorAlwaysShow": false,
+            "editorCutLongValues": true,
+            "editorDisplayColor": null,
+            "editorTextPrefix": null,
+            "editorTextSuffix": null,
+            "useForSmartColor": false,
+            "exportToToc": false,
+            "searchable": false,
+            "symmetricalRef": false,
+            "allowedRefs": "Any",
+            "allowedRefsEntityUid": null,
+            "allowedRefTags": [],
+            "allowOutOfLevelRef": false,
+            "autoChainRef": false,
+            "editorLinkStyle": "ZigZag",
+            "textLanguageMode": null
+          },
+          {
+            "identifier": "EmissiveLightCastsShadows",
+            "uid": 91023,
+            "type": "F_Bool",
+            "__type": "Bool",
+            "isArray": false,
+            "canBeNull": false,
+            "arrayMinLength": null,
+            "arrayMaxLength": null,
+            "min": null,
+            "max": null,
+            "regex": null,
+            "acceptFileTypes": null,
+            "defaultOverride": {
+              "id": "V",
+              "params": [
+                true
+              ]
+            },
+            "tilesetUid": null,
+            "doc": "World emission respects other shadow casters.",
             "editorDisplayMode": "NameAndValue",
             "editorDisplayPos": "Beneath",
             "editorDisplayScale": 1,
@@ -5681,6 +5933,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 0,
@@ -5955,6 +6249,48 @@
                   "__tile": null,
                   "defUid": 9012,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 0,
@@ -6282,6 +6618,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 70,
@@ -6584,6 +6962,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 710,
@@ -6886,6 +7306,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1350,
@@ -7188,6 +7650,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1970,
@@ -7490,6 +7994,41 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.6,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.6
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 240,
@@ -7792,6 +8331,41 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.8,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.8
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 900,
@@ -8094,6 +8668,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1450,
@@ -8396,6 +9012,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1620,
@@ -8698,6 +9356,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1720,
@@ -9000,6 +9700,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 2110,
@@ -9266,6 +10008,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 722,
@@ -9532,6 +10316,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1362,
@@ -9798,6 +10624,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1982,
@@ -10100,6 +10968,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1080,
@@ -10402,6 +11312,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 422,
@@ -10704,6 +11656,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 2296,
@@ -10970,6 +11964,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 722,
@@ -12194,6 +13230,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 100,
@@ -12528,6 +13606,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 450,
@@ -12862,6 +13982,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 800,
@@ -13196,6 +14358,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1150,
@@ -13530,6 +14734,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1500,
@@ -13864,6 +15110,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 1850,
@@ -14238,6 +15526,48 @@
                   "__tile": null,
                   "defUid": 91016,
                   "realEditorValues": []
+                },
+                {
+                  "__identifier": "EmissiveLightRadius",
+                  "__type": "Float",
+                  "__value": 0.0,
+                  "defUid": 91021,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        0.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightIntensity",
+                  "__type": "Float",
+                  "__value": 1.0,
+                  "defUid": 91022,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "__identifier": "EmissiveLightCastsShadows",
+                  "__type": "Bool",
+                  "__value": true,
+                  "defUid": 91023,
+                  "realEditorValues": [
+                    {
+                      "id": "V",
+                      "params": [
+                        true
+                      ]
+                    }
+                  ]
                 }
               ],
               "__worldX": 2200,

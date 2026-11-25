@@ -12,7 +12,11 @@ namespace PlatformerSandbox.Particles;
 /// </summary>
 internal readonly record struct ParticleDrawSource(
     ParticleSystem Pool, ParticleVisualLayer Layer, ParticleCoordinateSpace Space,
-    ParticleBlendMode Blend, ParticleSpriteShape Sprite);
+    ParticleBlendMode Blend, ParticleSpriteShape Sprite,
+    ParticleLightingMode Lighting = ParticleLightingMode.Scene)
+{
+    public bool ReceivesSceneLight => ParticleLightingPolicy.ReceivesSceneLight(Space, Lighting);
+}
 
 /// <summary>
 /// SpriteBatch adapter. GPU resources are created once and shared by all
@@ -72,7 +76,8 @@ internal sealed class MonoGameParticleRenderer : IDisposable
     /// No SpriteBatch is already begun when this method is called.
     /// </summary>
     public int DrawLayer(SpriteBatch batch, in ParticleViewport viewport,
-        ReadOnlySpan<ParticleDrawSource> sources, ParticleVisualLayer layer)
+        ReadOnlySpan<ParticleDrawSource> sources, ParticleVisualLayer layer,
+        ParticleBlendMode? onlyBlend = null, bool? receivesSceneLight = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(batch);
@@ -81,11 +86,13 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         for (int pass = 0; pass < 2; pass++)
         {
             ParticleBlendMode blend = (ParticleBlendMode)pass;
+            if (onlyBlend.HasValue && blend != onlyBlend.Value) continue;
             bool started = false;
             for (int i = 0; i < sources.Length; i++)
             {
                 ParticleDrawSource source = sources[i];
-                if (source.Layer != layer || source.Blend != blend) continue;
+                if (source.Layer != layer || source.Blend != blend ||
+                    (receivesSceneLight.HasValue && source.ReceivesSceneLight != receivesSceneLight.Value)) continue;
                 if (!started)
                 {
                     batch.Begin(blendState: blend == ParticleBlendMode.Alpha
@@ -122,6 +129,26 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         }
         LastDrawCount += drawn;
         return drawn;
+    }
+
+    // Avoid an empty full-viewport lighting pass when all eligible particles
+    // are outside the viewport or have faded out.
+    public static bool HasVisibleLit(in ParticleViewport viewport,
+        ReadOnlySpan<ParticleDrawSource> sources, ParticleVisualLayer layer, ParticleBlendMode blend)
+    {
+        foreach (ParticleDrawSource source in sources)
+        {
+            if (source.Layer != layer || source.Blend != blend || !source.ReceivesSceneLight) continue;
+            for (int j = 0; j < source.Pool.ActiveCount; j++)
+            {
+                ParticleState particle = source.Pool.GetAt(j);
+                double diameter = viewport.SizePixels(particle.Size, source.Space);
+                if (diameter > .001 && ParticlePremultipliedRgba.From(particle.Color).A != 0 &&
+                    viewport.IsVisible(viewport.ToScreen(particle.Position, source.Space), diameter))
+                    return true;
+            }
+        }
+        return false;
     }
 
     public void BeginFrame() => LastDrawCount = 0;

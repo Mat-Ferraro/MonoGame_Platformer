@@ -280,7 +280,7 @@ internal sealed class ParticlePlayground : IDisposable
             {
                 ParticleEffectPartDefinition style = part.Definition;
                 _compositeSources[_compositeSourceCount++] = new ParticleDrawSource(
-                    part.Particles, style.Layer, style.Space, style.Blend, style.Sprite);
+                    part.Particles, style.Layer, style.Space, style.Blend, style.Sprite, style.Lighting);
             }
     }
 
