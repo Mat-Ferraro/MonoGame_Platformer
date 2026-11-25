@@ -29,7 +29,7 @@ public sealed class PersistentVisibilityGeometryCache
         {
             var hull = blockers[i];
             if (entry.Hulls[i].ExitOnly != (respectLitFaces && ReceiverWallShadowPolicy.StartsAtExit(light, hull)) ||
-                !entry.Hulls[i].Vertices.SequenceEqual(hull.Vertices)) return false;
+                !entry.Hulls[i].Vertices.AsSpan().SequenceEqual(hull.Vertices)) return false;
         }
         return true;
     }
@@ -52,7 +52,7 @@ public sealed class PersistentVisibilityGeometryCache
         // frame-local reuse is independently disabled.
         foreach (Entry entry in _entries)
             if (Matches(entry, light, blockers, samples, respectLitFaces)) return;
-        var hulls = blockers.Select(h => new Hull(h.Vertices.ToArray(),
+        var hulls = blockers.Select(h => new Hull(h.CaptureValidatedVertices(),
             respectLitFaces && ReceiverWallShadowPolicy.StartsAtExit(light, h))).ToArray();
         if (_entries.Count >= Limit) _entries.RemoveLast();
         _entries.AddFirst(new Entry(light.Position, light.Radius, samples,

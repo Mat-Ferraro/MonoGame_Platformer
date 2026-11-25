@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,6 +20,15 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
     private readonly Dictionary<string, Texture2D> _images =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<string, (Color Tint, SpriteEffects Effects)> _artPrepared = new(StringComparer.Ordinal);
+    private static (Color Tint, SpriteEffects Effects) PrepareArt(LdtkTerrainArtwork art)
+    {
+        SpriteEffects effects = SpriteEffects.None;
+        if (art.FlipX) effects |= SpriteEffects.FlipHorizontally;
+        if (art.FlipY) effects |= SpriteEffects.FlipVertically;
+        return (new Color(Convert.ToByte(art.TintHex.Substring(1, 2), 16),
+            Convert.ToByte(art.TintHex.Substring(3, 2), 16), Convert.ToByte(art.TintHex.Substring(5, 2), 16)), effects);
+    }
     public LdtkVisualDefinition Definition { get; }
     public LdtkSceneryDefinition Scenery { get; }
     public LdtkTerrainArtworkDefinition? Terrain { get; }
@@ -73,7 +83,10 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                 LoadImage(sprite.TilesetPath, sprite.AtlasWidthPx, sprite.AtlasHeightPx);
             if (Terrain is not null)
                 foreach (LdtkTerrainArtwork art in Terrain.Artworks)
+                {
                     LoadImage(art.ImagePath);
+                    if (EnginePerformanceOptions.ArtworkPreparation) _artPrepared[art.InstanceId] = PrepareArt(art);
+                }
             // Scene preparation loads every authored map before committing the
             // world, so a missing/bad PNG cannot fail mid-frame.
             if (lighting is not null)
@@ -190,6 +203,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                             sprite.PivotY,sprite.RotationDegrees,view.Width,view.Height);
                         if (settings.ContactShadow && contactShadow is not null && !region.IsEmpty)
                             DrawContactDecoration(batch, contactShadow, x,y,w,h,sprite.PivotX,sprite.PivotY);
+                        if (EnginePerformanceOptions.ArtworkPreparation && region.IsEmpty) continue;
                         batch.End();
                         drawMaterial(submission,region,sb => DrawScenery(sb,sprite,cx,cy,view,Color.White,null),null,null,null);
                         batch.Begin(samplerState: SamplerState.PointClamp);
@@ -268,6 +282,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                                 view.Width, view.Height);
                         if (settings.ContactShadow && contactShadow is not null && !region.IsEmpty)
                             DrawContactDecoration(batch, contactShadow, spriteX,spriteY,spriteW,spriteH,art.PivotX,art.PivotY);
+                        if (EnginePerformanceOptions.ArtworkPreparation && region.IsEmpty) continue;
                         batch.End();
                         drawMaterial(submission, region, albedo, normals, edges, emission);
                         batch.Begin(samplerState: SamplerState.PointClamp);
@@ -347,13 +362,8 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                 Math.Max(1, (int)(w * .86)), Math.Max(2, (int)(h * .12))), Color.White);
         }
         Texture2D image = mapOverride ?? _images[art.ImagePath];
-        SpriteEffects effects = SpriteEffects.None;
-        if (art.FlipX) effects |= SpriteEffects.FlipHorizontally;
-        if (art.FlipY) effects |= SpriteEffects.FlipVertically;
-        Color tint = new(
-            Convert.ToByte(art.TintHex.Substring(1, 2), 16),
-            Convert.ToByte(art.TintHex.Substring(3, 2), 16),
-            Convert.ToByte(art.TintHex.Substring(5, 2), 16));
+        var (tint, effects) = _artPrepared.TryGetValue(art.InstanceId, out var prepared)
+            ? prepared : PrepareArt(art);
         batch.Draw(image, new Vector2((float)x, (float)y),
             new Rectangle(0, 0, image.Width, image.Height), mapOverride is not null
                 ? Color.White

@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
@@ -59,6 +60,34 @@ internal static class GymDebugText
             [' '] = ["00000","00000","00000","00000","00000","00000","00000"]
         };
 
+    private static Texture2D? _atlas;
+    private static readonly Dictionary<char, Rectangle> Regions = new();
+    public static void Initialize(GraphicsDevice graphics)
+    {
+        if (!EnginePerformanceOptions.HudAtlas) return;
+        Release(graphics);
+        const int pitchX = 7, pitchY = 9, columns = 16;
+        int width = columns * pitchX, height = ((Glyphs.Count + columns - 1) / columns) * pitchY;
+        var pixels = new Color[width * height];
+        int index = 0;
+        foreach (var entry in Glyphs)
+        {
+            int x = index % columns * pitchX + 1, y = index / columns * pitchY + 1;
+            Regions[entry.Key] = new Rectangle(x, y, 5, 7);
+            for (int row = 0; row < 7; row++)
+                for (int col = 0; col < 5; col++)
+                    if (entry.Value[row][col] == '1') pixels[(y + row) * width + x + col] = Color.White;
+            index++;
+        }
+        _atlas = new Texture2D(graphics, width, height);
+        _atlas.SetData(pixels);
+    }
+    public static void Release(GraphicsDevice graphics)
+    {
+        if (_atlas is not null && ReferenceEquals(_atlas.GraphicsDevice, graphics))
+        { _atlas.Dispose(); _atlas = null; Regions.Clear(); }
+    }
+
     public static void Draw(SpriteBatch batch, Texture2D pixel, int x, int y,
         string message, Color color, int scale = 2)
     {
@@ -69,7 +98,13 @@ internal static class GymDebugText
         int cursor = x;
         foreach (char raw in message)
         {
-            if (Glyphs.TryGetValue(char.ToUpperInvariant(raw), out string[]? glyph))
+            char ch = char.ToUpperInvariant(raw);
+            if (_atlas is not null && !_atlas.IsDisposed && ReferenceEquals(_atlas.GraphicsDevice, pixel.GraphicsDevice))
+            {
+                if (ch != ' ' && Regions.TryGetValue(ch, out Rectangle source))
+                    batch.Draw(_atlas, new Rectangle(cursor, y, 5 * scale, 7 * scale), source, color);
+            }
+            else if (Glyphs.TryGetValue(ch, out string[]? glyph))
             {
                 for (int row = 0; row < glyph.Length; row++)
                 {

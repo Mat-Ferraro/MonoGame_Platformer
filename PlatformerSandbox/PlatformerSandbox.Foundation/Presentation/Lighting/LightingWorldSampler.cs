@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.Collections.Generic;
 
@@ -6,22 +7,38 @@ namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 /// <summary>Forward point-light approximation for optional lit sprite surfaces.</summary>
 public static class LightingWorldSampler
 {
+    // Two radii are intentional: attenuation uses the art radius scale, while
+    // the existing shadow test uses the original authored sample geometry.
+    public readonly record struct PreparedSample(RadialLight Original, RadialLight? AttenuationLight);
+    public static IReadOnlyList<PreparedSample> Prepare(IReadOnlyList<RadialLight> lights, LightingArtPreset art)
+    {
+        var samples = new List<PreparedSample>();
+        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+            samples.Add(new PreparedSample(light, light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }));
+        return samples.AsReadOnly();
+    }
+    private static IEnumerable<PreparedSample> ReferenceSamples(IReadOnlyList<RadialLight> lights, LightingArtPreset art)
+    {
+        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+            yield return new PreparedSample(light, null);
+    }
     public static LightRgb Sample(LightPoint point, LightChannel channel,
         bool receivesShadows, string? ownOccluderId, LightingArtPreset art,
         IReadOnlyList<RadialLight> lights, IReadOnlyList<LightingOccluder> blockers,
-        SceneLightingLayer? layer = null)
+        SceneLightingLayer? layer = null, IReadOnlyList<PreparedSample>? prepared = null)
     {
         point.Validate(); art.Validate();
         ArgumentNullException.ThrowIfNull(lights);
         ArgumentNullException.ThrowIfNull(blockers);
         LightRgb total = art.Ambient * (1 - art.AtmosphericDarkness) *
             (layer?.AmbientScale ?? 1) * art.AmbientScaleFor(layer?.Id);
-        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, art))
         {
+            RadialLight light = sample.Original;
             if (layer is null ? (light.Channels & channel) == 0 :
                 !LightLayerRouting.Illuminates(light, layer)) continue;
             double attenuation = RadialLighting.Attenuation(
-                light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }, point);
+                sample.AttenuationLight ?? (light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }), point);
             if (attenuation <= 0) continue;
             if (light.CastShadows && receivesShadows && layer?.ReceivesShadows != false &&
                 IsShadowed(light, point, blockers, ownOccluderId))
@@ -40,7 +57,7 @@ public static class LightingWorldSampler
     public static LightRgb SampleSilhouetteReveal(LightPoint point, LightChannel channel,
         bool receivesShadows, string? ownOccluderId, LightingArtPreset art,
         IReadOnlyList<RadialLight> lights, IReadOnlyList<LightingOccluder> blockers,
-        SceneLightingLayer layer)
+        SceneLightingLayer layer, IReadOnlyList<PreparedSample>? prepared = null)
     {
         point.Validate(); art.Validate();
         ArgumentNullException.ThrowIfNull(lights);
@@ -48,12 +65,13 @@ public static class LightingWorldSampler
         ArgumentNullException.ThrowIfNull(layer);
         layer.Validate();
         LightRgb total = LightRgb.Black;
-        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, art))
         {
+            RadialLight light = sample.Original;
             if (!light.RevealsSilhouettes || !LightLayerRouting.Illuminates(light, layer))
                 continue;
             double attenuation = RadialLighting.Attenuation(
-                light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }, point);
+                sample.AttenuationLight ?? (light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }), point);
             if (attenuation <= 0) continue;
             if (light.CastShadows && receivesShadows && layer.ReceivesShadows &&
                 IsShadowed(light, point, blockers, ownOccluderId))
@@ -68,18 +86,18 @@ public static class LightingWorldSampler
     {
         // A sprite that casts shadows is shaded on its visible face as a *separate*
         // forward receiver. It cannot receive the blackness of its own blocker.
+        double directionLength = Math.Sqrt(light.Direction.X * light.Direction.X +
+            light.Direction.Y * light.Direction.Y);
+        LightPoint rayOrigin = light.Shape == LightShape.Directional
+            ? new LightPoint(
+                point.X - light.Direction.X / directionLength * light.DirectionalShadowLength,
+                point.Y - light.Direction.Y / directionLength * light.DirectionalShadowLength)
+            : light.Position;
         foreach (LightingOccluder blocker in blockers)
         {
             if (blocker.Owner == ownId || !LightLayerRouting.Occludes(light, blocker)) continue;
             // A finite directional shadow must not darken the hero for the
             // whole level. Match the GPU world's authored projection reach.
-            double directionLength = Math.Sqrt(light.Direction.X * light.Direction.X +
-                light.Direction.Y * light.Direction.Y);
-            LightPoint rayOrigin = light.Shape == LightShape.Directional
-                ? new LightPoint(
-                    point.X - light.Direction.X / directionLength * light.DirectionalShadowLength,
-                    point.Y - light.Direction.Y / directionLength * light.DirectionalShadowLength)
-                : light.Position;
             if (ReceiverWallShadowPolicy.StartsAtExit(light, blocker))
             {
                 // Use the same downstream-edge rule as the production mask.
@@ -106,7 +124,7 @@ public static class LightingWorldSampler
                     if (ShadowGeometry.EdgesTouchOrCross(rayOrigin, point,
                         blocker.Vertices[i], blocker.Vertices[(i+1)%blocker.Vertices.Length])) return true;
             }
-            else if (ShadowGeometry.IsOccluded(rayOrigin, point, new[] { blocker }))
+            else if (EnginePerformanceOptions.LightingValidation ? ShadowGeometry.IsOccludedBy(rayOrigin, point, blocker) : ShadowGeometry.IsOccluded(rayOrigin, point, new[] { blocker }))
                 return true;
         }
         return false;

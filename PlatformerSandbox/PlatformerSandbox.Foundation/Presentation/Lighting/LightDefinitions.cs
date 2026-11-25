@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -122,11 +123,32 @@ public sealed record RadialLight
             throw new ArgumentOutOfRangeException(nameof(Channels));
         if (Priority < -1000 || Priority > 1000)
             throw new ArgumentOutOfRangeException(nameof(Priority));
+        if (EnginePerformanceOptions.LightingValidation)
+        {
+            ValidateRouting(AffectsLayers);
+            ValidateRouting(OccluderLayers);
+        }
+        else
+        {
         foreach (IReadOnlyList<string>? routing in new[] { AffectsLayers, OccluderLayers })
             if (routing is not null && (routing.Count is < 1 or > 32 ||
                 routing.Any(id => !SceneLightingLayer.IsId(id)) ||
                 routing.Distinct(StringComparer.Ordinal).Count() != routing.Count))
                 throw new ArgumentException("Invalid light layer routing selection.");
+        }
+    }
+
+    private static void ValidateRouting(IReadOnlyList<string>? routing)
+    {
+        if (routing is null) return;
+        if (routing.Count is < 1 or > 32) throw new ArgumentException("Invalid light layer routing selection.");
+        for (int i = 0; i < routing.Count; i++)
+        {
+            if (!SceneLightingLayer.IsId(routing[i])) throw new ArgumentException("Invalid light layer routing selection.");
+            for (int j = 0; j < i; j++)
+                if (string.Equals(routing[i], routing[j], StringComparison.Ordinal))
+                    throw new ArgumentException("Invalid light layer routing selection.");
+        }
     }
 }
 
@@ -142,7 +164,14 @@ public readonly record struct LightingViewport(int Width, int Height, LightPoint
 
     public LightPoint Project(LightPoint world)
     {
-        Validate(); world.Validate();
+        Validate();
+        return ProjectWithValidatedViewport(world);
+    }
+
+    /// <summary>For a batch whose caller has already validated this immutable viewport.</summary>
+    public LightPoint ProjectWithValidatedViewport(LightPoint world)
+    {
+        world.Validate();
         return new LightPoint(Width * .5 + (world.X - Focus.X) * PixelsPerUnit,
             Height * .5 - (world.Y - Focus.Y) * PixelsPerUnit);
     }

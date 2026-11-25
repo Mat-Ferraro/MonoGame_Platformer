@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Gameplay.Input.Buffering;
 using PlatformerSandbox.Gameplay.States;
@@ -198,10 +199,31 @@ public sealed class WorldSession
     public long WorldTick { get; private set; }
     public double WorldTimeSeconds => WorldTick * FixedStepSeconds;
     public int PlayerCount => _players.Count;
-    public IReadOnlyList<StaticAabbCollider> StaticColliders => Array.AsReadOnly(_staticColliders);
+    private IReadOnlyList<StaticAabbCollider>? _staticView;
+    private IReadOnlyList<MovingPlatformTrajectory>? _trajectoryView;
+    private IReadOnlyList<MovingPlatformSample>? _platformView;
+    private long _platformViewTick = -1;
+    private WorldStepResult? _committedSnapshot;
+    private IReadOnlyList<WorldPlayerSlotInfo>? _slotView;
+    private void InvalidatePlayerViews() { _committedSnapshot = null; _slotView = null; }
+    public IReadOnlyList<StaticAabbCollider> StaticColliders => EnginePerformanceOptions.Snapshots
+        ? (_staticView ??= Array.AsReadOnly(_staticColliders)) : Array.AsReadOnly(_staticColliders);
     public IReadOnlyList<MovingPlatformTrajectory> MovingPlatformTrajectories =>
-        Array.AsReadOnly(_platforms);
-    public IReadOnlyList<MovingPlatformSample> MovingPlatforms =>
+        EnginePerformanceOptions.Snapshots ? (_trajectoryView ??= Array.AsReadOnly(_platforms)) : Array.AsReadOnly(_platforms);
+    public IReadOnlyList<MovingPlatformSample> MovingPlatforms
+    {
+        get
+        {
+            if (!EnginePerformanceOptions.Snapshots) return BuildPlatformView();
+            if (_platformView is null || _platformViewTick != WorldTick)
+            {
+                _platformView = BuildPlatformView();
+                _platformViewTick = WorldTick;
+            }
+            return _platformView;
+        }
+    }
+    private IReadOnlyList<MovingPlatformSample> BuildPlatformView() =>
         Array.AsReadOnly(_platforms.Select(p => p.Evaluate(WorldTimeSeconds)).ToArray());
 
     public bool HasPlayer(int playerId) => _players.ContainsKey(playerId);
@@ -220,6 +242,7 @@ public sealed class WorldSession
         _players.Add(playerId, new PlayerState(playerId, playerId, null, null, motor, input,
             CreateCharacterStates(motor), new CharacterAbilityCoordinator(),
             new WorldPlayerMotion()));
+        InvalidatePlayerViews();
         _pendingActions.Add(new PendingWorldEvent(
             WorldGameplayEventKind.PlayerJoined, playerId, motor.Bounds.Center));
     }
@@ -247,6 +270,7 @@ public sealed class WorldSession
             registration.CharacterId, registration.SpawnId, registration.InputSourceId,
             motor, input, CreateCharacterStates(motor), new CharacterAbilityCoordinator(),
             new WorldPlayerMotion()));
+        InvalidatePlayerViews();
         _pendingActions.Add(new PendingWorldEvent(
             WorldGameplayEventKind.PlayerJoined, registration.PlayerId, motor.Bounds.Center));
     }
@@ -259,7 +283,9 @@ public sealed class WorldSession
             player.SpawnId, player.InputSourceId);
     }
 
-    public IReadOnlyList<WorldPlayerSlotInfo> PlayerSlots =>
+    public IReadOnlyList<WorldPlayerSlotInfo> PlayerSlots => EnginePerformanceOptions.Snapshots
+        ? (_slotView ??= BuildSlotView()) : BuildSlotView();
+    private IReadOnlyList<WorldPlayerSlotInfo> BuildSlotView() =>
         Array.AsReadOnly(_players.Values.Select(p => GetPlayerSlot(p.Id)).ToArray());
 
     /// <summary>Rebind a device/source without resetting a motor or the world clock.</summary>
@@ -271,6 +297,7 @@ public sealed class WorldSession
             (source <= 0 || _players.Values.Any(p => p.Id != playerId && p.InputSourceId == source)))
             throw new ArgumentException("Input source already assigned or invalid.", nameof(inputSourceId));
         player.InputSourceId = inputSourceId;
+        InvalidatePlayerViews();
     }
 
     /// <summary>Change a future respawn destination without moving the player.</summary>
@@ -283,6 +310,7 @@ public sealed class WorldSession
         if (!definition.HasSpawn(spawnId))
             throw new ArgumentOutOfRangeException(nameof(spawnId));
         player.SpawnId = spawnId;
+        InvalidatePlayerViews();
     }
 
     public void RemovePlayer(int playerId)
@@ -293,6 +321,7 @@ public sealed class WorldSession
         _players.Remove(playerId);
         _triggerInside.Remove(playerId);
         _wallContact.Remove(playerId);
+        InvalidatePlayerViews();
         _pendingActions.Add(new PendingWorldEvent(
             WorldGameplayEventKind.PlayerRemoved, playerId, position));
     }
@@ -314,6 +343,7 @@ public sealed class WorldSession
         state.LastJumpStarted = false;
         _triggerInside.Remove(playerId);
         _wallContact.Remove(playerId);
+        InvalidatePlayerViews();
         _pendingActions.Add(new PendingWorldEvent(
             WorldGameplayEventKind.PlayerRespawned, playerId, motor.Bounds.Center));
     }
@@ -363,7 +393,9 @@ public sealed class WorldSession
         return ToSnapshot(state);
     }
 
-    public WorldStepResult Snapshot() => new(WorldTick, WorldTimeSeconds,
+    public WorldStepResult Snapshot() => EnginePerformanceOptions.Snapshots
+        ? (_committedSnapshot ??= BuildSnapshot()) : BuildSnapshot();
+    private WorldStepResult BuildSnapshot() => new(WorldTick, WorldTimeSeconds,
         Array.AsReadOnly(_players.Values.Select(ToSnapshot).ToArray()));
 
     /// <summary>
@@ -732,6 +764,7 @@ public sealed class WorldSession
             accepted.Player.LastJumpStarted = accepted.JumpStarted;
         }
         WorldTick = nextTick;
+        _committedSnapshot = null;
         _triggerInside.Clear();
         foreach (var pair in nextInside) _triggerInside.Add(pair.Key, pair.Value);
         _wallContact.Clear();

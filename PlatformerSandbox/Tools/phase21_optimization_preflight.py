@@ -17,7 +17,7 @@ for e,f in zip(x,y):
         if field['__identifier'] in ('Image','NormalMap','EdgeMap','EmissionMap') and field['__value']:
             assert (root/'Content/Levels'/field['__value']).is_file(),field['__value']
 source=(root/'Source/Game1.cs').read_text();renderer=(root/'Source/Lighting/GameplayLightingRenderer.cs').read_text()
-for i,flag in enumerate(('ReuseGeometry','ReuseLayerFields','PruneAreaSamples','CacheAcrossFrames','ReuseHardMasks')):
+for i,flag in enumerate(('ReuseGeometry','ReuseLayerFields','PruneAreaSamples','CacheAcrossFrames','ReuseHardMasks','ReuseSharedMasks','PersistSharedMasks')):
     assert f'{flag} = PerfEnabled({1<<i});' in source and f'public bool {flag}' in renderer
 assert 'IsPerformanceLab' in source and 'LIGHTING_PERFORMANCE_LAB' in (root/'PlatformerSandbox.Gameplay/GameFlow/GameSceneCoordinator.cs').read_text()
 assert 'LIGHTING / PERFORMANCE LAB' in (root/'PlatformerSandbox.Gameplay/GameFlow/GameUiNavigation.cs').read_text()

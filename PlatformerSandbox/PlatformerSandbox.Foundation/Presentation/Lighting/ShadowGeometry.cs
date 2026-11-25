@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -18,7 +19,32 @@ public sealed record LightingOccluder
     public SceneLightingLayer? LitFaceLayer { get; init; }
     public double LitFaceDepthZ { get; init; }
     public LightPoint[] Vertices { get; init; } = Array.Empty<LightPoint>();
+    // A record's vertices array is publicly mutable. A reference-only cache would
+    // silently accept edited or invalid geometry. Verify the exact saved values.
+    private sealed class ValidatedHull { public LightPoint[]? Vertices; }
+    private static readonly ConditionalWeakTable<LightingOccluder, ValidatedHull> ValidationCache = new();
     public void Validate()
+    {
+        if (!EnginePerformanceOptions.LightingValidation || Vertices is null)
+        { ValidateExhaustive(); return; }
+        var cached = ValidationCache.GetValue(this, static _ => new ValidatedHull());
+        lock (cached)
+        {
+            if (cached.Vertices is not null && Vertices.AsSpan().SequenceEqual(cached.Vertices)) return;
+            ValidateExhaustive();
+            cached.Vertices = (LightPoint[])Vertices.Clone();
+        }
+    }
+    // Internal cache keys can share this private defensive copy. Never expose
+    // it publicly, or permit consumers to modify it.
+    internal LightPoint[] CaptureValidatedVertices()
+    {
+        if (!EnginePerformanceOptions.LightingValidation) { ValidateExhaustive(); return (LightPoint[])Vertices.Clone(); }
+        Validate();
+        var cached = ValidationCache.GetValue(this, static _ => new ValidatedHull());
+        lock (cached) return cached.Vertices!;
+    }
+    public void ValidateExhaustive()
     {
         if (string.IsNullOrWhiteSpace(Id) || (OwnerId is not null && string.IsNullOrWhiteSpace(OwnerId)) || !SceneLightingLayer.IsId(LayerId) ||
             Vertices is null || Vertices.Length is < 3 or > MaxVertices)
@@ -117,18 +143,19 @@ public static class ShadowGeometry
     {
         source.Validate(); sample.Validate();
         foreach (LightingOccluder blocker in blockers)
-        {
-            // Light inside a solid: the first exit surface blocks every
-            // receiver outside that solid. Previously we ignored this blocker,
-            // which made a moving dash flash leak abruptly through a crate.
-            bool sourceInside = Contains(blocker, source);
-            bool sampleInside = Contains(blocker, sample);
-            if (sourceInside && !sampleInside) return true;
-            if (!sourceInside && sampleInside) return true;
-            for (int i = 0; i < blocker.Vertices.Length; i++)
-                if (SegmentsIntersect(source, sample, blocker.Vertices[i],
-                    blocker.Vertices[(i + 1) % blocker.Vertices.Length])) return true;
-        }
+            if (IsOccludedBy(source, sample, blocker)) return true;
+        return false;
+    }
+
+    public static bool IsOccludedBy(LightPoint source, LightPoint sample, LightingOccluder blocker)
+    {
+        source.Validate(); sample.Validate();
+        bool sourceInside = Contains(blocker, source);
+        bool sampleInside = Contains(blocker, sample);
+        if (sourceInside != sampleInside) return true;
+        for (int i = 0; i < blocker.Vertices.Length; i++)
+            if (SegmentsIntersect(source, sample, blocker.Vertices[i],
+                blocker.Vertices[(i + 1) % blocker.Vertices.Length])) return true;
         return false;
     }
 
