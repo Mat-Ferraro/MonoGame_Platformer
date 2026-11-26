@@ -17,6 +17,7 @@ public static class GameLevelIds
     public const string EmissiveLightingLab = "EMISSIVE_LIGHTING_LAB";
     public const string Phase21LightingLab = "PHASE21_LIGHTING_LAB";
     public const string LightingPerformanceLab = "LIGHTING_PERFORMANCE_LAB";
+    public const string LightingQualityLab = "LIGHTING_QUALITY_LAB";
     public const string RouteA = "ROUTE_A";
     public const string RouteB = "ROUTE_B";
     public const string LdtkTest = "LDTK_TEST";
@@ -32,7 +33,7 @@ public static class GameLevelIds
     public static bool IsStandalonePlayableLevel(string levelId) => levelId is
         (MovementGym or SharedWorld or AuthoredWorld or MotionLab or LdtkTest or
          LdtkParallaxDemo or LdtkSceneryDemo or LdtkTerrainDemo or
-         LdtkConnectedA or LdtkConnectedB or LightingBasics or LightingIntegrationTest or MaterialShowcaseTest or LightTypesLab or EmissiveLightingLab or Phase21LightingLab or LightingPerformanceLab);
+         LdtkConnectedA or LdtkConnectedB or LightingBasics or LightingIntegrationTest or MaterialShowcaseTest or LightTypesLab or EmissiveLightingLab or Phase21LightingLab or LightingPerformanceLab or LightingQualityLab);
 }
 
 public sealed record SceneDestination

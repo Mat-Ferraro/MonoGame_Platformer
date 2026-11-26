@@ -60,6 +60,7 @@ public sealed record RadialLight
     public double TubeLength { get; init; } = 3;
     public AreaEmitterFootprint EmitterFootprint { get; init; } = AreaEmitterFootprint.Line;
     public double EmitterWidth { get; init; } = 2;
+    public int AreaSampleCount { get; init; } // 0 = automatic
     public double PulseDepth { get; init; }
     public double PulseHz { get; init; } = 1;
     public LightRgb? PulseTint { get; init; }
@@ -106,7 +107,7 @@ public sealed record RadialLight
             !double.IsFinite(TubeLength) || TubeLength is < 0.1 or > 40 ||
             !double.IsFinite(DirectionalShadowLength) || DirectionalShadowLength is < 0.25 or > 30)
             throw new ArgumentOutOfRangeException(nameof(Shape), "Invalid bounded light shape parameters.");
-        if (!Enum.IsDefined(EmitterFootprint) || !double.IsFinite(EmitterWidth) || EmitterWidth is < .1 or > 40 ||
+        if (AreaSampleCount is not (0 or 1 or 3 or 5 or 7 or 9) || !Enum.IsDefined(EmitterFootprint) || !double.IsFinite(EmitterWidth) || EmitterWidth is < .1 or > 40 ||
             !double.IsFinite(PulseDepth) || PulseDepth is < 0 or > 1 ||
             !double.IsFinite(PulseHz) || PulseHz is < .01 or > 5)
             throw new ArgumentOutOfRangeException(nameof(EmitterFootprint));

@@ -1,0 +1,32 @@
+Width: 1280
+Height: 720
+Ticks: 120
+World tick: 120
+Scene: LIGHTING_PERFORMANCE_LAB
+Lights: 5
+Player bounds: Aabb { Min = Vector2D { X = 18.06875, Y = 14 }, Max = Vector2D { X = 18.868750000000002, Y = 15.599999999999998 }, Left = 18.06875, Right = 18.868750000000002, Bottom = 14, Top = 15.599999999999998, Width = 0.8000000000000007, Height = 1.5999999999999979, IsValid = True, Center = Vector2D { X = 18.46875, Y = 14.799999999999999 } }
+Camera: LightingViewport { Width = 1280, Height = 720, Focus = LightPoint { X = 20, Y = 14.799999999999999 }, PixelsPerUnit = 32 }
+Original mask: 127
+Quality: High
+Material regions: True
+Light regions: True
+Shared fields: True
+Skip clears: True
+Cache capacity: True
+Light width: 640
+Mask width: 640
+Light scale: 50
+Mask scale: 50
+Bloom scale: 100
+Motion frozen: True
+Shadow edge: Soft8Px
+Adaptive: False
+Static shadow fields: True
+Static shadow hits: 0
+Static fields: True
+Fixture: static_shadow
+Camera locked: True
+Camera pan: False
+Camera convergence: True
+Static hits: 0
+GPU: Intel(R) RaptorLake-S Mobile Graphics Controller

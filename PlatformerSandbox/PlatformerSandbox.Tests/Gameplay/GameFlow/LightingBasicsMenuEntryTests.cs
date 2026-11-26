@@ -34,22 +34,13 @@ public sealed class LightingBasicsMenuEntryTests
     }
 
     [Fact]
-    public void LightingLabAppearsInDefaultAndDiscoveredLevelSelectAndCanReturnToTitle()
+    public void RetiredLightingBasicsRemainsDirectLaunchableAndCanReturnToTitle()
     {
         Assert.True(GameLevelIds.IsStandalonePlayableLevel(GameLevelIds.LightingBasics));
-        GameUiMenuItem menu = Assert.Single(GameLevelMenuCatalog.Items,
-            item => item.Destination?.LevelId == GameLevelIds.LightingBasics);
-        Assert.Equal(GameUiCommand.PlaySelectedLevel, menu.Command);
-        Assert.Contains(GameLevelMenuCatalog.WithDiscoveredLevels(Array.Empty<string>()),
-            item => item.Destination?.LevelId == GameLevelIds.LightingBasics);
-
+        Assert.DoesNotContain(GameLevelMenuCatalog.Items,item => item.Destination?.LevelId == GameLevelIds.LightingBasics);
+        Assert.DoesNotContain(GameLevelMenuCatalog.WithDiscoveredLevels(Array.Empty<string>()),item => item.Destination?.LevelId == GameLevelIds.LightingBasics);
         using var flow = new GameFlowController(new Factory());
-        flow.Execute(GameUiCommand.OpenLevelSelect);
-        int index = flow.MenuItems.ToList().FindIndex(item =>
-            item.Destination?.LevelId == GameLevelIds.LightingBasics);
-        Assert.True(index >= 0);
-        for (int i = 0; i < index; i++) flow.Navigate(1);
-        flow.ConfirmSelection();
+        Assert.Equal(SceneQueueResult.Queued,flow.RequestPlay(GameLevelIds.LightingBasics));
         Assert.Equal(GameLevelIds.LightingBasics, flow.Scenes.Pending?.Destination?.LevelId);
         Assert.True(flow.CommitPending());
         Assert.Equal(MajorSceneKind.Gameplay, flow.ActiveScene);

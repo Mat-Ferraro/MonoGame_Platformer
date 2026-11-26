@@ -82,7 +82,9 @@ public sealed class LdtkContentCatalog
                 foreach (LdtkConnectedLevel level in connected.Levels.Values)
                 {
                     string id = AliasFor(Path.GetFileName(file), level.LevelId);
-                    if (IsReservedId(id) || entries.ContainsKey(id) ||
+                    bool qualityProject = Path.GetFileName(file) == "LightingQualityLab.ldtk" &&
+                        level.LevelId == GameLevelIds.LightingPerformanceLab && id == GameLevelIds.LightingQualityLab;
+                    if ((IsReservedId(id) && !qualityProject) || entries.ContainsKey(id) ||
                         staged.Any(other => other.LevelId == id))
                         throw new ArgumentException("Conflicting or reserved level ID: " + id);
                     // Validate each independently authored visual layer and free
@@ -139,6 +141,7 @@ public sealed class LdtkContentCatalog
     private static string AliasFor(string filename, string identifier) =>
         (filename, identifier) switch
         {
+            ("LightingQualityLab.ldtk", GameLevelIds.LightingPerformanceLab) => GameLevelIds.LightingQualityLab,
             ("FirstAttempt.ldtk", "Level_0") => GameLevelIds.LdtkTest,
             ("ParallaxDemo.ldtk", "PARALLAX_DEMO") => GameLevelIds.LdtkParallaxDemo,
             ("SceneryDemo.ldtk", "SCENERY_DEMO") => GameLevelIds.LdtkSceneryDemo,
@@ -149,5 +152,5 @@ public sealed class LdtkContentCatalog
     private static bool IsReservedId(string id) => id is
         GameLevelIds.MovementGym or GameLevelIds.SharedWorld or
         GameLevelIds.AuthoredWorld or GameLevelIds.MotionLab or
-        GameLevelIds.RouteA or GameLevelIds.RouteB;
+        GameLevelIds.RouteA or GameLevelIds.RouteB or GameLevelIds.LightingQualityLab;
 }

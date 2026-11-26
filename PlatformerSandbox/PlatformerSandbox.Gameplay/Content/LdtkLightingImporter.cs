@@ -122,6 +122,7 @@ public static class LdtkLightingImporter
                         EmitterFootprint = Enum.TryParse<AreaEmitterFootprint>(Text(fields, "EmitterFootprint", "Line"), false, out var footprint) && Enum.IsDefined(footprint)
                             ? footprint : throw new ArgumentException("EmitterFootprint must be Line, Disc or Rectangle."),
                         EmitterWidth = Number(fields, "EmitterWidthWorld", 2, .1, 40),
+                        AreaSampleCount = AreaSamples(fields),
                         PulseDepth = Number(fields, "LightPulseDepth", 0, 0, 1),
                         PulseHz = Number(fields, "LightPulseHz", 1, .01, 5),
                         PulseTint = fields.TryGetValue("LightPulseTint", out var pulseTint) && pulseTint.ValueKind != JsonValueKind.Null
@@ -458,6 +459,13 @@ public static class LdtkLightingImporter
             JsonValueKind.False => false,
             _ => throw new ArgumentException("Lighting field " + key + " must be boolean.")
         };
+    }
+    private static int AreaSamples(Dictionary<string, JsonElement> fields)
+    {
+        double n = Number(fields, "AreaSampleCount", 0, 0, 9);
+        if (n != (int)n || (int)n is not (0 or 1 or 3 or 5 or 7 or 9))
+            throw new ArgumentException("AreaSampleCount must be 0, 1, 3, 5, 7 or 9.");
+        return (int)n;
     }
     private static double Number(Dictionary<string, JsonElement> fields, string key,
         double fallback, double min, double max)

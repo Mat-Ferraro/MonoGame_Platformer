@@ -21,10 +21,22 @@ public static class ShadowCasterPruning
     {
         ArgumentNullException.ThrowIfNull(light);
         ArgumentNullException.ThrowIfNull(candidates);
+        var result = new List<LightingOccluder>(candidates.Count);
+        FilterInto(light,candidates,result);
+        return result;
+    }
+
+    /// <summary>Caller-owned scratch list; never use where consumers retain list identity.</summary>
+    public static void FilterInto(RadialLight light, IReadOnlyList<LightingOccluder> candidates, List<LightingOccluder> result)
+    {
+        ArgumentNullException.ThrowIfNull(light);
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(result);
+        if(ReferenceEquals(candidates,result)) throw new ArgumentException("Input and output must differ.");
+        result.Clear();
         light.Validate();
         double radius = light.Radius * ConservativeRadiusScale;
         double radiusSquared = radius * radius;
-        var result = new List<LightingOccluder>(candidates.Count);
         foreach (LightingOccluder caster in candidates)
         {
             if (caster is null)
@@ -35,7 +47,6 @@ public static class ShadowCasterPruning
             if (IntersectsBounds(caster, light.Position, radiusSquared))
                 result.Add(caster);
         }
-        return result;
     }
 
     private static bool IntersectsBounds(LightingOccluder caster,

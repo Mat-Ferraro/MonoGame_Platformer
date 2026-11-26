@@ -23,12 +23,13 @@ public sealed class L19CMaterialShowcaseAmplificationTests
     }
 
     [Fact]
-    public void MaterialShowcaseStillKeepsLightingIntegrationVisibleInMenu()
+    public void MaterialShowcaseKeepsLegacyLightingIntegrationHidden()
     {
         Assert.Contains(GameLevelMenuCatalog.Items,
             item => item.Destination?.LevelId == GameLevelIds.MaterialShowcaseTest);
-        Assert.Contains(GameLevelMenuCatalog.Items,
+        Assert.DoesNotContain(GameLevelMenuCatalog.Items,
             item => item.Destination?.LevelId == GameLevelIds.LightingIntegrationTest);
+        Assert.True(GameLevelIds.IsStandalonePlayableLevel(GameLevelIds.LightingIntegrationTest));
     }
 
     [Fact]

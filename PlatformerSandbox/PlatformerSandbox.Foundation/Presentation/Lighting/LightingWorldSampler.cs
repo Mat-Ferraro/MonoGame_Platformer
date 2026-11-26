@@ -10,29 +10,29 @@ public static class LightingWorldSampler
     // Two radii are intentional: attenuation uses the art radius scale, while
     // the existing shadow test uses the original authored sample geometry.
     public readonly record struct PreparedSample(RadialLight Original, RadialLight? AttenuationLight);
-    public static IReadOnlyList<PreparedSample> Prepare(IReadOnlyList<RadialLight> lights, LightingArtPreset art)
+    public static IReadOnlyList<PreparedSample> Prepare(IReadOnlyList<RadialLight> lights, LightingArtPreset art, int count = AreaEmitterSampling.MaximumSamples, PreparedAreaLightCache? cache = null)
     {
         var samples = new List<PreparedSample>();
-        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+        foreach (RadialLight light in cache is null ? AreaEmitterSampling.Expand(lights, count) : cache.Expand(lights, count))
             samples.Add(new PreparedSample(light, light with { Radius = Math.Min(10000, light.Radius * art.LightRadiusScale) }));
         return samples.AsReadOnly();
     }
-    private static IEnumerable<PreparedSample> ReferenceSamples(IReadOnlyList<RadialLight> lights, LightingArtPreset art)
+    private static IEnumerable<PreparedSample> ReferenceSamples(IReadOnlyList<RadialLight> lights, int count)
     {
-        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, AreaEmitterSampling.MaximumSamples))
+        foreach (RadialLight light in AreaEmitterSampling.Expand(lights, count))
             yield return new PreparedSample(light, null);
     }
     public static LightRgb Sample(LightPoint point, LightChannel channel,
         bool receivesShadows, string? ownOccluderId, LightingArtPreset art,
         IReadOnlyList<RadialLight> lights, IReadOnlyList<LightingOccluder> blockers,
-        SceneLightingLayer? layer = null, IReadOnlyList<PreparedSample>? prepared = null)
+        SceneLightingLayer? layer = null, IReadOnlyList<PreparedSample>? prepared = null, int sampleCount = AreaEmitterSampling.MaximumSamples)
     {
         point.Validate(); art.Validate();
         ArgumentNullException.ThrowIfNull(lights);
         ArgumentNullException.ThrowIfNull(blockers);
         LightRgb total = art.Ambient * (1 - art.AtmosphericDarkness) *
             (layer?.AmbientScale ?? 1) * art.AmbientScaleFor(layer?.Id);
-        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, art))
+        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, sampleCount))
         {
             RadialLight light = sample.Original;
             if (layer is null ? (light.Channels & channel) == 0 :
@@ -57,7 +57,7 @@ public static class LightingWorldSampler
     public static LightRgb SampleSilhouetteReveal(LightPoint point, LightChannel channel,
         bool receivesShadows, string? ownOccluderId, LightingArtPreset art,
         IReadOnlyList<RadialLight> lights, IReadOnlyList<LightingOccluder> blockers,
-        SceneLightingLayer layer, IReadOnlyList<PreparedSample>? prepared = null)
+        SceneLightingLayer layer, IReadOnlyList<PreparedSample>? prepared = null, int sampleCount = AreaEmitterSampling.MaximumSamples)
     {
         point.Validate(); art.Validate();
         ArgumentNullException.ThrowIfNull(lights);
@@ -65,7 +65,7 @@ public static class LightingWorldSampler
         ArgumentNullException.ThrowIfNull(layer);
         layer.Validate();
         LightRgb total = LightRgb.Black;
-        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, art))
+        foreach (PreparedSample sample in (IEnumerable<PreparedSample>?)prepared ?? ReferenceSamples(lights, sampleCount))
         {
             RadialLight light = sample.Original;
             if (!light.RevealsSilhouettes || !LightLayerRouting.Illuminates(light, layer))
@@ -96,6 +96,7 @@ public static class LightingWorldSampler
         foreach (LightingOccluder blocker in blockers)
         {
             if (blocker.Owner == ownId || !LightLayerRouting.Occludes(light, blocker)) continue;
+            if (PlatformerSandbox.Foundation.Performance.EnginePerformanceOptions.SharedSamples && !VisibilityGeometryFingerprint.SegmentMayTouch(rayOrigin, point, blocker)) continue;
             // A finite directional shadow must not darken the hero for the
             // whole level. Match the GPU world's authored projection reach.
             if (ReceiverWallShadowPolicy.StartsAtExit(light, blocker))

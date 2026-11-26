@@ -305,7 +305,9 @@ internal static class LdtkLevelRenderer
             if (drawBackdrop) backdropDrawn = true;
             bool gameplay = layer.Group == RenderLayerGroup.Gameplay;
             if (!drawBackdrop && !gameplay &&
-                (visuals is null || !visuals.HasLayerContent(scene, layer.Id))) continue;
+                (visuals is null || !(PlatformerSandbox.Foundation.Performance.EnginePerformanceOptions.VisibleLayers
+                    ? visuals.HasVisibleLayerContent(scene, layer, view.CameraLeftPx, view.CameraTopPx, viewport)
+                    : visuals.HasLayerContent(scene, layer.Id)))) continue;
             if (layer.Mode == RenderLayerLightingMode.Unlit)
             {
                 if (drawBackdrop)

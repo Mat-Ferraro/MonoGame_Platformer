@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PlatformerSandbox.Foundation.Performance;
 
 namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 
@@ -24,6 +25,17 @@ public sealed class SharedVisibilityKey
         _litFaces=litFaces; _softness=softness; _contact=contact; _emitter=emitter;
         _hulls=blockers.Select(h => (h.CaptureValidatedVertices(), litFaces && ReceiverWallShadowPolicy.StartsAtExit(light,h))).ToArray();
     }
+    public static int Fingerprint(LightingViewport view, RadialLight light,
+        SurfaceReceiverProjection receiver, int samples, bool litFaces, float softness,
+        bool contact, float emitter, IReadOnlyList<LightingOccluder> blockers)
+    {
+        var h = new HashCode();
+        h.Add(view); h.Add(receiver); h.Add(samples); h.Add(litFaces); h.Add(softness);
+        h.Add(contact); h.Add(emitter); h.Add(light.Position); h.Add(light.Radius);
+        h.Add(light.Shape); h.Add(light.Direction); h.Add(light.DirectionalShadowLength); h.Add(light.VirtualZ);
+        h.Add(VisibilityGeometryFingerprint.BlockersHash(light, blockers, litFaces));
+        return h.ToHashCode();
+    }
     public bool Matches(LightingViewport view, RadialLight light,
         SurfaceReceiverProjection receiver, int samples, bool litFaces, float softness,
         bool contact, float emitter, IReadOnlyList<LightingOccluder> blockers)
@@ -36,7 +48,7 @@ public sealed class SharedVisibilityKey
             _light.VirtualZ!=light.VirtualZ || _hulls.Length!=blockers.Count) return false;
         for(int i=0;i<_hulls.Length;i++)
             if (_hulls[i].Exit!=(litFaces && ReceiverWallShadowPolicy.StartsAtExit(light,blockers[i])) ||
-                !_hulls[i].Vertices.AsSpan().SequenceEqual(blockers[i].Vertices)) return false;
+                !(EnginePerformanceOptions.HashedVisibility ? VisibilityGeometryFingerprint.Same(_hulls[i].Vertices, blockers[i]) : _hulls[i].Vertices.AsSpan().SequenceEqual(blockers[i].Vertices))) return false;
         return true;
     }
 }

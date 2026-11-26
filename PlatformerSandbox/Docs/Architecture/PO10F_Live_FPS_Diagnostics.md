@@ -1,0 +1,7 @@
+# PO10F live FPS diagnostics
+
+The original HUD and CSV both use Stopwatch draw-start intervals. FPS is reciprocal of the mean interval; not simulation rate or physical monitor refresh. The old 120-interval HUD can take ~10 seconds to replace all samples at 12 FPS. Interactive labs now show separate rendered-frame and simulation-update throughput over successive windows of at least one second. Frame mean/P95 over the last 120 intervals remain available in Renderer Metrics. Update, Draw and EndDraw wall-time means refer to the same recent window; other includes software pacing, framework/OS overhead and unclassified wait. These are not GPU timestamps or display presentation counts. The existing CSV capture and automated rendering path are unchanged. Configuration changes reset the live window.
+
+The visible panel shows build mode, debugger attachment, requested lighting/mask scales, actual target dimensions and active-window state. Compare normal showcase to normal showcase (not Static Shadow); use Release without debugger, High quality, Optimized 50%, freeze light/scene animation, VSync off, uncapped, panel collapsed, and leave the player stationary. Choose these intentionally: enabling all optimizations never changes quality or pacing. Compare expanded versus collapsed panel separately.
+
+Apply on top of PO10F. C# compilation and runtime validation are required on the target machine. Two headless tests added for throughput and reset. No shader or rendering algorithm changed.

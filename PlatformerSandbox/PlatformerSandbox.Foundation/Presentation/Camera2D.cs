@@ -12,6 +12,8 @@ public sealed record CameraFollowSettings
     public double HorizontalSpeedThreshold { get; init; } = 0.25;
     public double FollowSharpness { get; init; } = 9.0;
     public double MaximumFrameSeconds { get; init; } = 0.05;
+    /// <summary>World-unit distance at which the focus reaches the exact dead-zone boundary. Zero disables snapping.</summary>
+    public double ConvergenceDistance { get; init; } = 0.001;
 
     public void Validate()
     {
@@ -21,6 +23,7 @@ public sealed record CameraFollowSettings
         Check(HorizontalSpeedThreshold, nameof(HorizontalSpeedThreshold), false);
         Check(FollowSharpness, nameof(FollowSharpness), true);
         Check(MaximumFrameSeconds, nameof(MaximumFrameSeconds), true);
+        Check(ConvergenceDistance, nameof(ConvergenceDistance), false);
     }
 
     private static void Check(double value, string name, bool positive)
@@ -72,8 +75,8 @@ public sealed class Camera2D
         double dt = Math.Min(deltaSeconds, _settings.MaximumFrameSeconds);
         double alpha = 1.0 - Math.Exp(-_settings.FollowSharpness * dt);
         // Vector2D refuses non-finite values, matching the project's numerical policy.
-        _focus = new Vector2D(_focus.X + (desiredX - _focus.X) * alpha,
-            _focus.Y + (desiredY - _focus.Y) * alpha);
+        _focus = new Vector2D(Converge(_focus.X, desiredX, alpha),
+            Converge(_focus.Y, desiredY, alpha));
     }
 
     public Camera2DView GetView(double levelWidth, double levelHeight,
@@ -81,11 +84,22 @@ public sealed class Camera2D
         Camera2DView.FromFocus(_focus, levelWidth, levelHeight,
             viewportWidth, viewportHeight, pixelsPerWorldUnit);
 
-    private static double ApplyDeadZone(double focus, double target, double halfSize)
+    private double Converge(double current, double desired, double alpha)
     {
-        double difference = target - focus;
-        return Math.Abs(difference) <= halfSize ? focus :
-            target - Math.Sign(difference) * halfSize;
+        double next = current + (desired - current) * alpha;
+        return _settings.ConvergenceDistance > 0 &&
+            Math.Abs(desired - next) <= _settings.ConvergenceDistance ? desired : next;
+    }
+
+    private double ApplyDeadZone(double focus, double target, double halfSize)
+    {
+        if (_settings.ConvergenceDistance == 0)
+        {
+            double difference = target - focus;
+            return Math.Abs(difference) <= halfSize ? focus : target - Math.Sign(difference) * halfSize;
+        }
+        double lower = target - halfSize, upper = target + halfSize;
+        return focus < lower ? lower : focus > upper ? upper : focus;
     }
 }
 

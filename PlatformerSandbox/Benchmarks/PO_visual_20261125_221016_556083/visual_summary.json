@@ -1,0 +1,93 @@
+[
+  {
+    "group": "hard_cache",
+    "name": "repeat",
+    "comparison": "control",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "hard_cache",
+    "name": "cached",
+    "comparison": "strict",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "hard_cache",
+    "name": "buffers_off",
+    "comparison": "strict",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "moving_hard_cache",
+    "name": "repeat",
+    "comparison": "control",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "moving_hard_cache",
+    "name": "cached",
+    "comparison": "strict",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "soft_cache_guard",
+    "name": "repeat",
+    "comparison": "control",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  },
+  {
+    "group": "soft_cache_guard",
+    "name": "cached",
+    "comparison": "strict",
+    "state_matches": true,
+    "reference_repeat_exact": true,
+    "verdict": "EXACT_MATCH",
+    "mean_abs": 0.0,
+    "rmse": 0.0,
+    "max_channel": 0,
+    "changed_fraction": 0.0,
+    "over_2_fraction": 0.0
+  }
+]

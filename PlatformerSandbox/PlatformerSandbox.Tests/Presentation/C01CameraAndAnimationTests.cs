@@ -95,6 +95,57 @@ public sealed class C01CameraAndAnimationTests
     }
 
     [Fact]
+    public void Camera_ConvergesExactlyAndRemainsStableAtDeadZoneBoundary()
+    {
+        var camera = new Camera2D(new CameraFollowSettings { HorizontalLookAhead = 0, ConvergenceDistance = .001 });
+        camera.Snap(new Vector2D(10, 10));
+        var target = new Vector2D(10.7, 15.28);
+        for (int i = 0; i < 100; i++) camera.Follow(target, Still, 1.0 / 60);
+        var settled = camera.Focus;
+        Assert.Equal(target.X - .4, settled.X);
+        Assert.Equal(target.Y - .24, settled.Y);
+        for (int i = 0; i < 60; i++) camera.Follow(target, Still, 1.0 / 60);
+        Assert.Equal(settled, camera.Focus);
+        camera.Follow(new Vector2D(12, 15.28), Still, 1.0/60);
+        Assert.True(camera.Focus.X > settled.X);
+    }
+
+    [Fact]
+    public void Camera_LegacyOptOutAndPanPathAreDeterministic()
+    {
+        var legacy = new Camera2D(new CameraFollowSettings { HorizontalLookAhead = 0, ConvergenceDistance = 0 });
+        legacy.Snap(new Vector2D(10, 10));
+        var target = new Vector2D(10.7, 15.28);
+        for (int i = 0; i < 60; i++) legacy.Follow(target, Still, 1.0 / 60);
+        Assert.NotEqual(target.Y - .24, legacy.Focus.Y);
+        var view = legacy.GetView(40, 40, 1280, 720, 32);
+        var a = BenchmarkCameraPath.View(view,40,40,30);
+        var b = BenchmarkCameraPath.View(view,40,40,150);
+        Assert.Equal(a, BenchmarkCameraPath.View(view,40,40,270));
+        Assert.Equal(0,a.Left);
+        Assert.NotEqual(a.Bottom,b.Bottom);
+        Assert.InRange(a.Bottom,0,40-a.VisibleHeight);
+        Assert.InRange(b.Bottom,0,40-b.VisibleHeight);
+    }
+
+    [Fact]
+    public void ManualQualityLabSweepSupportsIndependentAxesAt720pAnd1080p()
+    {
+        foreach (var size in new[]{(1280,720),(1920,1080)})
+        {
+            var basis=Camera2DView.FromFocus(new Vector2D(60,20),120,40,size.Item1,size.Item2,32);
+            var left=BenchmarkCameraPath.ManualView(basis,120,40,270,true,false);
+            var right=BenchmarkCameraPath.ManualView(basis,120,40,90,true,false);
+            Assert.True(right.Left>left.Left); Assert.Equal(left.Bottom,right.Bottom);
+            var down=BenchmarkCameraPath.ManualView(basis,120,40,270,false,true);
+            var up=BenchmarkCameraPath.ManualView(basis,120,40,90,false,true);
+            Assert.True(up.Bottom>down.Bottom); Assert.Equal(down.Left,up.Left);
+            Assert.InRange(right.Left,0,120-basis.VisibleWidth);
+            Assert.InRange(up.Bottom,0,40-basis.VisibleHeight);
+        }
+    }
+
+    [Fact]
     public void Camera_LookAheadChangesDirectionButDoesNotMoveSimulationPlayer()
     {
         var camera = new Camera2D(new CameraFollowSettings

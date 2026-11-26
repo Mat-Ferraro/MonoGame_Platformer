@@ -29,6 +29,20 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
         return (new Color(Convert.ToByte(art.TintHex.Substring(1, 2), 16),
             Convert.ToByte(art.TintHex.Substring(3, 2), 16), Convert.ToByte(art.TintHex.Substring(5, 2), 16)), effects);
     }
+    private readonly Dictionary<string, (LightingSurfaceOptions Options, LightPoint? Center, ProductionSurfaceSubmission Submission)> _preparedMaterials = new(StringComparer.Ordinal);
+    private ProductionSurfaceSubmission PrepareMaterial(string id, LightingSurfaceOptions settings, LightPoint? center,
+        float opacity, float rotation, bool flipX, bool flipY)
+    {
+        if (EnginePerformanceOptions.PreparedMaterials && _preparedMaterials.TryGetValue(id, out var cached) &&
+            cached.Options == settings && cached.Center == center) return cached.Submission;
+        var result = settings.MaterialShading == ProductionSurfaceShading.Legacy
+            ? SpatialSurfaceLighting.Promote(id, settings) : ProductionSurfaceSubmission.From(id, settings);
+        if (center is LightPoint c) result = result with { Center = c };
+        result = result with { VisualOpacity = opacity, MapRotationDegrees = rotation, MapFlipX = flipX, MapFlipY = flipY };
+        result.Validate();
+        if (EnginePerformanceOptions.PreparedMaterials) _preparedMaterials[id] = (settings,center,result);
+        return result;
+    }
     public LdtkVisualDefinition Definition { get; }
     public LdtkSceneryDefinition Scenery { get; }
     public LdtkTerrainArtworkDefinition? Terrain { get; }
@@ -196,8 +210,7 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                     if (post && drawMaterial is not null && lighting is not null &&
                         SpatialSurfaceLighting.CanPromote(settings, lighting.Layers.Get(settings.LayerId)))
                     {
-                        var submission = SpatialSurfaceLighting.Promote(sprite.InstanceId, settings)
-                            with { VisualOpacity = sprite.Opacity };
+                        var submission = PrepareMaterial(sprite.InstanceId, settings, null, sprite.Opacity, 0, false, false);
                         var (x,y,w,h) = LdtkSceneryTransform.Project(sprite,cx,cy);
                         var region = ProductionMaterialRegionPlanner.ForSprite(x,y,w,h,sprite.PivotX,
                             sprite.PivotY,sprite.RotationDegrees,view.Width,view.Height);
@@ -243,19 +256,9 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                         (settings.MaterialShading != ProductionSurfaceShading.Legacy ||
                             (lighting is not null && SpatialSurfaceLighting.CanPromote(settings, lighting.Layers.Get(settings.LayerId)))))
                     {
-                        ProductionSurfaceSubmission submission =
-                            settings.MaterialShading == ProductionSurfaceShading.Legacy
-                                ? SpatialSurfaceLighting.Promote(art.InstanceId, settings)
-                                : ProductionSurfaceSubmission.From(art.InstanceId, settings);
-                        if (lighting is not null &&
-                            lighting.SurfaceCenters.TryGetValue(art.InstanceId, out LightPoint center))
-                            submission = submission with { Center = center };
-                        // Capture the actual artwork opacity in the production contract.
-                        // The draw callback already applies it to the source alpha.
-                        // This remains independent of CastsShadows.
-                        submission = submission with { VisualOpacity = art.Opacity, MapRotationDegrees = art.RotationDegrees,
-                            MapFlipX = art.FlipX, MapFlipY = art.FlipY };
-                        submission.Validate();
+                        LightPoint? center = lighting is not null && lighting.SurfaceCenters.TryGetValue(art.InstanceId, out var c) ? c : null;
+                        ProductionSurfaceSubmission submission = PrepareMaterial(art.InstanceId, settings, center,
+                            art.Opacity, art.RotationDegrees, art.FlipX, art.FlipY);
                         Action<SpriteBatch> albedo = sb => DrawArtwork(sb, art,
                             cameraX, cameraY, view, Color.White, null);
                         Action<SpriteBatch>? normals =
@@ -293,6 +296,44 @@ internal sealed class LdtkVisualSceneAssets : IDisposable
                 }
             }
         }
+    }
+
+    public bool HasVisibleLayerContent(LdtkLightingScene scene, SceneLightingLayer layer,
+        double cameraX, double cameraY, Viewport view)
+    {
+        var plane = layer.Group switch { RenderLayerGroup.Background => LdtkVisualPlane.Background,
+            RenderLayerGroup.Gameplay => LdtkVisualPlane.Terrain, _ => LdtkVisualPlane.Foreground };
+        cameraX *= layer.ParallaxMultiplier; cameraY *= layer.ParallaxMultiplier;
+        foreach (var tiles in Definition.Layers)
+        {
+            if (tiles.Plane != plane || scene.Layers.ForTile(tiles.Name).Id != layer.Id) continue;
+            foreach (var tile in tiles.Tiles)
+            {
+                var (x,y,w,h) = LdtkVisualTransform.Project(tiles,tile,cameraX,cameraY,view.Width,view.Height);
+                if (w < .5 || h < .5) continue;
+                if (x+w >= -2 && y+h >= -2 && x <= view.Width+2 && y <= view.Height+2) return true;
+            }
+        }
+        bool Near(double x,double y,double w,double h)
+        {
+            // Match the existing conservative sprite culling, with extra room
+            // for contact decorations and independently projected materials.
+            double r = Math.Sqrt(w*w+h*h)+8;
+            return x+r>=0 && y+r>=0 && x-r<=view.Width && y-r<=view.Height;
+        }
+        foreach (var sprite in Scenery.Sprites)
+        {
+            if (sprite.Plane != plane || scene.GetSurface(sprite.InstanceId).LayerId != layer.Id) continue;
+            var (x,y,w,h) = LdtkSceneryTransform.Project(sprite,cameraX,cameraY);
+            if (Near(x,y,w,h)) return true;
+        }
+        if (Terrain is not null) foreach (var art in Terrain.Artworks)
+        {
+            if (art.Plane != plane || scene.GetSurface(art.InstanceId).LayerId != layer.Id) continue;
+            var (x,y,w,h) = LdtkTerrainArtworkTransform.Project(art,cameraX,cameraY);
+            if (Near(x,y,w,h)) return true;
+        }
+        return false;
     }
 
     public bool HasLayerContent(LdtkLightingScene scene, string layerId)

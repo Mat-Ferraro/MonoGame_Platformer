@@ -240,10 +240,12 @@ public sealed class GameplayLightingPresenter
 
     public IReadOnlyList<RadialLight> BuildVisible(LightingViewport viewport,
         IEnumerable<RadialLight>? particleLights = null,
-        IEnumerable<RadialLight>? debugLights = null, string? filterTag = null)
+        IEnumerable<RadialLight>? debugLights = null, string? filterTag = null,
+        LightingFrameBudget? budgetOverride = null, List<LightSelectionDiagnostic>? diagnostics = null)
     {
+        diagnostics?.Clear();
         if (!Enabled || _scene is null) return Array.Empty<RadialLight>();
-        LightingFrameBudget budget = LightingFrameBudget.For(Quality);
+        LightingFrameBudget budget = budgetOverride ?? LightingFrameBudget.For(Quality);
         var all = new List<RadialLight>(_scene.Lights.Count + _flashes.Count + 6);
         all.AddRange(CurrentAuthoredLights());
         foreach (Flash flash in _flashes)
@@ -275,7 +277,12 @@ public sealed class GameplayLightingPresenter
                 if (all.Count > 256) break;
             }
         string[]? tags = filterTag?.Split('|');
-        return LightingFramePlanner.Select(tags is null ? all : all.Where(l => tags.Contains(l.Tag, StringComparer.Ordinal)),
-            viewport, budget, ReducedFlashes);
+        var selected = LightingFramePlanner.Select(tags is null ? all : all.Where(l => tags.Contains(l.Tag, StringComparer.Ordinal)),
+            viewport, budget, ReducedFlashes, diagnostics);
+        if (diagnostics is not null && tags is not null)
+            foreach (RadialLight light in all)
+                if (!tags.Contains(light.Tag, StringComparer.Ordinal))
+                    diagnostics.Add(new LightSelectionDiagnostic(light, LightSelectionState.WorkloadFiltered));
+        return selected;
     }
 }

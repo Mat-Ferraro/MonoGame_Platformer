@@ -5,12 +5,12 @@ using System.Diagnostics;
 
 namespace PlatformerSandbox.Gameplay.GameFlow;
 
-public enum GameUiScreen { Title, Pause, Settings, Controls, LevelSelect }
+public enum GameUiScreen { Title, Pause, Settings, Controls, LevelSelect, Graphics }
 public enum GameUiCommand
 {
     PlayMovementGym, PlaySharedWorld, PlayAuthoredWorld, PlayMotionLab,
     Resume, Restart, Settings, Controls, ToggleHints, Back, ReturnToTitle, Quit,
-    PlayRouteLab, OpenLevelSelect, PlaySelectedLevel
+    PlayRouteLab, OpenLevelSelect, PlaySelectedLevel, Graphics
 }
 public readonly record struct GameUiMenuItem(string Label, GameUiCommand Command,
     SceneDestination? Destination = null);
@@ -30,25 +30,30 @@ public static class GameLevelMenuCatalog
         {
             new("PLAY / CONNECTED CAVERN", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LdtkConnectedA)),
-            new("LIGHTING / INTEGRATION TEST", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(LightingIntegrationTest)),
-            new("MATERIAL / LIGHTING SHOWCASE", GameUiCommand.PlaySelectedLevel,
+            new("TEST / MATERIAL SHOWCASE", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.MaterialShowcaseTest)),
-            new("LIGHTING / TYPES LAB (PHASE 20)", GameUiCommand.PlaySelectedLevel,
+            new("TEST / LIGHT TYPES SHOWCASE", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LightTypesLab)),
-            new("LIGHTING / EMISSIVE COLOR LAB", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.EmissiveLightingLab)),
-            new("LIGHTING / PHASE 21 LAB", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.Phase21LightingLab)),
-            new("LIGHTING / PERFORMANCE LAB", GameUiCommand.PlaySelectedLevel,
+            new("ENGINE PERFORMANCE LAB", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LightingPerformanceLab)),
-            new("LAB / LIGHTING BASICS", GameUiCommand.PlaySelectedLevel,
-                new SceneDestination(GameLevelIds.LightingBasics)),
-            new("GYM / MOVEMENT", GameUiCommand.PlaySelectedLevel,
+            new("TEST / LIGHTING QUALITY LAB", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.LightingQualityLab)),
+            new("TEST / MOVEMENT GYM", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.MovementGym))
         });
 
     public static IReadOnlyList<GameUiMenuItem> Items => _items;
+    public static bool IsLegacy(GameUiMenuItem item) => item.Destination?.LevelId is
+        GameLevelIds.LightingIntegrationTest or GameLevelIds.EmissiveLightingLab or GameLevelIds.Phase21LightingLab or GameLevelIds.LightingBasics;
+    public static IReadOnlyList<GameUiMenuItem> Primary(IReadOnlyList<GameUiMenuItem> entries)
+    {
+        string[] order = { GameLevelIds.LdtkConnectedA, GameLevelIds.LightingPerformanceLab, GameLevelIds.LightingQualityLab,
+            GameLevelIds.MovementGym, GameLevelIds.MaterialShowcaseTest, GameLevelIds.LightTypesLab };
+        var items = entries.Where(x => !IsLegacy(x)).OrderBy(x => Array.IndexOf(order,x.Destination?.LevelId)).ToList();
+        // Retired labs remain direct-launchable for regression coverage, never listed here.
+        items.Add(new("BACK", GameUiCommand.Back));
+        return items.AsReadOnly();
+    }
 
     /// <summary>Only display currently maintained LDtk scenes that actually exist.
     /// Debug fixtures remain available via direct --dev-level or linked exits.</summary>
@@ -57,7 +62,7 @@ public static class GameLevelMenuCatalog
         ArgumentNullException.ThrowIfNull(levelIds);
         var available = levelIds.ToHashSet(StringComparer.Ordinal);
         var menu = _items.Where(x => x.Destination is SceneDestination destination &&
-            (destination.LevelId is GameLevelIds.LightingBasics or GameLevelIds.MovementGym ||
+            (destination.LevelId == GameLevelIds.MovementGym ||
              available.Contains(destination.LevelId))).ToArray();
         return Array.AsReadOnly(menu);
     }
@@ -147,7 +152,7 @@ public sealed class GameUiNavigation
                 (scene == MajorSceneKind.Title && current == GameUiScreen.Title) ||
                 (scene == MajorSceneKind.Gameplay && current == GameUiScreen.Pause),
             GameUiScreen.Settings => current is GameUiScreen.Pause or GameUiScreen.Title,
-            GameUiScreen.Controls => current == GameUiScreen.Settings,
+            GameUiScreen.Controls or GameUiScreen.Graphics => current == GameUiScreen.Settings,
             _ => false
         };
         if (!valid) throw new InvalidOperationException("Invalid UI navigation transition.");
@@ -191,7 +196,8 @@ public sealed class GameFlowController : IDisposable
         IReadOnlyList<GameUiMenuItem>? levelMenuItems = null)
     {
         _scenes = new GameSceneCoordinator(factory);
-        _levelMenuItems = levelMenuItems ?? GameLevelMenuCatalog.Items;
+        var catalog = levelMenuItems ?? GameLevelMenuCatalog.Items;
+        _levelMenuItems = GameLevelMenuCatalog.Primary(catalog);
         if (_levelMenuItems.Count == 0)
             throw new ArgumentException("Level menu cannot be empty.", nameof(levelMenuItems));
     }
@@ -232,9 +238,10 @@ public sealed class GameFlowController : IDisposable
         [
             new(ShowFlowHints ? "FLOW HINTS: ON" : "FLOW HINTS: OFF", GameUiCommand.ToggleHints),
             new("CONTROLS", GameUiCommand.Controls),
+            new("GRAPHICS SETTINGS", GameUiCommand.Graphics),
             new("BACK", GameUiCommand.Back)
         ],
-        GameUiScreen.Controls => [new("BACK", GameUiCommand.Back)],
+        GameUiScreen.Controls or GameUiScreen.Graphics => [new("BACK", GameUiCommand.Back)],
         _ => Array.Empty<GameUiMenuItem>()
     };
 
@@ -385,6 +392,9 @@ public sealed class GameFlowController : IDisposable
                 break;
             case GameUiCommand.Settings:
                 _ui.Push(GameUiScreen.Settings, ActiveScene);
+                break;
+            case GameUiCommand.Graphics:
+                _ui.Push(GameUiScreen.Graphics, ActiveScene);
                 break;
             case GameUiCommand.Controls:
                 _ui.Push(GameUiScreen.Controls, ActiveScene);

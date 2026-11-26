@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PlatformerSandbox.Foundation.Performance;
 
 namespace PlatformerSandbox.Foundation.Presentation.Lighting;
 
@@ -12,6 +13,8 @@ public enum AreaEmitterFootprint { Line, Disc, Rectangle }
 public static class AreaEmitterSampling
 {
     public const int MaximumSamples = 9;
+    public static int ResolveCount(RadialLight light, int count) => count == 1 || EnginePerformanceOptions.AreaSamples != 0
+        ? count : light.AreaSampleCount == 0 ? count : light.AreaSampleCount;
     public static int CountForRadialBudget(int radialSamples) => radialSamples >= 192 ? 9 : radialSamples >= 128 ? 5 : 3;
     public static double Extent(RadialLight light) => light.Shape != LightShape.Tube ? 0 :
         light.EmitterFootprint == AreaEmitterFootprint.Rectangle
@@ -21,7 +24,7 @@ public static class AreaEmitterSampling
     public static IReadOnlyList<RadialLight> Samples(RadialLight light, int count = MaximumSamples)
     {
         light.Validate();
-        if (count is not (1 or 3 or 5 or 9)) throw new ArgumentOutOfRangeException(nameof(count));
+        if (count is not (1 or 3 or 5 or 7 or 9)) throw new ArgumentOutOfRangeException(nameof(count));
         if (light.Shape != LightShape.Tube) return new[] { light };
         double d = Math.Sqrt(light.Direction.X*light.Direction.X + light.Direction.Y*light.Direction.Y);
         LightPoint axis = light.Direction*(1/d), side = new(-axis.Y, axis.X);
@@ -39,6 +42,13 @@ public static class AreaEmitterSampling
                 double a=2*Math.PI*i/(count-1);
                 offsets.Add(axis*(Math.Cos(a)*r)+side*(Math.Sin(a)*r));
             }
+        }
+        else if (count == 7)
+        {
+            // Center and six symmetric rectangular witnesses.
+            offsets.Add(new(0,0));
+            for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x+=2)
+                offsets.Add(axis*(x*light.TubeLength/3)+side*(y*light.EmitterWidth/3));
         }
         else if (count == 9)
             for (int y=-1;y<=1;y++) for(int x=-1;x<=1;x++)
@@ -60,7 +70,7 @@ public static class AreaEmitterSampling
         foreach (RadialLight light in lights)
         {
             if (light.Shape != LightShape.Tube) { yield return light; continue; }
-            foreach (RadialLight sample in Samples(light,count)) yield return sample;
+            foreach (RadialLight sample in Samples(light,ResolveCount(light,count))) yield return sample;
         }
     }
 }

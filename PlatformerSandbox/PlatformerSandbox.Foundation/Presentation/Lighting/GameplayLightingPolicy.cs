@@ -132,6 +132,16 @@ public enum LightingQuality { Low, Balanced, High }
 public readonly record struct LightingFrameBudget(int MaxLights, int MaxShadowLights,
     int ShadowRadialSamples, int MaxParticleLights)
 {
+    /// <summary>Manual correctness inspection: retain the normal material-light ceiling
+    /// while allowing every selected light to cast its authored shadow. Sampling and
+    /// particle budgets still follow quality. Never use implicitly in gameplay or benchmarks.</summary>
+    public static LightingFrameBudget ForManualCoverage(LightingQuality quality)
+    {
+        var budget = For(quality);
+        return budget with { MaxLights = ProductionMaterialLightPlan.MaximumLights,
+            MaxShadowLights = ProductionMaterialLightPlan.MaximumLights };
+    }
+
     public static LightingFrameBudget For(LightingQuality quality) => quality switch
     {
         LightingQuality.Low => new(4, 0, 64, 1),
@@ -312,14 +322,18 @@ public sealed class LightingGameCatalog
 public static class LightingFramePlanner
 {
     public static IReadOnlyList<RadialLight> Select(IEnumerable<RadialLight> lights,
-        LightingViewport viewport, LightingFrameBudget budget, bool reducedFlashes)
+        LightingViewport viewport, LightingFrameBudget budget, bool reducedFlashes,
+        List<LightSelectionDiagnostic>? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(lights);
         viewport.Validate();
         if (budget.MaxLights <= 0 || budget.MaxShadowLights < 0)
             throw new ArgumentOutOfRangeException(nameof(budget));
 
-        RadialLight[] ordered = lights.Where(viewport.InfluencesViewport)
+        // Only snapshot rejected inputs when inspection was explicitly requested.
+        RadialLight[]? inspected = diagnostics is null ? null : lights.ToArray();
+        IEnumerable<RadialLight> source = inspected is null ? lights : inspected;
+        RadialLight[] ordered = source.Where(viewport.InfluencesViewport)
             .OrderByDescending(x => x.Priority).ThenBy(x => x.Id, StringComparer.Ordinal)
             .ToArray();
 
@@ -364,6 +378,21 @@ public static class LightingFramePlanner
                 Intensity = reducedFlashes && light.Owner == "flash"
                     ? light.Intensity * .25 : light.Intensity
             });
+        }
+        if (diagnostics is not null && inspected is not null)
+        {
+            var inView = new HashSet<string>(ordered.Select(l => l.Id), StringComparer.Ordinal);
+            var admitted = new HashSet<string>(candidates.Select(l => l.Id), StringComparer.Ordinal);
+            var active = result.ToDictionary(l => l.Id, StringComparer.Ordinal);
+            foreach (RadialLight light in inspected)
+            {
+                LightSelectionState state = !inView.Contains(light.Id) ? LightSelectionState.OutsideView :
+                    !admitted.Contains(light.Id) ? LightSelectionState.LightBudget :
+                    !active.TryGetValue(light.Id, out var selected) ? LightSelectionState.ShadowBudget :
+                    selected.CastShadows ? LightSelectionState.ActiveShadowed :
+                    light.CastShadows ? LightSelectionState.ActiveShadowLimited : LightSelectionState.ActiveUnshadowed;
+                diagnostics.Add(new LightSelectionDiagnostic(light, state));
+            }
         }
         return result;
     }

@@ -295,7 +295,7 @@ public sealed class GameSceneFlowTests
         flow.Execute(GameUiCommand.OpenLevelSelect);
         Assert.Equal(GameUiScreen.LevelSelect, flow.CurrentMenu);
         Assert.Contains(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.MovementGym);
-        Assert.Contains(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.LightingBasics);
+        Assert.DoesNotContain(flow.MenuItems, x => GameLevelMenuCatalog.IsLegacy(x));
         Assert.DoesNotContain(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.SharedWorld);
         Assert.DoesNotContain(flow.MenuItems, x => x.Destination?.LevelId == GameLevelIds.MotionLab);
     }

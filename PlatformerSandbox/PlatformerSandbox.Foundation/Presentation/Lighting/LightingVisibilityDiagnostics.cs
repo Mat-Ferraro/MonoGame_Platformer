@@ -22,3 +22,17 @@ public static class LightingVisibilityDiagnostics
             ? AuthoredLightVisibility.Active : AuthoredLightVisibility.BudgetCulled;
     }
 }
+
+/// <summary>Exact planner disposition, not an assertion of nonzero contribution at a pixel.</summary>
+public enum LightSelectionState
+{
+    WorkloadFiltered, OutsideView, LightBudget, ShadowBudget,
+    ActiveShadowed, ActiveUnshadowed, ActiveShadowLimited
+}
+
+public readonly record struct LightSelectionDiagnostic(RadialLight Light, LightSelectionState State)
+{
+    public bool IsActive => State is LightSelectionState.ActiveShadowed or
+        LightSelectionState.ActiveUnshadowed or LightSelectionState.ActiveShadowLimited;
+    public bool IsInView => State != LightSelectionState.WorkloadFiltered && State != LightSelectionState.OutsideView;
+}

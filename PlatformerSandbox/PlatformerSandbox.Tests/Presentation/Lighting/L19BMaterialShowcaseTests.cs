@@ -23,13 +23,14 @@ public sealed class L19BMaterialShowcaseTests
     }
 
     [Fact]
-    public void MaterialShowcaseIsPlayableAndSelectableWithoutDroppingOldScenes()
+    public void MaterialShowcaseIsSelectableAndRetiredIntegrationStillPlayable()
     {
         Assert.True(GameLevelIds.IsStandalonePlayableLevel(GameLevelIds.MaterialShowcaseTest));
         Assert.Contains(GameLevelMenuCatalog.Items,
             item => item.Destination?.LevelId == GameLevelIds.MaterialShowcaseTest);
-        Assert.Contains(GameLevelMenuCatalog.Items,
+        Assert.DoesNotContain(GameLevelMenuCatalog.Items,
             item => item.Destination?.LevelId == GameLevelIds.LightingIntegrationTest);
+        Assert.True(GameLevelIds.IsStandalonePlayableLevel(GameLevelIds.LightingIntegrationTest));
         Assert.Contains(GameLevelMenuCatalog.WithDiscoveredLevels(new[]
         {
             GameLevelIds.LightingIntegrationTest,

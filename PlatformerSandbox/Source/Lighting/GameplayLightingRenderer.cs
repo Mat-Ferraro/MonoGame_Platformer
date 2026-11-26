@@ -32,8 +32,62 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public int LastPersistentMaskHits { get; private set; }
     public int LastSharedMaskMisses { get; private set; }
     public int LastSharedMaskFallbacks { get; private set; }
+    public int LastFallbackCurrentFrame { get; private set; }
+    public int LastFallbackCapacity { get; private set; }
+    public PreparedAreaLightCache PreparedLights { get; } = new();
+    private IEnumerable<RadialLight> ExpandSamples(IEnumerable<RadialLight> lights, int count) =>
+        EnginePerformanceOptions.SharedSamples ? PreparedLights.Expand(lights, count) : AreaEmitterSampling.Expand(lights, count);
     public int LastTargetBinds { get; private set; }
+    private bool _productionTargets;
+    private Rectangle? _lightRegion, _materialMaskRegion;
+    public int LightWidth => _illumination?.Width ?? 0;
+    public int LightHeight => _illumination?.Height ?? 0;
+    public int MaskWidth => _visibility?.Width ?? 0;
+    public int MaskHeight => _visibility?.Height ?? 0;
+    public long LastLightCompositePixels { get; private set; }
+    public long LastMaskRasterPixels { get; private set; }
+    public long LastClearPixels { get; private set; }
+    public int LastCompatibleFieldHits { get; private set; }
+    public int LastRegionalMasks { get; private set; }
+    private static Rectangle Full(Texture2D target) => new(0,0,target.Width,target.Height);
+    private static Rectangle ScaleRegion(Rectangle region, int sw, int sh, int dw, int dh, int pad = 0)
+    {
+        var rect = LightingRenderWorkPolicy.MapRegion(region.X,region.Y,region.Width,region.Height,sw,sh,dw,dh,pad);
+        return new Rectangle(rect.X,rect.Y,rect.Width,rect.Height);
+    }
+    private SamplerState MaskSampler(Texture2D target) => target.Width == _world!.Width && target.Height == _world.Height
+        ? SamplerState.PointClamp : SamplerState.LinearClamp;
+    private void ClearTarget(SpriteBatch batch, RenderTarget2D target, Color color, Rectangle? region = null)
+    {
+        BindTarget(target);
+        if (region is Rectangle rect && rect != Full(target))
+        {
+            batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
+            batch.Draw(_whiteProductionVisibility, rect, color);
+            batch.End();
+            LastClearPixels += (long)rect.Width * rect.Height;
+        }
+        else { _device.Clear(color); LastClearPixels += (long)target.Width * target.Height; }
+    }
+    // Preserve the full-texture UV mapping when using a scissor: cropping the
+    // destination quad itself would shift shader screen-space coordinates.
+    private void DrawMaskIntoLight(SpriteBatch batch, Texture2D mask)
+    {
+        BindTarget(_individual);
+        Rectangle full = Full(_individual!);
+        Rectangle region = _lightRegion ?? full;
+        batch.Begin(_lightRegion.HasValue ? SpriteSortMode.Immediate : SpriteSortMode.Deferred,
+            _multiply, MaskSampler(mask), DepthStencilState.None,
+            _lightRegion.HasValue ? _productionMaterialScissor : RasterizerState.CullNone);
+        try { if (_lightRegion.HasValue) _device.ScissorRectangle = region;
+            batch.Draw(mask, full, Color.White); }
+        finally { batch.End(); _device.ScissorRectangle = full; _device.RasterizerState = RasterizerState.CullNone; }
+        LastLightCompositePixels += (long)region.Width * region.Height;
+    }
+
     public int SharedMaskTargets => _sharedMasks.Count;
+    public long MaskInvalidationSerial { get; private set; }
+    public int LastMaskEvictions { get; private set; }
     private const long SharedMaskBudgetBytes = 128L * 1024 * 1024;
     private sealed class SharedMaskEntry
     {
@@ -41,18 +95,63 @@ internal sealed class GameplayLightingRenderer : IDisposable
         public SharedVisibilityKey? Key;
         public long BuiltFrame, UsedFrame;
         public bool HorizontalOnly;
+        public int Fingerprint;
         public SharedMaskEntry(RenderTarget2D target) => Target = target;
     }
     private readonly List<SharedMaskEntry> _sharedMasks = new();
+    private readonly Dictionary<(int Hash, bool Horizontal), List<SharedMaskEntry>> _maskIndex = new();
+    // Reuse collision buckets under moving lights; bounded by the target pool.
+    private readonly Stack<List<SharedMaskEntry>> _maskBucketPool = new();
+    private void RecycleMaskBucket(List<SharedMaskEntry> entries)
+    { entries.Clear(); if (_maskBucketPool.Count < 96) _maskBucketPool.Push(entries); }
+    private void ClearMaskIndex()
+    {
+        foreach (var entries in _maskIndex.Values) RecycleMaskBucket(entries);
+        _maskIndex.Clear();
+    }
+    private static readonly SharedMaskEntry[] EmptyMaskEntries = Array.Empty<SharedMaskEntry>();
+    private IReadOnlyList<SharedMaskEntry> MaskCandidates(int hash, bool horizontal) =>
+        !EnginePerformanceOptions.HashedVisibility ? _sharedMasks :
+        _maskIndex.TryGetValue((hash,horizontal), out var entries) ? entries : EmptyMaskEntries;
+    private void UnindexMask(SharedMaskEntry entry)
+    {
+        var key = (entry.Fingerprint, entry.HorizontalOnly);
+        if (_maskIndex.TryGetValue(key, out var entries))
+        { entries.Remove(entry); if (entries.Count == 0) { _maskIndex.Remove(key); RecycleMaskBucket(entries); } }
+    }
+    private void IndexMask(SharedMaskEntry entry)
+    {
+        if (!EnginePerformanceOptions.HashedVisibility) return;
+        var key = (entry.Fingerprint,entry.HorizontalOnly);
+        if (!_maskIndex.TryGetValue(key, out var entries))
+            _maskIndex.Add(key, entries = _maskBucketPool.Count > 0 ? _maskBucketPool.Pop() : new());
+        entries.Add(entry);
+    }
     private long _sharedFrame;
     public void InvalidateSharedVisibility()
     {
+        MaskInvalidationSerial++;
         foreach (var entry in _sharedMasks) entry.Key = null;
+        ClearMaskIndex();
+        _fieldEntries.Clear();
+        _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
         ResetMaskKeys();
+    }
+    // Called at an Update/scene boundary, never while a layer is bound for drawing.
+    public void ResetManualLightingProfile()
+    {
+        InvalidateSharedVisibility();
+        ClearSharedMasks();
+        ClearFieldTargets();
+        _persistentGeometry.Clear();
+        PreparedLights.Clear();
+        CpuSubmitWindow.Clear();
     }
     private void SharedMaskDeviceResetting(object? sender, EventArgs e) => InvalidateSharedVisibility();
     private void ClearSharedMasks()
     {
+        if (_sharedMasks.Count > 0) MaskInvalidationSerial++;
         if (_sharedMasks.Count != 0)
         {
             _basicSurfaceEffect?.Parameters["ProductionVisibility0"]?.SetValue(_whiteProductionVisibility);
@@ -62,15 +161,20 @@ internal sealed class GameplayLightingRenderer : IDisposable
         }
         foreach (var entry in _sharedMasks) entry.Target.Dispose();
         _sharedMasks.Clear();
+        ClearMaskIndex();
     }
     private void BeginSharedMasks()
     {
         _sharedFrame++;
+        LastFallbackCurrentFrame = LastFallbackCapacity = LastMaskEvictions = 0;
         LastSharedMaskHits = LastPersistentMaskHits = LastSharedMaskMisses = LastSharedMaskFallbacks = LastTargetBinds = 0;
         if (_sharedMasks.Any(e => e.Target.IsDisposed)) ClearSharedMasks();
         if (!ReuseSharedMasks && !PersistSharedMasks) ClearSharedMasks();
         else if (!PersistSharedMasks)
+        {
             foreach (var entry in _sharedMasks) entry.Key = null;
+            ClearMaskIndex();
+        }
     }
     private SharedMaskEntry? AcquireSharedMask(LightingViewport view, RadialLight light,
         SurfaceReceiverProjection receiver, int samples, bool respectLitFaces,
@@ -79,15 +183,17 @@ internal sealed class GameplayLightingRenderer : IDisposable
     {
         hit = false;
         if (!ReuseSharedMasks && !PersistSharedMasks) return null;
-        foreach (var entry in _sharedMasks)
+        int fingerprint = EnginePerformanceOptions.HashedVisibility ? SharedVisibilityKey.Fingerprint(view,light,receiver,samples,respectLitFaces,softness,contact,emitter,blockers) : 0;
+        foreach (var entry in MaskCandidates(fingerprint,horizontalOnly))
         {
             bool current = entry.BuiltFrame == _sharedFrame;
             if (entry.Key is null || entry.HorizontalOnly != horizontalOnly ||
+                (EnginePerformanceOptions.HashedVisibility && entry.Fingerprint != fingerprint) ||
                 !entry.Key.Matches(view, light, receiver, samples, respectLitFaces,
                     softness, contact, emitter, blockers)) continue;
             // Persistent-only must not reuse or allocate duplicates of a
             // current-frame build. Its first build is available next frame.
-            if (current && !ReuseSharedMasks) { LastSharedMaskFallbacks++; return null; }
+            if (current && !ReuseSharedMasks) { LastSharedMaskFallbacks++; LastFallbackCurrentFrame++; return null; }
             if (!current && !PersistSharedMasks) continue;
             entry.UsedFrame = _sharedFrame;
             if (current) LastSharedMaskHits++; else LastPersistentMaskHits++;
@@ -96,20 +202,28 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastSharedMaskMisses++;
         // Never overwrite a texture referenced by a pair in this frame. Prefer
         // unused entries; recycle only prior-frame entries at the budget limit.
-        SharedMaskEntry? free = _sharedMasks.FirstOrDefault(e => e.Key is null && e.UsedFrame != _sharedFrame);
-        long bytes = (long)view.Width * view.Height * 4;
-        int limit = (int)Math.Min(48L, SharedMaskBudgetBytes / Math.Max(1L, bytes));
+        SharedMaskEntry? free = null;
+        foreach (var entry in _sharedMasks)
+            if (entry.Key is null && entry.UsedFrame != _sharedFrame) { free = entry; break; }
+        int mw = _visibility!.Width, mh = _visibility.Height;
+        int limit = LightingRenderWorkPolicy.MaskCapacity(mw,mh,SharedMaskBudgetBytes,
+            EnginePerformanceOptions.Po10CacheCapacity ? 96 : 48);
         if (free is null && _sharedMasks.Count < limit)
         {
-            free = new SharedMaskEntry(NewL19Target(view.Width,view.Height,SurfaceFormat.Color));
+            free = new SharedMaskEntry(NewL19Target(mw,mh,SurfaceFormat.Color));
             _sharedMasks.Add(free);
         }
         if (free is null)
-            free = _sharedMasks.Where(e => e.UsedFrame != _sharedFrame).OrderBy(e => e.UsedFrame).FirstOrDefault();
-        if (free is null) { LastSharedMaskFallbacks++; return null; }
+            foreach (var entry in _sharedMasks)
+                if (entry.UsedFrame != _sharedFrame && (free is null || entry.UsedFrame < free.UsedFrame)) free = entry;
+        if (free is null) { LastSharedMaskFallbacks++; LastFallbackCapacity++; return null; }
+        if (free.Key is not null) LastMaskEvictions++;
+        UnindexMask(free);
+        free.Fingerprint = fingerprint;
         free.Key = new SharedVisibilityKey(view,light,receiver,samples,respectLitFaces,softness,contact,emitter,blockers);
         free.HorizontalOnly = horizontalOnly;
         free.UsedFrame = free.BuiltFrame = _sharedFrame;
+        IndexMask(free);
         return free;
     }
     private void BindTarget(RenderTarget2D? target)
@@ -138,9 +252,108 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public int LastAreaSamplesPruned { get; private set; }
     private readonly FrameVisibilityGeometryCache _visibilityGeometryCache = new();
     private sealed record LayerFieldKey(LightingViewport View, SceneLightingLayer Layer,
-        LightingArtPreset Art, LightingFrameBudget Budget, IReadOnlyList<RadialLight> Lights,
-        IReadOnlyList<LightingOccluder> Blockers, int Samples);
+        LightRgb Ambient, LightingArtPreset Art, LightingFrameBudget Budget, IReadOnlyList<RadialLight> Lights,
+        IReadOnlyList<LightingOccluder> Blockers, int Samples)
+    {
+        public ulong? HardShadowQuota { get; init; }
+    }
     private LayerFieldKey? _lastLayerField;
+    public int LastStaticFieldHits { get; private set; }
+    private bool _lastFieldFromPriorFrame;
+    public int LastStaticShadowFieldHits { get; private set; }
+    private static bool StaticEligible(LayerFieldKey key) =>
+        EnginePerformanceOptions.Po10bStaticFields &&
+        (key.HardShadowQuota.HasValue && EnginePerformanceOptions.Po10fStaticShadowFields || key.Lights.All(l =>
+            (l.Shape is LightShape.Point or LightShape.Tube) && l.AffectsLayers is null && l.OccluderLayers is null &&
+            (!l.CastShadows || !key.Layer.ReceivesShadows)));
+    // Hard point-light experiment only. Exact camera, ordered lights, caster metadata,
+    // vertices and shadow quota. Any movement/edit or unsupported mode falls back.
+    private ulong? HardShadowQuotaFor(LayerFieldKey key)
+    {
+        if(!EnginePerformanceOptions.Po10bStaticFields || !EnginePerformanceOptions.Po10fStaticShadowFields ||
+           _shadowSoftnessPixels!=0 || !key.Layer.ReceivesShadows || key.Lights.Count>64 ||
+           key.Blockers.Count==0 || key.Blockers.Count>StaticShadowFieldSnapshot.MaxCasters) return null;
+        ulong quota=0;
+        for(int i=0;i<key.Lights.Count;i++)
+        {
+            var l=key.Lights[i];
+            if(l.Shape!=LightShape.Point || l.AffectsLayers is not null || l.OccluderLayers is not null) return null;
+            if(l.CastShadows && _shadowQuota.Contains(l.Id) && LightLayerRouting.Illuminates(l,key.Layer)) quota|=1UL<<i;
+        }
+        return quota==0?null:quota;
+    }
+    private static bool SameStaticField(LayerFieldKey a, LayerFieldKey b) =>
+        StaticEligible(a) && StaticEligible(b) && a.View == b.View && a.Ambient == b.Ambient &&
+        a.Layer == b.Layer && a.Budget == b.Budget && a.Samples == b.Samples &&
+        a.Art.LightMultiplier == b.Art.LightMultiplier && a.Art.LightRadiusScale == b.Art.LightRadiusScale &&
+        a.Art.Posterize == b.Art.Posterize && a.Lights.SequenceEqual(b.Lights) &&
+        a.HardShadowQuota == b.HardShadowQuota &&
+        (!a.HardShadowQuota.HasValue || StaticShadowFieldSnapshot.Matches(a.Blockers,b.Blockers));
+    private static LayerFieldKey SnapshotStaticField(LayerFieldKey key) => key with {
+        Lights=key.Lights.ToArray(), Blockers=key.HardShadowQuota.HasValue?StaticShadowFieldSnapshot.Capture(key.Blockers):Array.Empty<LightingOccluder>() };
+    private void CountStaticHit(LayerFieldKey key)
+    { LastStaticFieldHits++; if(key.HardShadowQuota.HasValue) LastStaticShadowFieldHits++; }
+    private readonly List<LightingOccluder> _layerRoutedCasters = new(), _layerNearbyCasters = new();
+    // At most two extra illumination surfaces (16 MiB additional target memory).
+    // Frame-local keys and exact static snapshots share the same bounded targets.
+    private readonly List<RenderTarget2D> _fieldSpareTargets = new();
+    private readonly List<(LayerFieldKey Key, RenderTarget2D Target, bool PriorFrame)> _fieldEntries = new();
+    private const long ExtraFieldBudgetBytes = 16L * 1024 * 1024;
+    private bool CompatibleFields(LayerFieldKey a, LayerFieldKey b) =>
+        a.View == b.View && a.Ambient == b.Ambient && a.Art == b.Art && a.Budget == b.Budget &&
+        a.Samples == b.Samples && ReferenceEquals(a.Lights,b.Lights) && ReferenceEquals(a.Blockers,b.Blockers) &&
+        LightingRenderWorkPolicy.SameRouting(b.Lights,a.Layer,b.Layer);
+    private void ClearFieldTargets()
+    {
+        _fieldEntries.Clear();
+        foreach (var target in _fieldSpareTargets) target.Dispose();
+        _fieldSpareTargets.Clear();
+        _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
+    }
+    private void SwitchFieldTarget(RenderTarget2D next)
+    {
+        var current = _illumination!;
+        _fieldSpareTargets.Remove(next);
+        _fieldSpareTargets.Add(current);
+        if (_lastLayerField is { } previous) _fieldEntries.Add((previous,current,_lastFieldFromPriorFrame));
+        _illumination = next;
+        _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
+    }
+    private bool TryReuseField(LayerFieldKey key)
+    {
+        for (int i = 0; i < _fieldEntries.Count; i++)
+        {
+            var entry = _fieldEntries[i];
+            if (entry.PriorFrame ? !SameStaticField(entry.Key,key) : !CompatibleFields(entry.Key,key)) continue;
+            _fieldEntries.RemoveAt(i);
+            SwitchFieldTarget(entry.Target);
+            _lastLayerField = key;
+            if (entry.PriorFrame) CountStaticHit(key);
+            return true;
+        }
+        return false;
+    }
+    private void PreservePreviousField()
+    {
+        if (_lastLayerField is null) return;
+        RenderTarget2D? next = null;
+        foreach (var target in _fieldSpareTargets)
+            if (!_fieldEntries.Any(e => ReferenceEquals(e.Target,target))) { next = target; break; }
+        if (next is null && _fieldSpareTargets.Count < 2 &&
+            TargetBytes(_illumination) * (_fieldSpareTargets.Count + 1) <= ExtraFieldBudgetBytes)
+        {
+            // Count this surface only after switching it into the pool.
+            next = NewL19Target(LightWidth,LightHeight,_illumination!.Format);
+        }
+        if (next is null && _fieldEntries.Count > 0)
+        {
+            next = _fieldEntries[0].Target;
+            _fieldEntries.RemoveAt(0);
+        }
+        if (next is not null) SwitchFieldTarget(next);
+    }
     private int AreaSamples(int radialBudget) => AreaSampleOverride ??
         AreaEmitterSampling.CountForRadialBudget(radialBudget);
 
@@ -385,22 +598,17 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public long Frames { get; private set; }
     public double AverageSubmitMilliseconds { get; private set; }
     public double PeakSubmitMilliseconds { get; private set; }
-    // Eleven baseline full-resolution RGBA8 targets, plus one lazy temporary
-    // for two-pass softness (only allocated after a Soft preset is selected).
-    // This excludes driver allocations, row padding and backbuffers.
-    public double EstimatedTargetsMegabytes => _world is null ? 0 :
-        (_world.Width * (double)_world.Height *
-            // Four targets switch from 4 bytes/pixel to 8 in HDR mode.
-            (44 + 4 * _sharedMasks.Count + (_l19HdrAllocated ? 16 : 0) +
-             (_softBlurScratch is { IsDisposed: false } ? 4 : 0) +
-             (_l19EmissionMap is { IsDisposed: false } ? 4 : 0)) +
-         (_l19BloomA is { IsDisposed: false } ?
-              2.0 * _l19BloomA.Width * _l19BloomA.Height * (_l19HdrAllocated ? 8 : 4) : 0) +
-         (_l20BloomMidA is { IsDisposed: false } ?
-              2.0 * _l20BloomMidA.Width * _l20BloomMidA.Height * (_l19HdrAllocated ? 8 : 4) : 0) +
-         (_l20BloomWideA is { IsDisposed: false } ?
-              2.0 * _l20BloomWideA.Width * _l20BloomWideA.Height * (_l19HdrAllocated ? 8 : 4) : 0)) /
-         (1024 * 1024);
+    // Actual allocated target dimensions/formats; excludes driver allocations,
+    // row padding, backbuffers and non-target textures.
+    private static double TargetBytes(RenderTarget2D? t) => t is { IsDisposed: false }
+        ? (double)t.Width * t.Height * (t.Format == SurfaceFormat.HalfVector4 ? 8 : 4) : 0;
+    public double EstimatedTargetsMegabytes => (TargetBytes(_world) + TargetBytes(_illumination) +
+        TargetBytes(_individual) + TargetBytes(_visibility) + TargetBytes(_litLayer) + TargetBytes(_layeredCanvas) +
+        TargetBytes(_basicAlbedoCanvas) + TargetBytes(_basicNormalMap) + TargetBytes(_basicEdgeMap) +
+        TargetBytes(_productionMask0) + TargetBytes(_productionMask1) + TargetBytes(_softBlurScratch) +
+        TargetBytes(_l19EmissionMap) + TargetBytes(_l19BloomA) + TargetBytes(_l19BloomB) +
+        TargetBytes(_l20BloomMidA) + TargetBytes(_l20BloomMidB) + TargetBytes(_l20BloomWideA) + TargetBytes(_l20BloomWideB) +
+        _sharedMasks.Sum(e => TargetBytes(e.Target)) + _fieldSpareTargets.Sum(TargetBytes)) / (1024 * 1024);
 
     public GameplayLightingRenderer(GraphicsDevice device, Effect? basicSurfaceEffect = null,
         Effect? polygonRimEffect = null, Effect? mapTransformEffect = null)
@@ -472,10 +680,22 @@ internal sealed class GameplayLightingRenderer : IDisposable
         return tex;
     }
 
-    private void EnsureTargets(int w, int h)
+    private void EnsureTargets(int w, int h, bool production = false)
     {
+        bool contactFull = _shadowSoftnessPixels > 0 && FilterMode == ShadowFilterMode.ContactHardening;
+        int ls = production && !contactFull ? EnginePerformanceOptions.Po10LightScale : 100;
+        // Contact-hardening's shader uses pixel-space profile coordinates. Keep
+        // the validated full-resolution mask for that policy until shader parity.
+        int ms = production && !contactFull
+            ? EnginePerformanceOptions.Po10MaskScale : 100;
+        int lw = LightingRenderWorkPolicy.ScaleDimension(w,ls), lh = LightingRenderWorkPolicy.ScaleDimension(h,ls);
+        int mw = LightingRenderWorkPolicy.ScaleDimension(w,ms), mh = LightingRenderWorkPolicy.ScaleDimension(h,ms);
         if (_world is { IsDisposed: false } && _world.Width == w && _world.Height == h &&
-            _l19LastHdrRequest == HdrEnabled) return;
+            _l19LastHdrRequest == HdrEnabled && _productionTargets == production &&
+            LightWidth == lw && LightHeight == lh && MaskWidth == mw && MaskHeight == mh &&
+            !_fieldSpareTargets.Any(t => t.IsDisposed)) return;
+        _productionTargets = production;
+        ClearFieldTargets();
         ResetMaskKeys();
         ClearSharedMasks();
         _l19LastHdrRequest = HdrEnabled;
@@ -489,7 +709,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         _l19EmissionMap?.Dispose(); _l19EmissionMap = null;
         _world = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _visibility = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
+        _visibility = new RenderTarget2D(_device, mw, mh, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         _basicAlbedoCanvas = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
@@ -497,9 +717,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         _basicEdgeMap = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _productionMask0 = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
+        _productionMask0 = new RenderTarget2D(_device, mw, mh, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        _productionMask1 = new RenderTarget2D(_device, w, h, false, SurfaceFormat.Color,
+        _productionMask1 = new RenderTarget2D(_device, mw, mh, false, SurfaceFormat.Color,
             DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         // Use true RGBA16F for *accumulation*, not only a float final pass.
         // RGBA8 is retained as a tested fallback for unsupported GPUs.
@@ -507,7 +727,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             ? SurfaceFormat.HalfVector4 : SurfaceFormat.Color;
         try
         {
-            CreateL19SceneTargets(w, h, sceneFormat);
+            CreateL19SceneTargets(w, h, lw, lh, sceneFormat);
         }
         catch (Exception e) when (sceneFormat == SurfaceFormat.HalfVector4 &&
             e is not OutOfMemoryException)
@@ -516,17 +736,17 @@ internal sealed class GameplayLightingRenderer : IDisposable
             _illumination?.Dispose(); _individual?.Dispose(); _litLayer?.Dispose();
             _layeredCanvas?.Dispose();
             _l19HdrUnavailable = true;
-            CreateL19SceneTargets(w, h, SurfaceFormat.Color);
+            CreateL19SceneTargets(w, h, lw, lh, SurfaceFormat.Color);
         }
         _l19HdrAllocated = sceneFormat == SurfaceFormat.HalfVector4 && !_l19HdrUnavailable;
         _geometryEffect.Projection = Matrix.CreateOrthographicOffCenter(0, w, h, 0, 0, 1);
         TargetRebuilds++; // Diagnostic: should change on first use / actual resize only.
     }
 
-    private void CreateL19SceneTargets(int w, int h, SurfaceFormat format)
+    private void CreateL19SceneTargets(int w, int h, int lw, int lh, SurfaceFormat format)
     {
-        _illumination = NewL19Target(w, h, format);
-        _individual = NewL19Target(w, h, format);
+        _illumination = NewL19Target(lw, lh, format);
+        _individual = NewL19Target(lw, lh, format);
         _litLayer = NewL19Target(w, h, format);
         _layeredCanvas = NewL19Target(w, h, format);
     }
@@ -578,8 +798,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
 
     private bool EnsureL19BloomTargets()
     {
-        int w = Math.Max(1, (_layeredCanvas!.Width + 1) / 2);
-        int h = Math.Max(1, (_layeredCanvas.Height + 1) / 2);
+        int w = LightingRenderWorkPolicy.ScaleDimension(Math.Max(1, (_layeredCanvas!.Width + 1) / 2), EnginePerformanceOptions.Po10bBloomScale);
+        int h = LightingRenderWorkPolicy.ScaleDimension(Math.Max(1, (_layeredCanvas.Height + 1) / 2), EnginePerformanceOptions.Po10bBloomScale);
         if (_l19BloomA is { IsDisposed: false } && _l20BloomWideB is { IsDisposed: false } &&
             _l19BloomA.Width == w && _l19BloomA.Height == h) return true;
         DisposeBloomPyramid();
@@ -606,7 +826,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
 
     public void BeginWorld()
     {
+        _fieldEntries.Clear();
         _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
         ResetMaskKeys();
         _visibilityGeometryCache.Clear();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -624,7 +846,10 @@ internal sealed class GameplayLightingRenderer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _shadowQuota.Clear(); _shadowCounted.Clear();
-        _lastLayerField = null;
+        if (!EnginePerformanceOptions.Po10bStaticFields) _fieldEntries.Clear();
+        _lastFieldFromPriorFrame = _lastLayerField is { } previous && StaticEligible(previous);
+        if (!_lastFieldFromPriorFrame) _lastLayerField = null;
+        LastStaticFieldHits = LastStaticShadowFieldHits = 0;
         ResetMaskKeys();
         _visibilityGeometryCache.Clear();
         BeginSharedMasks();
@@ -644,6 +869,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastContactProfileBytesUploaded = 0;
         LastSoftFilterPasses = 0;
         LastSoftFilterPixels = 0;
+        LastLightCompositePixels = LastMaskRasterPixels = LastClearPixels = 0;
+        LastCompatibleFieldHits = LastRegionalMasks = 0;
+        _lightRegion = _materialMaskRegion = null;
         LastEmissiveSurfaces = 0;
         LastPostProcessCpuMilliseconds = 0;
         LastBloomPasses = 0;
@@ -668,7 +896,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastShadowMasksSkippedByRange = 0;
         _productionRadialSamples = budget.ShadowRadialSamples;
         EnsureTargets(_device.PresentationParameters.BackBufferWidth,
-            _device.PresentationParameters.BackBufferHeight);
+            _device.PresentationParameters.BackBufferHeight, production: true);
         BindTarget(_layeredCanvas);
         _device.Clear(Color.Black);
         foreach (RadialLight light in lights)
@@ -679,6 +907,18 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public void EndLayeredFrame(SpriteBatch batch)
     {
         if (_capturing) throw new InvalidOperationException("Cannot present while capturing a layer.");
+        if (_lastLayerField is { } completed && StaticEligible(completed))
+            _lastLayerField = SnapshotStaticField(completed);
+        if (EnginePerformanceOptions.Po10bStaticFields)
+        {
+            for (int i = _fieldEntries.Count - 1; i >= 0; i--)
+            {
+                var entry = _fieldEntries[i];
+                if (!StaticEligible(entry.Key)) _fieldEntries.RemoveAt(i);
+                else if (!entry.PriorFrame) _fieldEntries[i] = (SnapshotStaticField(entry.Key), entry.Target, true);
+            }
+        }
+        _layerRoutedCasters.Clear(); _layerNearbyCasters.Clear();
         var l19Watch = Stopwatch.StartNew();
         // The lit scene is complete. Bloom operates here, BEFORE any HUD/UI.
         // No source texture is ever sampled while bound for writing.
@@ -864,7 +1104,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public void BeginBasicMaterialFrameWithShapes(LightingViewport viewport, LightRgb ambient,
         IReadOnlyList<BasicMaterialLight> lights, IReadOnlyList<BasicShadowShape> blockers)
     {
+        _fieldEntries.Clear();
         _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
         ResetMaskKeys();
         _visibilityGeometryCache.Clear();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -1054,8 +1296,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastMaterialLightsEvaluated += selected.Count;
         LastMaterialMaxLightsOnSurface = Math.Max(LastMaterialMaxLightsOnSurface, selected.Count);
         int count = AreaSamples(_productionRadialSamples);
-        LastAreaSampleEvaluations += selected.Count(l => l.Shape == LightShape.Tube)*count;
-        selected = AreaEmitterSampling.Expand(selected, count).ToArray();
+        LastAreaSampleEvaluations += selected.Where(l => l.Shape == LightShape.Tube).Sum(l => AreaEmitterSampling.ResolveCount(l,count));
+        selected = ExpandSamples(selected, count).ToArray();
         // A point sample outside the clipped receiver's radius contributes zero.
         // Projected receivers can transform coordinates, so keep their samples.
         if (PruneAreaSamples && !surface.Receiver.Active && ownWalls.Count == 0)
@@ -1174,7 +1416,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             _basicSurfaceEffect.Parameters["ProductionVisibility1"].SetValue(_whiteProductionVisibility);
             (Texture2D visibility0, Texture2D visibility1) =
                 DrawProductionVisibility(batch, viewport, surface, lightsInPair,
-                    blockers, layer, back0, back1);
+                    blockers, layer, back0, back1, region);
             anyBackRim |= back0 || back1;
             BindBasicSurfaceShader(material, productionGain: art.LightMultiplier);
             BindProductionMaterialMaps(normalTexture, edgeTexture);
@@ -1257,7 +1499,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
     private (Texture2D Mask0, Texture2D Mask1) DrawProductionVisibility(
         SpriteBatch batch, LightingViewport viewport, ProductionSurfaceSubmission surface,
         IReadOnlyList<RadialLight> selected, IReadOnlyList<LightingOccluder> blockers,
-        SceneLightingLayer layer, bool back0, bool back1)
+        SceneLightingLayer layer, bool back0, bool back1, ProductionMaterialRegion region)
     {
         // White means unobstructed: use the immutable one-pixel texture rather
         // than binding and clearing a full-screen render target for each slot.
@@ -1323,7 +1565,16 @@ internal sealed class GameplayLightingRenderer : IDisposable
             // The two existing targets preserve their contents. Reuse only an
             // exact slot match within the frame, never a filtered mask or a
             // different self-exclusion, projection or virtual-depth policy.
-            bool cacheMask = shared is null && ReuseHardMasks && _shadowSoftnessPixels <= 0f;
+            // Shared masks must remain full-domain: a later receiver may sample anywhere.
+            // Restrict scratch masks with padding for uniform blur; folded receivers/rims/contact hardening keep the reference domain.
+            bool regional = EnginePerformanceOptions.Po10MaterialRegions && shared is null && !contact &&
+                !back && !surface.Receiver.Active;
+            int padding = (int)Math.Ceiling(softness * 2) + 3;
+            // Padding is expressed in target texels, conservatively at least the logical filter support.
+            _materialMaskRegion = regional ? ScaleRegion(new Rectangle(region.X,region.Y,region.Width,region.Height),
+                viewport.Width,viewport.Height,target.Width,target.Height,padding) : null;
+            if (_materialMaskRegion.HasValue) LastRegionalMasks++;
+            bool cacheMask = !regional && shared is null && ReuseHardMasks && _shadowSoftnessPixels <= 0f;
             var maskKey = cacheMask ? new HardMaskKey(viewport,
                 light.Shape == LightShape.Directional ? light : scaled,
                 surface.Receiver.Mode == ReceiverProjectionMode.Folded ? surface.Receiver : new SurfaceReceiverProjection(), !back,
@@ -1338,11 +1589,11 @@ internal sealed class GameplayLightingRenderer : IDisposable
             IReadOnlyList<LightPoint> fan;
             if (light.Shape == LightShape.Directional)
             {
-                DrawDirectionalMask(viewport, light, nearby, target, surface.Receiver, respectLitFaces: !back);
+                DrawDirectionalMask(batch, viewport, light, nearby, target, surface.Receiver, respectLitFaces: !back);
                 fan = Array.Empty<LightPoint>();
                 _contactReady = false;
             }
-            else fan = DrawVisibilityFan(viewport, scaled,
+            else fan = DrawVisibilityFan(batch, viewport, scaled,
                 nearby, _productionRadialSamples, target, surface.Receiver, respectLitFaces: !back);
             // Back-rim slots do not illuminate the front face; use the unblurred
             // visibility mask for them. Never let penumbra filtering create a rim.
@@ -1354,13 +1605,14 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 if (light.Shape != LightShape.Directional && surface.Receiver.Mode != ReceiverProjectionMode.Folded)
                     PrepareContactProfile(scaled, fan, viewport);
                 else _contactReady = false;
-                RenderTarget2D scratch = EnsureSoftBlurScratch(viewport.Width, viewport.Height);
+                RenderTarget2D scratch = EnsureSoftBlurScratch(target.Width, target.Height);
                 GaussianVisibilityPass(batch, target, scratch, viewport,
                     horizontal: true, blend: BlendState.Opaque);
                 GaussianVisibilityPass(batch, scratch, target, viewport,
                     horizontal: false, blend: BlendState.Opaque);
                 LastSoftMaterialMasks++;
             }
+            _materialMaskRegion = null;
             if (cacheMask) _hardMaskKeys[slot] = maskKey;
             if (slot == 0) mask0 = target;
             else mask1 = target;
@@ -1395,7 +1647,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         fx.Parameters["L20LightExtra"].SetValue(new Vector4(inner,
             (float)(light.TubeLength * viewport.PixelsPerUnit * .5), 0, 0));
         L19Fullscreen(batch, _world!, "L20LightField", _individual,
-            viewport.Width, viewport.Height);
+            _individual!.Width, _individual.Height);
     }
 
     private VertexPositionColor[] _poShadowVertices = Array.Empty<VertexPositionColor>();
@@ -1408,13 +1660,12 @@ internal sealed class GameplayLightingRenderer : IDisposable
             Array.Resize(ref _poShadowVertices, Math.Max(count, Math.Max(256, _poShadowVertices.Length * 2)));
         return _poShadowVertices;
     }
-    private void DrawDirectionalMask(LightingViewport view, RadialLight light,
+    private void DrawDirectionalMask(SpriteBatch batch, LightingViewport view, RadialLight light,
         IReadOnlyList<LightingOccluder> blockers, RenderTarget2D target,
         SurfaceReceiverProjection? receiver = null, bool respectLitFaces = false)
     {
         view.Validate();
-        BindTarget(target);
-        _device.Clear(Color.White);
+        ClearTarget(batch, target, Color.White, _materialMaskRegion);
         // L20 shadow-fidelity correction: project each *authored simple hull*
         // only by the light's bounded world-space reach. The old version swept
         // every edge multiple screen diagonals, creating giant black wedges.
@@ -1439,20 +1690,25 @@ internal sealed class GameplayLightingRenderer : IDisposable
         if (triangles.Count == 0) return;
         _device.BlendState = BlendState.Opaque;
         _device.DepthStencilState = DepthStencilState.None;
-        _device.RasterizerState = RasterizerState.CullNone;
+        _device.RasterizerState = _materialMaskRegion.HasValue ? _productionMaterialScissor : RasterizerState.CullNone;
+        if (_materialMaskRegion is Rectangle clip) _device.ScissorRectangle = clip;
         int triangleCount = triangles.Count / 3;
         VertexPositionColor[] data = EnginePerformanceOptions.LightingBuffers ? ShadowVertices(triangles.Count) : triangles.ToArray();
         if (EnginePerformanceOptions.LightingBuffers) triangles.CopyTo(data);
-        foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
+        try
         {
-            pass.Apply();
-            _device.DrawUserPrimitives(PrimitiveType.TriangleList,
-                data, 0, triangleCount);
+            foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                _device.DrawUserPrimitives(PrimitiveType.TriangleList, data, 0, triangleCount);
+            }
         }
+        finally { _device.RasterizerState = RasterizerState.CullNone; _device.ScissorRectangle = Full(target); }
+        LastMaskRasterPixels += (long)(_materialMaskRegion?.Width ?? target.Width) * (_materialMaskRegion?.Height ?? target.Height);
         LastShadowTriangles += triangleCount;
     }
 
-    private IReadOnlyList<LightPoint> DrawVisibilityFan(LightingViewport viewport, RadialLight light,
+    private IReadOnlyList<LightPoint> DrawVisibilityFan(SpriteBatch batch, LightingViewport viewport, RadialLight light,
         IReadOnlyList<LightingOccluder> blockers, int samples, RenderTarget2D destination,
         SurfaceReceiverProjection? receiver = null, bool respectLitFaces = false)
     {
@@ -1465,8 +1721,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             geometryTimer.Stop();
             LastMaterialMaskGeometryCpuMilliseconds += geometryTimer.Elapsed.TotalMilliseconds;
         }
-        BindTarget(destination);
-        _device.Clear(Color.Black);
+        ClearTarget(batch, destination, Color.Black, _materialMaskRegion);
         if (boundary.Count < 3) return boundary;
         var triangles = ShadowVertices(boundary.Count * 3);
         LightPoint center = viewport.ProjectWithValidatedViewport(receiver?.ProjectShadow(light.Position) ?? light.Position);
@@ -1485,13 +1740,18 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LastShadowTriangles += boundary.Count;
         _device.BlendState = BlendState.Opaque;
         _device.DepthStencilState = DepthStencilState.None;
-        _device.RasterizerState = RasterizerState.CullNone;
-        foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
+        _device.RasterizerState = _materialMaskRegion.HasValue ? _productionMaterialScissor : RasterizerState.CullNone;
+        if (_materialMaskRegion is Rectangle clip) _device.ScissorRectangle = clip;
+        try
         {
-            pass.Apply();
-            _device.DrawUserPrimitives(PrimitiveType.TriangleList, triangles,
-                0, boundary.Count);
+            foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                _device.DrawUserPrimitives(PrimitiveType.TriangleList, triangles, 0, boundary.Count);
+            }
         }
+        finally { _device.RasterizerState = RasterizerState.CullNone; _device.ScissorRectangle = Full(destination); }
+        LastMaskRasterPixels += (long)(_materialMaskRegion?.Width ?? destination.Width) * (_materialMaskRegion?.Height ?? destination.Height);
         return boundary;
     }
 
@@ -1891,7 +2151,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         EnsureTargets(_device.PresentationParameters.BackBufferWidth,
-            _device.PresentationParameters.BackBufferHeight);
+            _device.PresentationParameters.BackBufferHeight, production: true);
         BindTarget(_world);
         _device.Clear(Color.Transparent);
         _capturing = true;
@@ -1915,25 +2175,48 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LightRgb ambient = art.Ambient * ((1 - art.AtmosphericDarkness) *
             layer.AmbientScale * art.AmbientScaleFor(layer.Id));
         int sampleCount = AreaSamples(budget.ShadowRadialSamples);
-        // Only the latest compatible field is retained in the existing target.
-        // Production material draws use other targets; no new VRAM required.
-        var key = new LayerFieldKey(viewport, layer, art, budget, lights, blockers, sampleCount);
+        // Reference mode keeps one field; PO10A optionally retains two additional
+        // exact-compatible fields for the duration of the frame.
+        var key = new LayerFieldKey(viewport, layer, ambient.Clamp(), art, budget, lights, blockers, sampleCount);
+        if (HardShadowQuotaFor(key) is ulong quota) key = key with { HardShadowQuota=quota };
         bool canReuse = ReuseLayerFields && lights.All(l => l.Shape is LightShape.Point or LightShape.Tube);
-        bool reused = canReuse && _lastLayerField == key;
+        bool share = EnginePerformanceOptions.Po10SharedFields && lights.All(l => l.Shape is LightShape.Point or LightShape.Tube);
+        bool staticHit = _lastFieldFromPriorFrame && _lastLayerField is { } saved && SameStaticField(saved,key);
+        bool exact = !_lastFieldFromPriorFrame && canReuse && _lastLayerField == key;
+        int previousStaticHits = LastStaticFieldHits;
+        bool compatible = !exact && !staticHit &&
+            ((share && !_lastFieldFromPriorFrame && _lastLayerField is { } previous && CompatibleFields(previous,key)) ||
+             ((share || StaticEligible(key)) && TryReuseField(key)));
+        bool reused = exact || compatible || staticHit;
+        if (staticHit) { CountStaticHit(key); _lastLayerField = key; _lastFieldFromPriorFrame = false; }
+        if (compatible && LastStaticFieldHits == previousStaticHits) LastCompatibleFieldHits++;
         if (reused) LastLayerFieldReuses++;
         else
         {
+            if (share || EnginePerformanceOptions.Po10bStaticFields) PreservePreviousField();
             _lastLayerField = null;
+            _lastFieldFromPriorFrame = false;
             LastLayerFieldBuilds++;
-            BindTarget(_illumination);
-            _device.Clear(ToColor(ambient.Clamp()));
+            ClearTarget(batch, _illumination!, ToColor(ambient.Clamp()));
             LastTubeLights += lights.Count(l => l.Shape == LightShape.Tube && LightLayerRouting.Illuminates(l, layer));
-            LastAreaSampleEvaluations += lights.Count(l => l.Shape == LightShape.Tube && LightLayerRouting.Illuminates(l, layer))*sampleCount;
-            foreach (RadialLight light in AreaEmitterSampling.Expand(lights, sampleCount))
+            LastAreaSampleEvaluations += lights.Where(l => l.Shape == LightShape.Tube && LightLayerRouting.Illuminates(l, layer)).Sum(l => AreaEmitterSampling.ResolveCount(l,sampleCount));
+            foreach (RadialLight light in ExpandSamples(lights, sampleCount))
             {
                 if (!LightLayerRouting.Illuminates(light, layer)) continue;
-                BindTarget(_individual);
-                _device.Clear(Color.Black);
+                Rectangle logical = new(0,0,w,h);
+                Rectangle lightQuad = logical;
+                if (light.Shape == LightShape.Point)
+                {
+                    LightPoint center = viewport.Project(light.Position);
+                    float radius = (float)(Math.Min(10000, light.Radius * art.LightRadiusScale) * viewport.PixelsPerUnit);
+                    lightQuad = new Rectangle((int)Math.Round(center.X-radius),(int)Math.Round(center.Y-radius),
+                        Math.Max(1,(int)Math.Round(radius*2)),Math.Max(1,(int)Math.Round(radius*2)));
+                }
+                // Round once in logical screen coordinates, then scale the draw (not its clipping).
+                Rectangle work = ScaleRegion(lightQuad,w,h,LightWidth,LightHeight,1);
+                _lightRegion = EnginePerformanceOptions.Po10LightRegions && light.Shape == LightShape.Point ? work : null;
+                if (_lightRegion is Rectangle empty && (empty.Width == 0 || empty.Height == 0)) { _lightRegion = null; continue; }
+                ClearTarget(batch, _individual!, Color.Black, _lightRegion);
                 if (light.Shape != LightShape.Point)
                 {
                     DrawShapedLight(batch, viewport, light with {
@@ -1961,7 +2244,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
                         (int)Math.Round(center.Y - radius),
                         Math.Max(1, (int)Math.Round(radius * 2)),
                         Math.Max(1, (int)Math.Round(radius * 2)));
-                    batch.Begin(blendState: _additive, samplerState: SamplerState.LinearClamp);
+                    batch.Begin(blendState: _additive, samplerState: SamplerState.LinearClamp,
+                        transformMatrix: LightWidth == w && LightHeight == h ? (Matrix?)null : Matrix.CreateScale(LightWidth/(float)w,LightHeight/(float)h,1f));
                     foreach (LightRgb rgb in lightPasses)
                         batch.Draw(art.Posterize ? _posterizedFalloff : _falloff,
                             destination, ToColor(rgb));
@@ -1971,7 +2255,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 if (light.CastShadows && layer.ReceivesShadows &&
                     _shadowQuota.Contains(light.Id))
                 {
-                    var relevant = new List<LightingOccluder>();
+                    var relevant = EnginePerformanceOptions.Po10fCasterBuffers ? _layerRoutedCasters : new List<LightingOccluder>();
+                    relevant.Clear();
                     foreach (LightingOccluder blocker in blockers)
                         if (LightLayerRouting.Occludes(light, blocker)) relevant.Add(blocker);
                     if (relevant.Count > 0)
@@ -1980,8 +2265,11 @@ internal sealed class GameplayLightingRenderer : IDisposable
                         {
                             Radius = Math.Min(10000, light.Radius * art.LightRadiusScale)
                         };
-                        IReadOnlyList<LightingOccluder> nearby = light.Shape is LightShape.Directional or LightShape.Tube
-                            ? relevant : ShadowCasterPruning.Filter(scaled, relevant);
+                        IReadOnlyList<LightingOccluder> nearby;
+                        if(light.Shape is LightShape.Directional or LightShape.Tube) nearby=relevant;
+                        else if(EnginePerformanceOptions.Po10fCasterBuffers)
+                        { ShadowCasterPruning.FilterInto(scaled,relevant,_layerNearbyCasters); nearby=_layerNearbyCasters; }
+                        else nearby=ShadowCasterPruning.Filter(scaled,relevant);
                         LastShadowCastersPrunedByRange += relevant.Count - nearby.Count;
                         if (nearby.Count > 0)
                         {
@@ -1994,17 +2282,21 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 }
                 BindTarget(_illumination);
                 batch.Begin(blendState: _additive, samplerState: SamplerState.PointClamp);
-                batch.Draw(_individual!, new Rectangle(0, 0, w, h), Color.White);
+                Rectangle accumulation = _lightRegion ?? Full(_individual!);
+                if (_lightRegion.HasValue) batch.Draw(_individual!, accumulation, accumulation, Color.White);
+                else batch.Draw(_individual!, accumulation, Color.White);
+                LastLightCompositePixels += (long)accumulation.Width * accumulation.Height;
+                _lightRegion = null;
                 batch.End();
             }
-            if (canReuse) _lastLayerField = key;
+            if (canReuse || share || StaticEligible(key)) _lastLayerField = key;
         }
         BindTarget(_litLayer);
-        _device.Clear(Color.Transparent);
+        if (!EnginePerformanceOptions.Po10SkipClears) { _device.Clear(Color.Transparent); LastClearPixels += (long)w*h; }
         batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
         batch.Draw(_world, new Rectangle(0, 0, w, h), Color.White);
         batch.End();
-        batch.Begin(blendState: _multiplyKeepAlpha, samplerState: SamplerState.PointClamp);
+        batch.Begin(blendState: _multiplyKeepAlpha, samplerState: MaskSampler(_illumination!));
         batch.Draw(_illumination!, new Rectangle(0, 0, w, h), Color.White);
         batch.End();
         BindTarget(_layeredCanvas);
@@ -2061,7 +2353,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         LightRgb ambient = art.Ambient * (1 - art.AtmosphericDarkness);
         BindTarget(_illumination);
         _device.Clear(ToColor(ambient));
-        foreach (RadialLight light in AreaEmitterSampling.Expand(visible, AreaEmitterSampling.CountForRadialBudget(budget.ShadowRadialSamples)))
+        foreach (RadialLight light in ExpandSamples(visible, AreaSamples(budget.ShadowRadialSamples)))
         {
             BindTarget(_individual);
             _device.Clear(Color.Black);
@@ -2221,14 +2513,18 @@ internal sealed class GameplayLightingRenderer : IDisposable
         try
         {
             effect.CurrentTechnique = effect.Techniques["GaussianVisibility"];
+            Rectangle? clip = ReferenceEquals(destination,_individual) ? _lightRegion : _materialMaskRegion;
             batch.Begin(SpriteSortMode.Immediate, blend, SamplerState.LinearClamp,
-                DepthStencilState.None, RasterizerState.CullNone, effect);
-            try { batch.Draw(source, new Rectangle(0, 0, view.Width, view.Height), Color.White); }
-            finally { batch.End(); }
+                DepthStencilState.None, clip.HasValue ? _productionMaterialScissor : RasterizerState.CullNone, effect);
+            Rectangle full = Full(destination);
+            try { if (clip.HasValue) _device.ScissorRectangle = clip.Value;
+                batch.Draw(source, full, Color.White); }
+            finally { batch.End(); _device.RasterizerState = RasterizerState.CullNone; _device.ScissorRectangle = full; }
         }
         finally { effect.CurrentTechnique = previousTechnique; }
         LastSoftFilterPasses++;
-        LastSoftFilterPixels += (long)view.Width * view.Height;
+        Rectangle counted = (ReferenceEquals(destination,_individual) ? _lightRegion : _materialMaskRegion) ?? Full(destination);
+        LastSoftFilterPixels += (long)counted.Width * counted.Height;
     }
 
     private void ApplyVisibilityMask(SpriteBatch batch, LightingViewport view,
@@ -2254,15 +2550,15 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 {
                     RenderTarget2D hardTarget = horizontalOnly ? _visibility! : entry.Target;
                     if (light.Shape == LightShape.Directional)
-                        DrawDirectionalMask(view, light, occluders, hardTarget, respectLitFaces: respectLitFaces);
+                        DrawDirectionalMask(batch, view, light, occluders, hardTarget, respectLitFaces: respectLitFaces);
                     else
                     {
                         double before = LastMaterialMaskGeometryCpuMilliseconds;
-                        var fan = DrawVisibilityFan(view, light, occluders, radialSamples, hardTarget,
+                        var fan = DrawVisibilityFan(batch, view, light, occluders, radialSamples, hardTarget,
                             respectLitFaces: respectLitFaces);
                         LastLayerMaskGeometryCpuMilliseconds += LastMaterialMaskGeometryCpuMilliseconds - before;
                         LastMaterialMaskGeometryCpuMilliseconds = before;
-                        if (fan.Count < 3) { entry.Key = null; return; }
+                        if (fan.Count < 3) { UnindexMask(entry); entry.Key = null; return; }
                     }
                     LastLegacyVisibilityMasks++;
                     if (horizontalOnly)
@@ -2275,32 +2571,26 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 }
                 else
                 {
-                    BindTarget(_individual);
-                    batch.Begin(blendState: _multiply, samplerState: SamplerState.PointClamp);
-                    batch.Draw(entry.Target, new Rectangle(0,0,view.Width,view.Height), Color.White);
-                    batch.End();
+                    DrawMaskIntoLight(batch, entry.Target);
                 }
                 return;
             }
         }
         if (light.Shape == LightShape.Directional)
         {
-            DrawDirectionalMask(view, light, occluders, _visibility!, respectLitFaces: respectLitFaces);
+            DrawDirectionalMask(batch, view, light, occluders, _visibility!, respectLitFaces: respectLitFaces);
             _contactReady = false;
             LastLegacyVisibilityMasks++;
             if (_shadowSoftnessPixels > 0f && _basicSurfaceEffect is not null)
             {
-                RenderTarget2D scratch = EnsureSoftBlurScratch(view.Width, view.Height);
+                RenderTarget2D scratch = EnsureSoftBlurScratch(_visibility!.Width, _visibility.Height);
                 GaussianVisibilityPass(batch, _visibility!, scratch, view, true, BlendState.Opaque);
                 GaussianVisibilityPass(batch, scratch, _individual!, view, false, _multiply);
                 LastSoftLayerMasks++;
             }
             else
             {
-                BindTarget(_individual);
-                batch.Begin(blendState: _multiply, samplerState: SamplerState.PointClamp);
-                batch.Draw(_visibility!, new Rectangle(0, 0, view.Width, view.Height), Color.White);
-                batch.End();
+                DrawMaskIntoLight(batch, _visibility!);
             }
             return;
         }
@@ -2327,8 +2617,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
             triangles[i * 3 + 2] = new VertexPositionColor(new Vector3((float)b.X, (float)b.Y, 0), Color.White);
         }
         LastShadowTriangles += polygon.Count;
-        BindTarget(_visibility);
-        _device.Clear(Color.Black);
+        ClearTarget(batch, _visibility!, Color.Black);
+        LastMaskRasterPixels += (long)_visibility!.Width * _visibility.Height;
         _device.BlendState = BlendState.Opaque;
         _device.DepthStencilState = DepthStencilState.None;
         _device.RasterizerState = RasterizerState.CullNone;
@@ -2344,7 +2634,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             // into the existing per-light illumination target. The hard path
             // below is preserved when softness is disabled.
             PrepareContactProfile(light, polygon, view);
-            RenderTarget2D scratch = EnsureSoftBlurScratch(view.Width, view.Height);
+            RenderTarget2D scratch = EnsureSoftBlurScratch(_visibility!.Width, _visibility.Height);
             GaussianVisibilityPass(batch, _visibility!, scratch, view,
                 horizontal: true, blend: BlendState.Opaque);
             GaussianVisibilityPass(batch, scratch, _individual!, view,
@@ -2353,18 +2643,20 @@ internal sealed class GameplayLightingRenderer : IDisposable
         }
         else
         {
-            BindTarget(_individual);
-            // Original Phase 16 hard visibility multiplication (unmodified).
-            batch.Begin(blendState: _multiply, samplerState: SamplerState.PointClamp);
-            batch.Draw(_visibility!, new Rectangle(0, 0, view.Width, view.Height), Color.White);
-            batch.End();
+            DrawMaskIntoLight(batch, _visibility!);
         }
     }
 
     public void Abort()
     {
+        MaskInvalidationSerial++;
+        _lightRegion = _materialMaskRegion = null;
+        _fieldEntries.Clear();
         foreach (var entry in _sharedMasks) entry.Key = null;
+        ClearMaskIndex();
+        PreparedLights.Clear();
         _lastLayerField = null;
+        _lastFieldFromPriorFrame = false;
         ResetMaskKeys();
         _visibilityGeometryCache.Clear();
         _persistentGeometry.Clear();
@@ -2389,6 +2681,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         if (_disposed) return;
         _disposed = true;
         _device.DeviceResetting -= SharedMaskDeviceResetting;
+        ClearFieldTargets();
         _world?.Dispose(); _illumination?.Dispose(); _individual?.Dispose(); _visibility?.Dispose();
         _litLayer?.Dispose(); _layeredCanvas?.Dispose(); _basicAlbedoCanvas?.Dispose();
         _basicNormalMap?.Dispose(); _basicEdgeMap?.Dispose();
