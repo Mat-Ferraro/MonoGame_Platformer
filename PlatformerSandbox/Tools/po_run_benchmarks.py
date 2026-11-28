@@ -215,11 +215,13 @@ def validate_pb_tick_window(c, metadata):
     if start-int(metadata['PB warmup start tick'])<c['pb_warmup_ticks']:
         raise ValueError('short PB warmup')
     if c.get('pb_platform_script'):
-        if metadata.get('PB workload version')!='5': raise ValueError('wrong PB workload version')
+        if metadata.get('PB workload version')!='7': raise ValueError('wrong PB workload version')
         if min(int(metadata[k]) for k in ('PB measured platform commands','PB measured deaths','PB measured respawns'))<=0:
             raise ValueError('platform or lifecycle workload not exercised')
         if int(metadata.get('PB prop pair impacts','0'))<=0: raise ValueError('prop-to-prop impact workload not exercised')
         if int(metadata.get('PB platform prop contacts','0'))<=0: raise ValueError('platform-to-prop contact workload not exercised')
+        if int(metadata.get('PB committed coupled event iterations','0'))<=0: raise ValueError('coupled event workload not exercised')
+        if int(metadata['PB platform recovery attempts'])<0: raise ValueError('invalid platform recovery counter')
     return end-start
 
 
@@ -526,6 +528,7 @@ def read_result(c, dest):
             if min(result['dynamic_bodies'],result['dynamic_sweeps'],result['dynamic_contacts'])<=0: raise ValueError('dynamic workload not exercised')
             if not math.isfinite(result['dynamic_cpu_ms']) or result['dynamic_cpu_ms']<0: raise ValueError('invalid dynamic CPU measurement')
             result['dynamic_cpu_ms_per_tick']=result['dynamic_cpu_ms']/ticks
+            result.update(pb_workload_version=int(m['PB workload version']),pb_platform_recovery_attempts=int(m['PB platform recovery attempts']),pb_coupled_event_iterations=int(m['PB committed coupled event iterations']))
         if result['simulation_ticks_between_recorded_frames']<0: raise ValueError('world clock moved backwards')
         if c['spatial_mode']=='Indexed' and result['spatial_queries']<=0: raise ValueError('indexed collision path not exercised')
     for k in ('gc0','gc1','gc2'): result[k+'_total']=sum(col(k))
@@ -608,11 +611,11 @@ def write_summary(out, results):
                 w.writerow([name,len(rs),med('fps'),med('p95_ms'),med('p99_ms'),med('cpu_submit_ms_mean'),med('target_changes_mean'),med('selected_clear_pixels_mean') if 'selected_clear_pixels_mean' in rs[0] else '',statistics.median(r.get('gpu_skipped_binds_total',0)/r['frames'] for r in rs),statistics.median(r.get('gpu_skipped_clear_pixels_total',0)/r['frames'] for r in rs),';'.join(sorted({flag for r in rs for flag in r.get('unexercised_refinement',[])})), ' | '.join(sorted({r.get('gpu_gl_renderer','') for r in rs}))])
     if any(n.startswith('pb01_') for n in groups):
         with (out/'pb01_baseline.csv').open('w',newline='',encoding='utf-8') as f:
-            w=csv.writer(f);w.writerow(['case','runs','median_fps','median_p95_ms','median_simulation_cpu_ms','median_draw_cpu_ms','median_thread_alloc_bytes','median_simulation_ticks','median_drawn_particles','median_logical_lights','native_renderer','median_dynamic_bodies','median_dynamic_sweeps','median_dynamic_contacts','median_dynamic_cpu_ms_per_tick','median_platform_commands','median_deaths','median_respawns','median_start_tick','median_end_tick','median_prop_pair_impacts','median_character_pushes','median_character_boundary_impacts','median_platform_prop_contacts','median_platform_prop_stops','median_platform_destroyed_props'])
+            w=csv.writer(f);w.writerow(['case','runs','median_fps','median_p95_ms','median_simulation_cpu_ms','median_draw_cpu_ms','median_thread_alloc_bytes','median_simulation_ticks','median_drawn_particles','median_logical_lights','native_renderer','median_dynamic_bodies','median_dynamic_sweeps','median_dynamic_contacts','median_dynamic_cpu_ms_per_tick','median_platform_commands','median_deaths','median_respawns','median_start_tick','median_end_tick','median_prop_pair_impacts','median_character_pushes','median_character_boundary_impacts','median_platform_prop_contacts','median_platform_prop_stops','median_platform_destroyed_props','workload_version','median_platform_recovery_attempts','median_committed_coupled_event_iterations'])
             for n,rs in groups.items():
                 if not n.startswith('pb01_'): continue
                 med=lambda k:statistics.median(r[k] for r in rs)
-                w.writerow([n,len(rs),med('fps'),med('p95_ms'),med('simulation_cpu_ms_mean'),med('previous_draw_cpu_ms_mean'),med('thread_alloc_bytes_mean'),med('simulation_ticks_between_recorded_frames'),med('drawn_particles_mean'),med('logical_lights_mean'),' | '.join(sorted({r['gpu_gl_renderer'] for r in rs})),*[statistics.median(r.get(k,0) for r in rs) for k in ('dynamic_bodies','dynamic_sweeps','dynamic_contacts','dynamic_cpu_ms_per_tick','pb_platform_commands','pb_deaths','pb_respawns','pb_start_tick','pb_end_tick','pb_prop_pair_impacts','pb_character_pushes','pb_character_boundary_impacts','pb_platform_prop_contacts','pb_platform_prop_stops','pb_platform_destroyed_props')]])
+                w.writerow([n,len(rs),med('fps'),med('p95_ms'),med('simulation_cpu_ms_mean'),med('previous_draw_cpu_ms_mean'),med('thread_alloc_bytes_mean'),med('simulation_ticks_between_recorded_frames'),med('drawn_particles_mean'),med('logical_lights_mean'),' | '.join(sorted({r['gpu_gl_renderer'] for r in rs})),*[statistics.median(r.get(k,0) for r in rs) for k in ('dynamic_bodies','dynamic_sweeps','dynamic_contacts','dynamic_cpu_ms_per_tick','pb_platform_commands','pb_deaths','pb_respawns','pb_start_tick','pb_end_tick','pb_prop_pair_impacts','pb_character_pushes','pb_character_boundary_impacts','pb_platform_prop_contacts','pb_platform_prop_stops','pb_platform_destroyed_props','pb_workload_version','pb_platform_recovery_attempts','pb_coupled_event_iterations')]])
     baseline=groups.get('candidate_uncapped' ,[]) or groups.get('po10b_reference',[])
     if not baseline: return
     b=statistics.median(r['mean_ms'] for r in baseline)

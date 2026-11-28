@@ -22,7 +22,7 @@ internal static class DynamicContactSolver
     }
     private readonly record struct Hit(int A,int B,int Terrain,double Time,Vector2D Normal);
     private readonly record struct Constraint(int Lower,int Upper,bool X);
-    internal sealed record Result(SortedDictionary<int,DynamicBodyState> Bodies,long Sweeps,long Contacts,long Pairs,int LargestIsland,long CharacterImpacts,long PlatformImpacts);
+    internal sealed record Result(SortedDictionary<int,DynamicBodyState> Bodies,long Sweeps,long Contacts,long Pairs,int LargestIsland,long CharacterImpacts,long PlatformImpacts,long EventIterations);
     private static double Dot(Vector2D a,Vector2D b)=>a.X*b.X+a.Y*b.Y;
     internal static Result Advance(IEnumerable<DynamicBodyState> states,IReadOnlyList<StaticAabbCollider> terrain,
         PhysicsMaterialCatalog materials,Func<int,string> surface,Func<DynamicBodyState,StaticAabbCollider,bool> solid,
@@ -81,7 +81,7 @@ internal static class DynamicContactSolver
             }
         }
         Record(startTime);
-        long sweeps=0,contacts=0,pairContacts=0,characterImpacts=0,platformImpacts=0; int largestIsland=0;
+        long sweeps=0,contacts=0,pairContacts=0,characterImpacts=0,platformImpacts=0,eventIterations=0; int largestIsland=0;
         double remaining=dt;
         // Use one absolute clock for moving boundaries. Reconstructing it from
         // dt-remaining can leave a sub-ULP residual or sample a different end
@@ -92,6 +92,7 @@ internal static class DynamicContactSolver
         for(int step=0;remaining>0;step++)
         {
             if(step==EventBudget)throw new InvalidOperationException("Coupled dynamic event budget exhausted.");
+            eventIterations++;
             double horizon=remaining, segmentEnd=endTime;
             if(paths.Length>0)
             {
@@ -356,6 +357,6 @@ internal static class DynamicContactSolver
         Record(endTime);
         var output=new SortedDictionary<int,DynamicBodyState>();
         foreach(var n in nodes)output.Add(n.State.Id.LocalId,n.State with{Bounds=n.Box,Velocity=n.V,PendingForce=default,PendingImpulse=default});
-        return new(output,sweeps,contacts,pairContacts,largestIsland,characterImpacts,platformImpacts);
+        return new(output,sweeps,contacts,pairContacts,largestIsland,characterImpacts,platformImpacts,eventIterations);
     }
 }

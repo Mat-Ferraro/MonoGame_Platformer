@@ -182,6 +182,24 @@
         "Mass": 1,
         "CollisionMask": "Terrain, Platform, Dynamic, Character",
         "CrushResponse": "StopPlatform"
+      },
+      {
+        "Id": 13,
+        "Material": "Wood",
+        "X": 53.5,
+        "Y": 24.0,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character",
+        "CrushResponse": "StopPlatform"
+      },
+      {
+        "Id": 14,
+        "Material": "Wood",
+        "X": 54.5,
+        "Y": 18.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character",
+        "CrushResponse": "StopPlatform"
       }
     ]
   }

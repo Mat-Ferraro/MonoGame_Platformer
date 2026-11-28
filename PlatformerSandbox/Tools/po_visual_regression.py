@@ -209,7 +209,13 @@ def pb_dynamic_plan(tier='quick'):
         target=9 if a['scene']=='PHYSICS_INTERACTION_LAB' else 12
         for c in [a]+[c for _,c,_ in b]:c['pb_visual_body']=target
         carriers.append((name+'_carrier',a,b))
-    return pairs+carriers
+    elevators=[]
+    for name,ref,variants in pairs:
+        if ref['scene']!='ENGINE_INTEGRATION_LAB' or ref['visual_ticks'] not in (60,150):continue
+        a,b=deepcopy((ref,variants))
+        for c in [a]+[c for _,c,_ in b]:c['pb_visual_body']=13
+        elevators.append((name+'_vertical_carrier',a,b))
+    return pairs+carriers+elevators
 
 
 def main():

@@ -117,7 +117,7 @@ public sealed class PB01FoundationTests
         var integrated=Prepare(GameLevelIds.EngineIntegrationLab);
         Assert.Equal(3,feature.Imported.World.MovingPlatformTrajectories.Count);
         Assert.Equal(3072,feature.Imported.WidthPx);
-        Assert.NotEmpty(integrated.Imported.World.MovingPlatformTrajectories);
+        Assert.Equal(2,integrated.Imported.World.MovingPlatformTrajectories.Count);
         Assert.NotEmpty(integrated.Imported.World.Triggers);
         Assert.NotEmpty(integrated.Connected.WindRegions);
         Assert.Empty(integrated.Connected.Exits);

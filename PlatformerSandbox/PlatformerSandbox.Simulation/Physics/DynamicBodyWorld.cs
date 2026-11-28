@@ -85,6 +85,8 @@ public sealed class DynamicBodyWorld
     /// collision pairs or passive touching faces. A subset of Metrics.Contacts.</summary>
     public long PairContacts { get; private set; }
     public int LargestContactIsland { get; private set; }
+    /// <summary>Event-loop passes in successfully committed coupled solves only. Excludes previews, discarded retries and independent terrain solves.</summary>
+    public long CoupledEventIterations { get; private set; }
     public double LastStepMilliseconds { get; private set; }
     public double TotalStepMilliseconds { get; private set; }
     public IReadOnlyList<DynamicBodyState> Bodies=>Array.AsReadOnly(_bodies.Values.ToArray());
@@ -236,13 +238,14 @@ public sealed class DynamicBodyWorld
                     throw new InvalidOperationException("Rider/support coupling ended in penetration; tick not committed.");
             var nextMetrics=new DynamicStepMetrics(checked(Metrics.Steps+1),checked(Metrics.Sweeps+result.Sweeps),checked(Metrics.Contacts+result.Contacts));
             long nextPairs=checked(PairContacts+result.Pairs);
+            long nextIterations=checked(CoupledEventIterations+result.EventIterations);
             long nextCharacterImpacts=checked(CharacterBoundaryImpacts+result.CharacterImpacts);
             long nextPushes=checked(CharacterPushes+(pushes?.Count??0));
             long nextPlatformContacts=checked(PlatformContacts+result.PlatformImpacts);
             long nextDestroyed=checked(DestroyedByPlatform+destroyed.Count);
             _bodies=result.Bodies;foreach(int id in destroyed)_ignored.Remove(DynamicId(id));
             PlatformContacts=nextPlatformContacts;DestroyedByPlatform=nextDestroyed;LastPlatformDestroyedBodyIds=Array.AsReadOnly(destroyed.OrderBy(id=>id).ToArray());Metrics=nextMetrics;PairContacts=nextPairs;LargestContactIsland=result.LargestIsland;
-            CharacterBoundaryImpacts=nextCharacterImpacts;CharacterPushes=nextPushes;
+            CharacterBoundaryImpacts=nextCharacterImpacts;CharacterPushes=nextPushes;CoupledEventIterations=nextIterations;
             LastStepMilliseconds=System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;TotalStepMilliseconds+=LastStepMilliseconds;return;
         }
         if(trace is not null)return;

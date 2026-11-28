@@ -726,7 +726,8 @@ public sealed class CharacterMovementController
             if (freeGroundIterations > maxFreeGroundIterations ||
                 sameTimeIterations > maxSameTimeIterations)
             {
-                double selfVelocity = velocity.X - externalHorizontalSpeed;
+                double supportVelocityX = support?.Evaluate(_elapsedSeconds + elapsed).Velocity.X ?? 0.0;
+                double selfVelocity = velocity.X - supportVelocityX - externalHorizontalSpeed;
                 double speedLimit = grounded ?
                     _groundMotion.MaximumSpeed : _airMotion.MaximumSpeed;
                 throw new SimulationNoProgressException(
@@ -738,7 +739,7 @@ public sealed class CharacterMovementController
                     $"direction={direction}, grounded={grounded}, " +
                     $"supportId={(support is null ? "none" : support.Id.ToString())}, " +
                     $"velocityX={velocity.X:R}, velocityY={velocity.Y:R}, " +
-                    $"personalVelocityX={selfVelocity:R}, " +
+                    $"supportVelocityX={supportVelocityX:R}, personalVelocityX={selfVelocity:R}, " +
                     $"speedLimit={speedLimit:R}, externalX={externalHorizontalSpeed:R}, " +
                     $"bounds=({bounds.Left:R}, {bounds.Bottom:R}, " +
                     $"{bounds.Right:R}, {bounds.Top:R}), " +
@@ -806,22 +807,21 @@ public sealed class CharacterMovementController
                     bounds, support, movingFloorWorldTime);
                 MovingPlatformSample floor = support.Evaluate(movingFloorWorldTime);
                 double localV = velocity.X - floor.Velocity.X - externalHorizontalSpeed;
-                // On a moving support with wind, the stored world velocity may
-                // already be the exact representable sum of platform + current
-                // + requested cruise, while subtracting those contributions
-                // reconstructs a relative speed a few ULPs outside the limit.
-                // Reassigning the cruise world velocity then changes NO bits,
-                // and the sub-ULP phase is selected forever without clock
-                // progress. Use the exact relative cruise only when the stored
-                // world velocity ALREADY equals that representable sum. A real
-                // overspeed remains on the normal analytical deceleration path.
-                if (direction != HorizontalDirection.Neutral)
-                {
-                    double cruiseLocal = (int)direction * _groundMotion.MaximumSpeed;
-                    double cruiseWorld = floor.Velocity.X + externalHorizontalSpeed + cruiseLocal;
-                    if (velocity.X == cruiseWorld)
-                        localV = cruiseLocal;
-                }
+                // Exact world-space phase endpoints need not survive the
+                // inverse subtraction of support motion and external current.
+                // In particular, neutral braking and reversal both end at zero
+                // personal speed, but (floor + current) - floor - current can
+                // leave a nonzero ULP residual. Reapplying the same world speed
+                // then selects the same sub-resolution phase indefinitely.
+                // Recognize only exact representable endpoint sums, not a
+                // velocity tolerance: real braking/overspeed remains analytical.
+                double transportWorld = floor.Velocity.X + externalHorizontalSpeed;
+                double cruiseLocal = (int)direction * _groundMotion.MaximumSpeed;
+                double cruiseWorld = transportWorld + cruiseLocal;
+                if (velocity.X == transportWorld)
+                    localV = 0.0;
+                else if (velocity.X == cruiseWorld)
+                    localV = cruiseLocal;
                 HorizontalMotionTrajectory relative = _groundMotion.CreateTrajectory(
                     0.0, localV, direction);
                 double rideDuration = remaining;

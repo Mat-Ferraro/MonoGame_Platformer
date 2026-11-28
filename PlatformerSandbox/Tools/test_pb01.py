@@ -47,16 +47,17 @@ class PB01ToolTests(unittest.TestCase):
             for e in entries:
                 x=e['X']*32;y=data['pxHei']-e['Y']*32;hx=e.get('HalfWidth',.5)*32;hy=e.get('HalfHeight',.5)*32
                 self.assertFalse(any(x-hx<b[2] and x+hx>b[0] and y-hy<b[3] and y+hy>b[1] for b in solid),e)
-        for tier,n in [('quick',4),('full',8)]:
+        for tier,n in [('quick',5),('full',10)]:
             plan=visual.pb_dynamic_plan(tier);self.assertEqual(n,len(plan))
             for _,ref,variants in plan:
                 self.assertTrue(ref['pb_dynamic_visual']);self.assertEqual(0,ref['camera_pan'])
+            self.assertTrue(any(ref['scene']=='ENGINE_INTEGRATION_LAB' and ref['pb_visual_body']==13 for _,ref,_ in plan))
         for c in bench.pb01_baseline_plan('full'):
             env=bench.environment(c,Path('capture'));self.assertEqual('1800',env['PS_PB01_RECORDED_TICKS']);self.assertEqual('300',env['PS_PB01_WARMUP_TICKS'])
 
     def test_coupled_fixture_pairs_and_capture_target(self):
         fixture=json.loads((ROOT/'Content/Physics/DynamicBodies.json').read_text())['Levels']
-        for level,base,count in [('PHYSICS_INTERACTION_LAB',6,10),('ENGINE_INTEGRATION_LAB',9,12)]:
+        for level,base,count in [('PHYSICS_INTERACTION_LAB',6,10),('ENGINE_INTEGRATION_LAB',9,14)]:
             entries=fixture[level];self.assertEqual(count,len(entries))
             self.assertTrue(all(set(e['CollisionMask'].split(', '))=={'Terrain','Platform','Dynamic','Character'} for e in entries))
             def box(e):
@@ -100,11 +101,11 @@ class PB01ToolTests(unittest.TestCase):
     def test_absolute_tick_window_and_exercised_workload(self):
         c=bench.pb01_baseline_plan('quick')[0]
         m={'PB measurement start tick':'180','PB measurement end tick':'480','PB warmup start tick':'23',
-           'PB tick benchmark':'True','PB workload version':'5','PB platform prop contacts':'1','PB prop pair impacts':'1','PB measured platform commands':'5',
+           'PB tick benchmark':'True','PB workload version':'7','PB committed coupled event iterations':'3','PB platform recovery attempts':'0','PB platform prop contacts':'1','PB prop pair impacts':'1','PB measured platform commands':'5',
            'PB measured deaths':'1','PB measured respawns':'1'}
         self.assertEqual(300,bench.validate_pb_tick_window(c,m))
         self.assertEqual('1',bench.environment(c,Path('capture'))['PS_PB01_PLATFORM_SCRIPT'])
-        for k,v in [('PB measurement start tick','181'),('PB measurement end tick','481'),('PB warmup start tick','121'),('PB measured platform commands','0'),('PB measured respawns','0'),('PB prop pair impacts','0'),('PB platform prop contacts','0')]:
+        for k,v in [('PB measurement start tick','181'),('PB measurement end tick','481'),('PB warmup start tick','121'),('PB measured platform commands','0'),('PB measured respawns','0'),('PB prop pair impacts','0'),('PB platform prop contacts','0'),('PB committed coupled event iterations','0'),('PB platform recovery attempts','-1'),('PB workload version','6')]:
             with self.assertRaises(ValueError):bench.validate_pb_tick_window(c,{**m,k:v})
 
     def test_crush_lifecycle_authored_defaults(self):
@@ -158,6 +159,75 @@ class PB01ToolTests(unittest.TestCase):
         self.assertTrue({'PlayerSpawn','MovingPlatform','Checkpoint','WindZone','ParticleZone','LightSource','TerrainArtwork','ScenerySprite','PaintedSprite'}<=kinds)
         self.assertNotIn('LevelExit',kinds)
         self.assertEqual(len(entities),len({e['iid'] for e in entities}))
+
+    def test_showcase_art_matches_collision_and_lights(self):
+        import pb01_showcase_art as art
+        level=json.loads(art.LEVEL.read_text())['levels'][0]
+        grid=next(l for l in level['layerInstances'] if l['__identifier']=='Collisions')
+        g=grid['__gridSize']; w=grid['__cWid']; cells=grid['intGridCsv']
+        entities=[e for l in level['layerInstances'] for e in l['entityInstances']]
+        solids=[e for e in entities if art.fields(e).get('Plane')=='Terrain']
+        self.assertEqual(len(art.rectangles(grid)),len(solids))
+        occupied=set()
+        for e in solids:
+            f=art.fields(e); x,y=e['px']; width,height=e['width'],e['height']
+            self.assertTrue(all(v%g==0 for v in (x,y,width,height)))
+            self.assertEqual([0,0],e['__pivot'])
+            self.assertEqual((1,0,0,0,False,False,True),(f['Opacity'],f['RotationDeg'],f['ParallaxX'],f['ParallaxY'],f['FlipX'],f['FlipY'],f['CastsShadows']))
+            rect=(x//g,y//g,width//g,height//g)
+            self.assertIn(rect,art.rectangles(grid))
+            self.assertEqual(art.stone(grid,rect),(art.LEVEL.parent/f['Image']).read_bytes())
+            for cy in range(rect[1],rect[1]+rect[3]):
+                for cx in range(rect[0],rect[0]+rect[2]):
+                    self.assertNotIn(cy*w+cx,occupied);occupied.add(cy*w+cx)
+        self.assertEqual({i for i,v in enumerate(cells) if v},occupied)
+        lights=[e for e in entities if e['__identifier']=='LightSource']
+        markers=[e for e in entities if art.fields(e).get('Image')==art.PREFIX+'Lamp.png']
+        self.assertEqual(len(art.LIGHTS),len(lights));self.assertEqual(len(lights),len(markers))
+        for light in lights:
+            x,y=light['px']; f=art.fields(light)
+            self.assertTrue(all(not cells[cy*w+cx] for cy in range(y//g,(y+23)//g+1) for cx in range(x//g,(x+23)//g+1)))
+            self.assertTrue(any(m['px']==light['px'] and art.fields(m)['Tint']==f['Color'] and not art.fields(m)['CastsShadows'] for m in markers))
+        self.assertTrue(any(art.fields(e)['CastShadows'] for e in lights))
+        self.assertTrue(any(not art.fields(e)['CastShadows'] for e in lights))
+        for i in occupied:
+            if i>=w and cells[i-w]:continue
+            x=(i%w+.5)*g;y=(i//w)*g
+            self.assertTrue(any(math.hypot(x-(e['px'][0]+12),y-(e['px'][1]+12))<art.fields(e)['RadiusWorld']*g for e in lights),(x,y))
+        for e in entities:
+            f=art.fields(e)
+            if f.get('Plane') in ('Background','Foreground'):
+                self.assertFalse(f['CastsShadows'])
+                if e not in markers:self.assertLessEqual(f['Opacity'],.30)
+
+    def test_integrated_elevator_sweep_and_crush_station(self):
+        level=json.loads((ROOT/'Content/Levels/EngineIntegrationLab.ldtk').read_text())['levels'][0]
+        grid=next(x for x in level['layerInstances'] if x['__identifier']=='Collisions');w=grid['__cWid'];g=grid['__gridSize']
+        solid=[(i%w*g,i//w*g,(i%w+1)*g,(i//w+1)*g) for i,v in enumerate(grid['intGridCsv']) if v]
+        def overlaps(a,b):return a[0]<b[2] and a[2]>b[0] and a[1]<b[3] and a[3]>b[1]
+        paths={}
+        for e in (e for l in level['layerInstances'] for e in l['entityInstances'] if e['__identifier']=='MovingPlatform'):
+            f={x['__identifier']:x['__value'] for x in e['fieldInstances']};x,y=e['px'];dx=f['VelocityX']*32;dy=-f['VelocityY']*32
+            swept=(min(x,x+dx),min(y,y+dy),max(x,x+dx)+e['width'],max(y,y+dy)+e['height'])
+            self.assertFalse(any(overlaps(swept,b) for b in solid));self.assertFalse(any(overlaps(swept,b) for b in paths.values()));paths[f['ColliderId']]=swept
+        self.assertEqual({8001,8002},set(paths))
+        entries=json.loads((ROOT/'Content/Physics/DynamicBodies.json').read_text())['Levels']['ENGINE_INTEGRATION_LAB'];carrier,blocker=[next(e for e in entries if e['Id']==i) for i in (13,14)]
+        for e in (carrier,blocker):self.assertEqual('StopPlatform',e['CrushResponse'])
+        def box(e):return ((e['X']-.5)*32,level['pxHei']-(e['Y']+.5)*32,(e['X']+.5)*32,level['pxHei']-(e['Y']-.5)*32)
+        self.assertEqual(box(carrier)[3],paths[8002][1]);self.assertTrue(overlaps(box(blocker),paths[8002]));self.assertTrue(any(box(blocker)[3]==b[1] and box(blocker)[0]<b[2] and box(blocker)[2]>b[0] for b in solid))
+
+    def test_closeout_evidence_rejects_short_or_missing_runs(self):
+        with tempfile.TemporaryDirectory() as path:
+            target=Path(path)
+            for level in ('PHYSICS_INTERACTION_LAB','ENGINE_INTEGRATION_LAB'):
+                (target/(level+'_closeout_replay.csv')).write_text('level,mode,ticks,mean_world_step_ms,p95_world_step_ms,allocated_bytes_per_tick,committed_dynamic_cpu_ms_per_tick,platform_stops,recovery_attempts,contacts,platform_contacts,committed_coupled_event_iterations,deaths,respawns\n'+level+',Indexed,10000,1,2,100,0.5,3,3,5,5,5,1,1\n')
+            scale=target/'PB01_closeout_scaling.csv'
+            scale.write_text('mode,body_count,ticks,mean_step_ms,p95_step_ms,allocated_bytes_per_tick,contacts,pair_contacts,committed_coupled_event_iterations\n'+''.join(f'Indexed,{n},600,1,2,100,3,3,3\n' for n in (8,32,64)))
+            validate.validate_closeout_evidence(target,'full','Indexed')
+            with self.assertRaises(ValueError):validate.validate_closeout_evidence(target,'quick','Indexed')
+            with self.assertRaises(ValueError):validate.validate_closeout_evidence(target,'full','Verify')
+            scale.unlink()
+            with self.assertRaises(OSError):validate.validate_closeout_evidence(target,'full','Indexed')
 
     def test_benchmark_summary_is_separate_from_gpu_experiments(self):
         with tempfile.TemporaryDirectory() as path:

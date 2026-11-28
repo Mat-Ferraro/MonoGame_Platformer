@@ -1,5 +1,7 @@
 """PB01 correctness and opt-in integrated performance baselines. Standard library only."""
 import argparse
+import csv
+import math
 from datetime import datetime
 import json
 import os
@@ -28,6 +30,51 @@ def plan(root, tier, headless=False, no_bench=False, bench_only=False, repeats=N
             if allow_battery: cmd+=['--allow-battery']
             steps.append(('integrated_benchmark',cmd,'Reference','PO_auto_*.zip'))
     return steps
+
+
+
+def validate_closeout_evidence(target, tier, mode):
+    """Reject missing, partial, stale-mode or non-finite acceptance CSVs."""
+    replay_ticks={'quick':600,'standard':3000,'full':10000}[tier]
+    scale_ticks={'quick':120,'standard':300,'full':600}[tier]
+    def rows(name):
+        with (target/name).open(newline='',encoding='utf-8') as f:
+            return list(csv.DictReader(f))
+    def numeric(row, keys):
+        for key in keys:
+            x=float(row[key])
+            if not math.isfinite(x) or x<0:raise ValueError(f'invalid {key}: {x}')
+    for level in ('PHYSICS_INTERACTION_LAB','ENGINE_INTEGRATION_LAB'):
+        r=rows(level+'_closeout_replay.csv')
+        if len(r)!=1:raise ValueError(f'{level}: expected one replay row')
+        row=r[0]
+        if (row['level'],row['mode'],int(row['ticks']))!=(level,mode,replay_ticks):raise ValueError(f'{level}: wrong replay configuration')
+        numeric(row,('mean_world_step_ms','p95_world_step_ms','allocated_bytes_per_tick','committed_dynamic_cpu_ms_per_tick','platform_stops','recovery_attempts'))
+        if min(int(row[k]) for k in ('contacts','platform_contacts','committed_coupled_event_iterations','deaths','respawns'))<=0:raise ValueError(f'{level}: replay workload not exercised')
+    scale=rows('PB01_closeout_scaling.csv')
+    if len(scale)!=3 or {int(r['body_count']) for r in scale}!={8,32,64}:raise ValueError('wrong body scaling cases')
+    for row in scale:
+        if row['mode']!=mode or int(row['ticks'])!=scale_ticks:raise ValueError('wrong scaling configuration')
+        numeric(row,('mean_step_ms','p95_step_ms','allocated_bytes_per_tick'))
+        if min(int(row[k]) for k in ('contacts','pair_contacts','committed_coupled_event_iterations'))<=0:raise ValueError('scaling workload not exercised')
+
+def write_closeout_comparison(out):
+    """Same workload/machine comparison; Verify is a diagnostic cost, not a shipping preset."""
+    samples={}
+    for mode in ('Reference','Indexed','Verify'):
+        target=out/('tests_'+mode.lower())
+        for filename in ('PHYSICS_INTERACTION_LAB_closeout_replay.csv','ENGINE_INTEGRATION_LAB_closeout_replay.csv','PB01_closeout_scaling.csv'):
+            with (target/filename).open(newline='',encoding='utf-8') as f:
+                for row in csv.DictReader(f):
+                    name=row.get('level') or 'scaling_'+row['body_count']
+                    samples.setdefault(name,{})[mode]=row
+    with (out/'PB01_closeout_comparison.csv').open('w',newline='',encoding='utf-8') as f:
+        w=csv.writer(f);w.writerow(['workload','mode','ticks','mean_ms','p95_ms','allocated_bytes_per_tick','mean_ratio_vs_reference'])
+        for name,modes in sorted(samples.items()):
+            def mean(r):return float(r.get('mean_world_step_ms') or r['mean_step_ms'])
+            baseline=mean(modes['Reference'])
+            for mode,row in modes.items():
+                w.writerow([name,mode,row['ticks'],mean(row),row.get('p95_world_step_ms') or row['p95_step_ms'],row['allocated_bytes_per_tick'],mean(row)/baseline if baseline>0 else ''])
 
 
 def main():
@@ -67,11 +114,19 @@ def main():
             if name.startswith('tests_') and code==0:
                 # Require real evidence, not a successful zero-test run.
                 if not all((target/n).is_file() for n in ('results.trx','PHYSICS_INTERACTION_LAB_fixed_ticks.csv','ENGINE_INTEGRATION_LAB_fixed_ticks.csv','PHYSICS_INTERACTION_LAB_dynamic_ticks.csv','ENGINE_INTEGRATION_LAB_dynamic_ticks.csv','PB01_character_prop_ticks.csv')):code=1
+                if code==0:
+                    try:validate_closeout_evidence(target,a.tier,mode)
+                    except (OSError,ValueError,KeyError) as exc:
+                        (target/'closeout_evidence_error.txt').write_text(str(exc),encoding='utf-8');print('Closeout evidence:',exc);code=1
             results.append(dict(step=name,mode=mode,exit_code=code,archives=sorted(p.name for p in archives)))
             if code:status=code;break
     except KeyboardInterrupt:status=130
     finally:
-        summary=dict(tier=a.tier,headless=a.headless,benchmark_only=a.bench_only,exit_code=status,steps=results,not_run=[n for n,_,_,_ in steps if n not in {r['step'] for r in results}])
+        if all(any(r['step']=='tests_'+mode and r['exit_code']==0 for r in results) for mode in ('reference','indexed','verify')):
+            try:write_closeout_comparison(out)
+            except (OSError,ValueError,KeyError) as exc:
+                (out/'comparison_error.txt').write_text(str(exc),encoding='utf-8');status=1
+        summary=dict(tier=a.tier,headless=a.headless,benchmark_only=a.bench_only,exit_code=status,automated_closeout_candidate=(status==0 and a.tier=='full' and not (a.headless or a.no_bench or a.bench_only)),manual_acceptance_required=True,steps=results,not_run=[n for n,_,_,_ in steps if n not in {r['step'] for r in results}])
         (out/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
         (out/'summary.md').write_text('# PB01 validation\n\n'+ '\n'.join(f"- {r['step']}: {'PASS' if r['exit_code']==0 else 'FAIL'}" for r in results)+'\n\nNot run: '+', '.join(summary['not_run'])+'\n',encoding='utf-8')
         archive=out.with_suffix('.zip')

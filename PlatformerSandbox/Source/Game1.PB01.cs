@@ -27,7 +27,7 @@ public sealed partial class Game1
     private int PbVisualTargetId=>int.TryParse(Environment.GetEnvironmentVariable("PS_PB01_VISUAL_BODY"),out int n)&&n>0?n:1;
     private long? _pbWarmupStartTick;
     private bool _pbTickWarmupComplete;
-    private long _pbStartSweeps,_pbStartContacts,_pbStartPairContacts,_pbStartCharacterPushes,_pbStartCharacterImpacts,_pbStartPlatformContacts,_pbStartPlatformStops,_pbStartDestroyed;
+    private long _pbStartSweeps,_pbStartContacts,_pbStartPairContacts,_pbStartCharacterPushes,_pbStartCharacterImpacts,_pbStartPlatformContacts,_pbStartPlatformStops,_pbStartRecoveryAttempts,_pbStartEventIterations,_pbStartDestroyed;
     private double _pbStartDynamicMs;
     private int _pbMeasuredPlaybackRequests,_pbMeasuredDeaths,_pbMeasuredRespawns;
     private int PbWarmupTicks=>int.TryParse(Environment.GetEnvironmentVariable("PS_PB01_WARMUP_TICKS"),out int n)&&n>0?n:60;
@@ -39,7 +39,7 @@ public sealed partial class Game1
     private bool PbBenchmarkBoundaryReached=>PbTickBenchmark&&PerfCaptureActive&&_worldClockTest is WorldSession w&&
         w.WorldTick>=(_pbTickWarmupComplete?_pbMeasurementStartTick+PbRecordedTicks:PbTargetStartTick);
     private bool PbTickBenchmark=>_poAutoStarted&&Environment.GetEnvironmentVariable("PS_PB01_TICK_BENCHMARK")=="1";
-    private void ResetPbBenchmark(){_pbWarmupStartTick=null;_pbTickWarmupComplete=false;_pbStartSweeps=_pbStartContacts=_pbStartPairContacts=_pbStartCharacterPushes=_pbStartCharacterImpacts=_pbStartPlatformContacts=_pbStartPlatformStops=_pbStartDestroyed=0;_pbStartDynamicMs=0;_pbMeasuredPlaybackRequests=_pbMeasuredDeaths=_pbMeasuredRespawns=0;}
+    private void ResetPbBenchmark(){_pbWarmupStartTick=null;_pbTickWarmupComplete=false;_pbStartSweeps=_pbStartContacts=_pbStartPairContacts=_pbStartCharacterPushes=_pbStartCharacterImpacts=_pbStartPlatformContacts=_pbStartPlatformStops=_pbStartRecoveryAttempts=_pbStartEventIterations=_pbStartDestroyed=0;_pbStartDynamicMs=0;_pbMeasuredPlaybackRequests=_pbMeasuredDeaths=_pbMeasuredRespawns=0;}
     private void ApplyPbScript(WorldSession world)
     {
         if(!PbScriptEnabled||world.DynamicBodies is not DynamicBodyWorld d)return;

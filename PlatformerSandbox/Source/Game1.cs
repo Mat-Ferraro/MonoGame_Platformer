@@ -3045,7 +3045,7 @@ public sealed partial class Game1 : Game
                     _pbTickWarmupComplete=true;_poAutoWarmupFrames=_phase21BenchmarkFrame;
                     _pbMeasurementStartTick=tick;
                     var d=_worldClockTest.DynamicBodies;
-                    _pbStartSweeps=d?.Metrics.Sweeps??0;_pbStartContacts=d?.Metrics.Contacts??0;_pbStartPairContacts=d?.PairContacts??0;_pbStartCharacterPushes=d?.CharacterPushes??0;_pbStartCharacterImpacts=d?.CharacterBoundaryImpacts??0;_pbStartDynamicMs=d?.TotalStepMilliseconds??0;_pbStartPlatformContacts=d?.PlatformContacts??0;_pbStartPlatformStops=_worldClockTest?.PropPlatformStops??0;_pbStartDestroyed=d?.DestroyedByPlatform??0;
+                    _pbStartSweeps=d?.Metrics.Sweeps??0;_pbStartContacts=d?.Metrics.Contacts??0;_pbStartPairContacts=d?.PairContacts??0;_pbStartCharacterPushes=d?.CharacterPushes??0;_pbStartCharacterImpacts=d?.CharacterBoundaryImpacts??0;_pbStartDynamicMs=d?.TotalStepMilliseconds??0;_pbStartPlatformContacts=d?.PlatformContacts??0;_pbStartPlatformStops=_worldClockTest?.PropPlatformStops??0;_pbStartRecoveryAttempts=_worldClockTest?.PropPlatformRecoveryAttempts??0;_pbStartEventIterations=d?.CoupledEventIterations??0;_pbStartDestroyed=d?.DestroyedByPlatform??0;
                 }
                 return;
             }
@@ -3155,7 +3155,7 @@ public sealed partial class Game1 : Game
                             "Automatic case: "+Environment.GetEnvironmentVariable("PS_PO_AUTO_CASE"),
                             "Warmup frames: "+warmup,"Recorded frames: "+_phase21Benchmark.Count,
                             "PB tick benchmark: "+PbTickBenchmark,"PB warmup start tick: "+(_pbWarmupStartTick??0),
-                            "PB workload version: 5", "PB measured platform commands: "+_pbMeasuredPlaybackRequests,
+                            "PB workload version: 7", "PB measured platform commands: "+_pbMeasuredPlaybackRequests,
                             "PB measured deaths: "+_pbMeasuredDeaths,"PB measured respawns: "+_pbMeasuredRespawns,
                             "PB dynamic bodies: "+(_worldClockTest?.DynamicBodies?.Bodies.Count??0),
                             "PB dynamic sweeps: "+((_worldClockTest?.DynamicBodies?.Metrics.Sweeps??0)-_pbStartSweeps),
@@ -3165,6 +3165,8 @@ public sealed partial class Game1 : Game
                             "PB character boundary impacts: "+((_worldClockTest?.DynamicBodies?.CharacterBoundaryImpacts??0)-_pbStartCharacterImpacts),
                             "PB platform prop contacts: "+((_worldClockTest?.DynamicBodies?.PlatformContacts??0)-_pbStartPlatformContacts),
                             "PB platform prop stops: "+((_worldClockTest?.PropPlatformStops??0)-_pbStartPlatformStops),
+                            "PB platform recovery attempts: "+((_worldClockTest?.PropPlatformRecoveryAttempts??0)-_pbStartRecoveryAttempts),
+                            "PB committed coupled event iterations: "+((_worldClockTest?.DynamicBodies?.CoupledEventIterations??0)-_pbStartEventIterations),
                             "PB platform destroyed props: "+((_worldClockTest?.DynamicBodies?.DestroyedByPlatform??0)-_pbStartDestroyed),
                             "PB dynamic CPU ms: "+FormattableString.Invariant($"{(_worldClockTest?.DynamicBodies?.TotalStepMilliseconds??0)-_pbStartDynamicMs:R}"),
                             "Warmup minimum: "+(_poAutoStarted?_poMinimumWarmup:warmup), "Warmup maximum: "+(_poAutoStarted?_poMaximumWarmup:warmup),

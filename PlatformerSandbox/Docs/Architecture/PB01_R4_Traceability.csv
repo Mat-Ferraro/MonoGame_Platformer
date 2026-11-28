@@ -1,0 +1,9 @@
+Capability,Dedicated lab,Integrated lab,Automated evidence,Acceptance
+Rigid-body translation and friction,Material/prop controls,Existing crates,PB01DynamicBodyTests; PB01CoupledPropTests; scaling,Pending full run
+Character push and support,Horizontal and vertical platforms,Crates and elevator 8002,PB01CharacterPropTests; PB01CloseoutTests,Pending full run
+Platform push and crush,8001/8002/8003,8001/8002; crates 13/14,PB01PlatformPropTests; IntegratedElevatorActuallyObstructsAndRetreats,Pending full run
+Pinch/landing handoff,Horizontal wall and jump,Existing mixed world,PB01LandingWallHandoffTests,Pending full run
+Deterministic combined interactions,PhysicsInteractionLab,EngineIntegrationLab,AuthoredMixedWorldStressReplay; 10000 ticks per full case,Pending full run
+Performance,Body count scale,Workload v6 VSync and uncapped,PB01_closeout_comparison.csv; pb01_baseline.csv,Pending measurements
+Visual and audio interoperability,Existing feature presenters,Lighting particles audio camera checkpoint wind,Visual differential captures; manual acceptance,Pending manual and graphical run
+Rotational dynamics,Not implemented,Not implemented,PB02,Deferred
