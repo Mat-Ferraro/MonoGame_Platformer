@@ -76,9 +76,9 @@ public sealed class GameplayLightingPresenter
         // Do not leave player-attached light proxies behind after a player leaves
         // or respawns. Respawn's separate green flash is still spawned below.
         if (e.Kind is WorldGameplayEventKind.PlayerRemoved or
-            WorldGameplayEventKind.PlayerRespawned)
+            WorldGameplayEventKind.PlayerRespawned or WorldGameplayEventKind.PlayerDied)
             _flashes.RemoveAll(f => f.FollowPlayerId == e.PlayerId);
-        if (e.Kind == WorldGameplayEventKind.PlayerRemoved) return;
+        if (e.Kind is WorldGameplayEventKind.PlayerRemoved or WorldGameplayEventKind.PlayerDied) return;
         LightRgb rgb;
         double radius, intensity, duration;
         bool frontFacingPulse = e.Kind == WorldGameplayEventKind.AbilityActivated &&
@@ -132,7 +132,7 @@ public sealed class GameplayLightingPresenter
             if (flash.FollowPlayerId is not int playerId) continue;
             int playerIndex = -1;
             for (int j = 0; j < committed.Players.Count; j++)
-                if (committed.Players[j].PlayerId == playerId)
+                if (committed.Players[j].PlayerId == playerId && !committed.Players[j].IsDead)
                 { playerIndex = j; break; }
             if (playerIndex < 0)
             {

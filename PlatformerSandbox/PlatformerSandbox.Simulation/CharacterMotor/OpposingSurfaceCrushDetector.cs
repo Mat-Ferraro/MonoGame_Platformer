@@ -154,6 +154,103 @@ public static class OpposingSurfaceCrushDetector
         return earliestById;
     }
 
+    /// <summary>
+    /// Classify a closing side pinch at an actual motion/contact boundary.
+    /// A resting opposite face need not produce a new sweep hit, and two
+    /// impacts can have distinct binary64 times. Do not wait for the next
+    /// strict sweep to discover that there is no legal horizontal velocity.
+    /// This is only a contact-boundary query, not initial-overlap recovery.
+    /// </summary>
+    internal static void ThrowIfClosingSideContact(Aabb body, double time,
+        IReadOnlyList<StaticAabbCollider> statics,
+        IReadOnlyList<MovingPlatformTrajectory> platforms)
+    {
+        const double faceTolerance = 1e-8; // Existing sweep face alignment budget.
+        CharacterCrushEvent? crush = null;
+        foreach (var platform in platforms)
+        {
+            var sample = platform.Evaluate(time);
+            double vx = sample.Velocity.X;
+            if (vx == 0 || Math.Min(body.Top, sample.Bounds.Top) -
+                Math.Max(body.Bottom, sample.Bounds.Bottom) <= AlignmentTolerance) continue;
+            double pushingFace = vx > 0 ? sample.Bounds.Right : sample.Bounds.Left;
+            double playerFace = vx > 0 ? body.Left : body.Right;
+            if (Math.Abs(pushingFace - playerFace) > faceTolerance) continue;
+            foreach (var wall in statics)
+            {
+                if (Math.Min(body.Top, wall.Bounds.Top) -
+                    Math.Max(body.Bottom, wall.Bounds.Bottom) <= AlignmentTolerance) continue;
+                double opposingFace = vx > 0 ? wall.Bounds.Left : wall.Bounds.Right;
+                double oppositePlayerFace = vx > 0 ? body.Right : body.Left;
+                if (Math.Abs(opposingFace - oppositePlayerFace) > faceTolerance) continue;
+                double corridor = vx > 0 ? opposingFace - pushingFace : pushingFace - opposingFace;
+                // Two nearby faces are not enough: the gap must actually be
+                // at the body's width (or a precision-sized residual below it).
+                if (Math.Abs(corridor - body.Width) > faceTolerance) continue;
+                crush = PreferStableId(crush, new CharacterCrushEvent(platform.Id,
+                    wall.Id, CharacterCrushAxis.Horizontal, time, body));
+            }
+        }
+        if (crush is not null) throw new CharacterCrushException(crush);
+    }
+
+    /// <summary>
+    /// Classify a rejected endpoint only when a moving horizontal face has
+    /// actually closed an initially valid corridor below the character width.
+    /// Unlike the predictive query, the resolved endpoint may have entered
+    /// the opposing surface's vertical span during this interval (landing).
+    /// Never treats an isolated overlap, a retreat, or an escaped rider as crush.
+    /// The caller must discard this endpoint and retry or apply its crush policy.
+    /// </summary>
+    public static CharacterCrushEvent? AtPenetratingSideEndpoint(
+        Aabb bodyStart, Aabb bodyEnd, double startTime, double endTime,
+        IReadOnlyList<StaticAabbCollider> statics,
+        IReadOnlyList<MovingPlatformTrajectory> platforms)
+    {
+        Validate(bodyStart, bodyEnd, startTime, endTime - startTime);
+        CharacterCrushEvent? result = null;
+        foreach (var pusher in platforms)
+        {
+            // Solver-predicted props do not own authored playback.
+            if (pusher.IsTickMotion) continue;
+            Aabb a0 = pusher.Evaluate(startTime).Bounds;
+            Aabb a1 = pusher.Evaluate(endTime).Bounds;
+            if (!AabbCollisionDetector.Overlaps(bodyEnd, a1) ||
+                AabbCollisionDetector.Overlaps(bodyStart, a0)) continue;
+            double dx = a1.Left - a0.Left;
+            if (dx == 0.0) continue;
+
+            void Consider(int id, Aabb b0, Aabb b1)
+            {
+                if (id == pusher.Id ||
+                    Math.Min(bodyEnd.Top, a1.Top) - Math.Max(bodyEnd.Bottom, a1.Bottom) <= AlignmentTolerance ||
+                    Math.Min(bodyEnd.Top, b1.Top) - Math.Max(bodyEnd.Bottom, b1.Bottom) <= AlignmentTolerance)
+                    return;
+                bool movingRight = dx > 0.0;
+                bool initiallyBetween = movingRight
+                    ? a0.Right <= bodyStart.Left + AlignmentTolerance && b0.Left >= bodyStart.Right - AlignmentTolerance
+                    : b0.Right <= bodyStart.Left + AlignmentTolerance && a0.Left >= bodyStart.Right - AlignmentTolerance;
+                // The rejected player must still be on the pushed side and
+                // reach into the corridor, rather than have crossed behind it.
+                bool stillBetween = movingRight
+                    ? bodyEnd.Center.X > a1.Center.X && bodyEnd.Right > a1.Right && bodyEnd.Left < b1.Left
+                    : bodyEnd.Center.X < a1.Center.X && bodyEnd.Left < a1.Left && bodyEnd.Right > b1.Right;
+                double before = movingRight ? b0.Left - a0.Right : a0.Left - b0.Right;
+                double after = movingRight ? b1.Left - a1.Right : a1.Left - b1.Right;
+                if (!initiallyBetween || !stillBetween || before < bodyStart.Width - AlignmentTolerance ||
+                    after >= before || after > bodyEnd.Width + AlignmentTolerance) return;
+                result = PreferStableId(result, new CharacterCrushEvent(pusher.Id,
+                    id, CharacterCrushAxis.Horizontal, endTime, bodyStart));
+            }
+
+            foreach (var wall in statics) Consider(wall.Id, wall.Bounds, wall.Bounds);
+            foreach (var other in platforms)
+                if (other.Id != pusher.Id)
+                    Consider(other.Id, other.Evaluate(startTime).Bounds, other.Evaluate(endTime).Bounds);
+        }
+        return result;
+    }
+
     private static CharacterCrushEvent? HorizontalClosingGap(
         Aabb bodyStart, Aabb bodyEnd, Aabb aStart, Aabb aEnd,
         Aabb bStart, Aabb bEnd, int movingId, int opposingId,

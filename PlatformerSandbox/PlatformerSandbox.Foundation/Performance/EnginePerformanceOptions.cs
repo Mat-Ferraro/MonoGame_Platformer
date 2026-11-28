@@ -21,6 +21,40 @@ public static class EnginePerformanceOptions
     // Main game thread only. Host clears this on every successful scene change.
     // Automated benchmark and visual captures never select the manual lab.
     public static LightingQualityLabProfile? ManualLightingLab { get; set; }
+    public static bool? ManualGpuShadowBuffers { get; set; }
+    private static bool ProcessGpuShadowBuffers { get; } = OptIn("PS_PO_GPU_SHADOW_BUFFERS");
+    public static bool GpuShadowBuffers => ManualGpuShadowBuffers ?? SavedGraphics?.GpuShadowBuffers ?? ProcessGpuShadowBuffers;
+    public static bool? ManualGpuShadowResident { get; set; }
+    public static bool? ManualGpuShadowIndexed { get; set; }
+    private static bool ProcessGpuShadowResident { get; } = OptIn("PS_PO_GPU_SHADOW_RESIDENT");
+    private static bool ProcessGpuShadowIndexed { get; } = OptIn("PS_PO_GPU_SHADOW_INDEXED");
+    public static bool GpuShadowResident => GpuShadowBuffers && (ManualGpuShadowResident ?? SavedGraphics?.GpuShadowResident ?? ProcessGpuShadowResident);
+    public static bool GpuShadowIndexed => GpuShadowBuffers && (ManualGpuShadowIndexed ?? SavedGraphics?.GpuShadowIndexed ?? ProcessGpuShadowIndexed);
+    public static bool? ManualGpuLocalMasks { get; set; }
+    private static bool ProcessGpuLocalMasks { get; } = OptIn("PS_PO_GPU_LOCAL_MASKS");
+    public static bool GpuLocalMasks => ManualGpuLocalMasks ?? SavedGraphics?.GpuLocalMasks ?? ProcessGpuLocalMasks;
+    public static bool? ManualGpuSpecializedMaterials { get; set; }
+    private static bool ProcessGpuSpecializedMaterials { get; } = OptIn("PS_PO_GPU_SPECIALIZED_MATERIALS");
+    public static bool GpuSpecializedMaterials => ManualGpuSpecializedMaterials ?? SavedGraphics?.GpuSpecializedMaterials ?? ProcessGpuSpecializedMaterials;
+    public static bool? ManualGpuFusedLayer { get; set; }
+    private static bool ProcessGpuFusedLayer { get; } = OptIn("PS_PO_GPU_FUSED_LAYER");
+    public static bool GpuFusedLayer => ManualGpuFusedLayer ?? SavedGraphics?.GpuFusedLayer ?? ProcessGpuFusedLayer;
+    public static bool? ManualGpuBatchUnshadowed { get; set; }
+    private static bool ProcessGpuBatchUnshadowed { get; } = OptIn("PS_PO_GPU_BATCH_UNSHADOWED");
+    public static bool GpuBatchUnshadowed => ManualGpuBatchUnshadowed ?? SavedGraphics?.GpuBatchUnshadowed ?? ProcessGpuBatchUnshadowed;
+    public static bool? ManualGpuFastBloom { get; set; }
+    private static bool ProcessGpuFastBloom { get; } = OptIn("PS_PO_GPU_FAST_BLOOM");
+    public static bool GpuFastBloom => ManualGpuFastBloom ?? SavedGraphics?.GpuFastBloom ?? ProcessGpuFastBloom;
+    public static bool? ManualGpuInstancedParticles { get; set; }
+    private static bool ProcessGpuInstancedParticles { get; } = OptIn("PS_PO_GPU_INSTANCED_PARTICLES");
+    public static bool GpuInstancedParticles => ManualGpuInstancedParticles ?? SavedGraphics?.GpuInstancedParticles ?? ProcessGpuInstancedParticles;
+    public static bool? ManualGpuScopedBinds { get; set; }
+    private static bool ProcessGpuScopedBinds { get; } = OptIn("PS_PO_GPU_SCOPED_BINDS");
+    public static bool GpuScopedBinds => ManualGpuScopedBinds ?? SavedGraphics?.GpuScopedBinds ?? ProcessGpuScopedBinds;
+    public static bool? ManualGpuMaterialClear { get; set; }
+    private static bool ProcessGpuMaterialClear { get; } = OptIn("PS_PO_GPU_MATERIAL_CLEAR");
+    public static bool GpuMaterialClear => ManualGpuMaterialClear ?? SavedGraphics?.GpuMaterialClear ?? ProcessGpuMaterialClear;
+    public static bool GpuTiming { get; } = OptIn("PS_PO_GPU_TIMING");
     private static GraphicsPreferences? _savedGraphics;
     private static LightingQualityLabProfile? _savedProfile;
     public static GraphicsPreferences? SavedGraphics

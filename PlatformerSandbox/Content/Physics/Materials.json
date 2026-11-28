@@ -1,0 +1,63 @@
+{
+  "Version": 1,
+  "FrictionCombine": "GeometricMean",
+  "RestitutionCombine": "Maximum",
+  "Materials": [
+    {
+      "Id": "Default",
+      "StaticFriction": 0.5,
+      "DynamicFriction": 0.4,
+      "Restitution": 0,
+      "AreaDensity": 1,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Ice",
+      "StaticFriction": 0.05,
+      "DynamicFriction": 0.03,
+      "Restitution": 0.05,
+      "AreaDensity": 0.9,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Wood",
+      "StaticFriction": 0.5,
+      "DynamicFriction": 0.35,
+      "Restitution": 0.1,
+      "AreaDensity": 0.6,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Metal",
+      "StaticFriction": 0.6,
+      "DynamicFriction": 0.4,
+      "Restitution": 0.05,
+      "AreaDensity": 7.8,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Stone",
+      "StaticFriction": 0.8,
+      "DynamicFriction": 0.65,
+      "Restitution": 0.05,
+      "AreaDensity": 2.5,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Rubber",
+      "StaticFriction": 0.9,
+      "DynamicFriction": 0.75,
+      "Restitution": 0.8,
+      "AreaDensity": 1.1,
+      "LinearDamping": 0
+    },
+    {
+      "Id": "Slime",
+      "StaticFriction": 0.9,
+      "DynamicFriction": 0.8,
+      "Restitution": 0,
+      "AreaDensity": 1,
+      "LinearDamping": 0
+    }
+  ]
+}

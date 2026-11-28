@@ -30,13 +30,13 @@ public sealed class SteerableJumpMotor
     private readonly JumpReleaseConstraints? _releaseConstraints;
     private readonly JumpDescentConstraints _descentConstraints;
     private readonly HorizontalMotionProfile _airMotion;
-    private readonly StaticAabbCollider[] _obstacles;
+    private IReadOnlyList<StaticAabbCollider> _obstacles;
     private readonly double _gravity;
     private readonly int _maxContactEvents;
     private readonly CollisionAssistancePolicy _assistancePolicy;
     private int _ceilingCorrectionsUsed;
-    private readonly MovingPlatformTrajectory? _movingPlatform;
-    private readonly MovingPlatformTrajectory[] _movingPlatformColliders;
+    private MovingPlatformTrajectory? _movingPlatform;
+    private MovingPlatformTrajectory[] _movingPlatformColliders;
     // Inherited at takeoff once. The airborne reference remains relative to
     // the launch frame; subsequent platform reversals cannot re-parent it.
     private readonly double _inheritedVerticalVelocity;
@@ -109,7 +109,7 @@ public sealed class SteerableJumpMotor
             }
         }
 
-        _obstacles = obstacles.ToArray();
+        _obstacles = SpatialColliderSet.Wrap(obstacles);
         var ids = new HashSet<int>();
         foreach (StaticAabbCollider obstacle in _obstacles)
         {
@@ -133,9 +133,15 @@ public sealed class SteerableJumpMotor
             if (!ids.Add(platform.Id))
                 throw new ArgumentException("Moving collider IDs must be globally unique.",
                     nameof(additionalMovingPlatforms));
-            if (AabbCollisionDetector.Overlaps(takeoffBounds,
-                    platform.Evaluate(startTimeSeconds).Bounds))
-                throw new InvalidOperationException("Jump starts penetrating a moving platform.");
+            Aabb platformBounds = platform.Evaluate(startTimeSeconds).Bounds;
+            if (AabbCollisionDetector.FindOverlap(takeoffBounds,
+                    new StaticAabbCollider(platform.Id, platformBounds)) is { } overlap)
+                throw new InvalidOperationException(
+                    $"Jump starts penetrating a moving platform. Platform={platform.Id}, " +
+                    $"time={startTimeSeconds:R}, depth={overlap.PenetrationDepth:R}, " +
+                    $"normal=({overlap.Normal.X:R},{overlap.Normal.Y:R}), " +
+                    $"takeoff=[{takeoffBounds.Left:R},{takeoffBounds.Bottom:R},{takeoffBounds.Right:R},{takeoffBounds.Top:R}], " +
+                    $"platform=[{platformBounds.Left:R},{platformBounds.Bottom:R},{platformBounds.Right:R},{platformBounds.Top:R}].");
         }
         _movingPlatformColliders = platforms.ToArray();
         _inheritedVerticalVelocity = inheritedVerticalVelocity;
@@ -165,6 +171,14 @@ public sealed class SteerableJumpMotor
     /// copied motor commits its progress only when the parent step succeeds.
     /// </summary>
     internal SteerableJumpMotor Fork() => (SteerableJumpMotor)MemberwiseClone();
+
+    internal void UseTickGeometry(IReadOnlyList<StaticAabbCollider> geometry) => _obstacles = geometry;
+    internal void UseTickMovingGeometry(MovingPlatformTrajectory[] moving)
+    {
+        var previous=_movingPlatform;
+        _movingPlatformColliders=moving;
+        _movingPlatform=(previous is null?null:moving.FirstOrDefault(p=>p.Id==previous.Id))??moving.FirstOrDefault();
+    }
 
     /// <summary>
     /// A blocking wall consumed an external transport component. The world
@@ -263,7 +277,7 @@ public sealed class SteerableJumpMotor
                     $"{bounds.Right:R},{bounds.Top:R}], " +
                     $"velocity=({velocity.X:R},{velocity.Y:R}), " +
                     $"contacts={contacts.Count}, " +
-                    $"staticColliders={_obstacles.Length}, " +
+                    $"staticColliders={_obstacles.Count}, " +
                     $"movingPlatforms={_movingPlatformColliders.Length}.");
             }
 
@@ -278,6 +292,9 @@ public sealed class SteerableJumpMotor
             // A *small* residual overlap may be repaired explicitly, within a
             // bounded distance, before querying the next analytical segment.
             // A side repair keeps the reference Y law unchanged.
+            if (contacts.Count > 0)
+                OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds,
+                    _worldTimeSeconds + elapsed, _obstacles, _movingPlatformColliders);
             foreach (MovingPlatformTrajectory platform in _movingPlatformColliders)
             {
                 MovingPlatformSample snapshot = platform.Evaluate(
@@ -602,6 +619,11 @@ public sealed class SteerableJumpMotor
                 continue;
             }
 
+            // A persistent opposite side is a constraint even if it did not
+            // generate a second equal-time analytical impact.
+            OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(hit.Value.BodyBoundsAtImpact,
+                _worldTimeSeconds + elapsed + hit.Value.TimeSeconds, _obstacles, _movingPlatformColliders);
+
             // Milestone 27 intentional assistance: a single *static*
             // ceiling corner can be cleared by a designer-bounded lateral
             // shift along its underside. Genuine multi-contact manifolds,
@@ -769,9 +791,18 @@ public sealed class SteerableJumpMotor
         // its private bounds, so the controller and the next jump update see
         // exactly the same nonpenetrating geometry. Never change jump height,
         // flight time, or real (greater than budget) penetration.
+        // A grounded result is at the impact instant, NOT the requested
+        // end of the tick. The parent owns the remaining grounded interval.
+        // Comparing it to future platform geometry can manufacture a pinch.
+        double motionEnd = _worldTimeSeconds + (grounded ? elapsed : durationSeconds);
+        if (motionEnd > _worldTimeSeconds &&
+            OpposingSurfaceCrushDetector.AtPenetratingSideEndpoint(_bounds, bounds,
+                _worldTimeSeconds, motionEnd, _obstacles, _movingPlatformColliders) is { } endpointCrush)
+            throw new CharacterCrushException(endpointCrush);
+        OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds,
+            motionEnd, _obstacles, _movingPlatformColliders);
         bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
-            bounds, _worldTimeSeconds + durationSeconds,
-            _movingPlatformColliders, _obstacles);
+            bounds, motionEnd, _movingPlatformColliders, _obstacles);
         // Publish exactly face-aligned static support at the jump boundary;
         // otherwise the next fixed step could fail strict start validation.
         bounds = StaticFloorPrecisionAlignment.Align(bounds, _obstacles);
@@ -788,7 +819,7 @@ public sealed class SteerableJumpMotor
         _ceilingCorrectionsUsed = ceilingCorrectionsUsed;
         _worldTimeSeconds += durationSeconds;
         return new SteerableJumpStepResult(bounds, velocity, grounded,
-            contacts.ToArray(), assists.ToArray());
+            contacts.ToArray(), assists.ToArray(), grounded ? elapsed : durationSeconds);
     }
 
     // Only called AFTER a real simultaneous analytical impact has been

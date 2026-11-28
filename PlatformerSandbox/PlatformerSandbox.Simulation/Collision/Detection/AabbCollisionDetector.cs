@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Spatial;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Simulation.Collision.Contacts;
 
@@ -104,7 +105,7 @@ public static class AabbCollisionDetector
 
         SweepHit? best = null;
         HashSet<int> ids = new();
-        foreach (StaticAabbCollider obstacle in obstacles)
+        foreach (StaticAabbCollider obstacle in SpatialColliderSet.Select(obstacles, () => SpatialBounds.Swept(moving, displacement)))
         {
             ArgumentNullException.ThrowIfNull(obstacle);
             if (!ids.Add(obstacle.Id))
@@ -119,7 +120,7 @@ public static class AabbCollisionDetector
                  hit.Value.ColliderId < best.Value.ColliderId))
                 best = hit;
         }
-        return best;
+        return SpatialColliderSet.Verify(obstacles, best, () => SweepFirst(moving, displacement, obstacles));
     }
 
     private static bool GetAxisTimes(

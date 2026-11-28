@@ -40,6 +40,7 @@ internal sealed class InteractiveControlPanel
     public bool Focused { get; private set; }
     public void Reset() { CompactAction=null; _choiceItems=null; Expanded = true; Focused = false; _page = _focus = 0; }
     public void Release() { DismissChoice(); Focused = false; }
+    public void GoToFirstPage() { DismissChoice(); _page=_focus=0; }
     public void Clear() => _items.Clear();
     public void Add(string label, string value, Action? action, bool selected = false) => _items.Add(new(label,value,action,selected));
     public void Toggle(string label, bool value, Action action) => Add(label,value?"ON":"OFF",action,value);

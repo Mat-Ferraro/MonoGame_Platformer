@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Spatial;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Simulation.Collision.Contacts;
 using PlatformerSandbox.Simulation.Motion.Integration;
@@ -137,7 +138,7 @@ public static class ParabolicAabbCollisionDetector
         ArgumentNullException.ThrowIfNull(obstacles);
         var ids = new HashSet<int>();
         ParabolicSweepHit? best = null;
-        foreach (StaticAabbCollider obstacle in obstacles)
+        foreach (StaticAabbCollider obstacle in SpatialColliderSet.Select(obstacles, () => SpatialColliderSet.Parabolic(moving, velocity, acceleration, durationSeconds), contactAlignmentTolerance))
         {
             ArgumentNullException.ThrowIfNull(obstacle);
             if (!ids.Add(obstacle.Id))
@@ -150,7 +151,7 @@ public static class ParabolicAabbCollisionDetector
                   candidate.ColliderId < best.Value.ColliderId)))
                 best = candidate;
         }
-        return best;
+        return SpatialColliderSet.Verify(obstacles, best, () => SweepFirst(moving, velocity, acceleration, durationSeconds, obstacles, contactAlignmentTolerance));
     }
 
     private static void ValidateMotion(Aabb moving, double duration, double tolerance)

@@ -38,6 +38,12 @@ public static class GameLevelMenuCatalog
                 new SceneDestination(GameLevelIds.LightingPerformanceLab)),
             new("TEST / LIGHTING QUALITY LAB", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.LightingQualityLab)),
+            new("ENGINE SCALABILITY LAB", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.EngineScalabilityLab)),
+            new("TEST / PHYSICS INTERACTION LAB", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.PhysicsInteractionLab)),
+            new("ENGINE INTEGRATION LAB", GameUiCommand.PlaySelectedLevel,
+                new SceneDestination(GameLevelIds.EngineIntegrationLab)),
             new("TEST / MOVEMENT GYM", GameUiCommand.PlaySelectedLevel,
                 new SceneDestination(GameLevelIds.MovementGym))
         });
@@ -48,7 +54,7 @@ public static class GameLevelMenuCatalog
     public static IReadOnlyList<GameUiMenuItem> Primary(IReadOnlyList<GameUiMenuItem> entries)
     {
         string[] order = { GameLevelIds.LdtkConnectedA, GameLevelIds.LightingPerformanceLab, GameLevelIds.LightingQualityLab,
-            GameLevelIds.MovementGym, GameLevelIds.MaterialShowcaseTest, GameLevelIds.LightTypesLab };
+            GameLevelIds.EngineScalabilityLab, GameLevelIds.PhysicsInteractionLab, GameLevelIds.EngineIntegrationLab, GameLevelIds.MovementGym, GameLevelIds.MaterialShowcaseTest, GameLevelIds.LightTypesLab };
         var items = entries.Where(x => !IsLegacy(x)).OrderBy(x => Array.IndexOf(order,x.Destination?.LevelId)).ToList();
         // Retired labs remain direct-launchable for regression coverage, never listed here.
         items.Add(new("BACK", GameUiCommand.Back));

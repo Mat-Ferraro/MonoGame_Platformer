@@ -51,6 +51,11 @@ internal sealed class LdtkGrayboxAnimator
         {
             WorldPlayerSnapshot player = players[i];
             int id = player.PlayerId;
+            if(player.IsDead)
+            {
+                _players.Remove(id);_wasGrounded.Remove(id);_landing.Remove(id);_facing.Remove(id);
+                continue;
+            }
             bool isGrounded = player.IsGrounded;
             SpriteAnimationClip desired = SelectClip(player);
             if (!_players.TryGetValue(id, out SpriteAnimationPlayer? timeline))

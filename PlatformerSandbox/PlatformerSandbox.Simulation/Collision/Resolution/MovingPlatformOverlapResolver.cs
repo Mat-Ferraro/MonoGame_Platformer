@@ -123,8 +123,16 @@ public static class MovingPlatformOverlapResolver
                            Math.Abs(candidate.displacement.Y);
             if (depth > maximumCorrection)
                 break;
-            Aabb corrected = body.Translated(candidate.displacement);
-            if (staticObstacles.Any(obstacle =>
+            // Set the contacting coordinate exactly, rather than adding a
+            // rounded displacement which can leave the same overlap present.
+            Aabb corrected = candidate.normal.X < 0.0
+                ? new Aabb(new(floor.Left - body.Width, body.Bottom), new(floor.Left, body.Top))
+                : candidate.normal.X > 0.0
+                ? new Aabb(new(floor.Right, body.Bottom), new(floor.Right + body.Width, body.Top))
+                : candidate.normal.Y < 0.0
+                ? new Aabb(new(body.Left, floor.Bottom - body.Height), new(body.Right, floor.Bottom))
+                : new Aabb(new(body.Left, floor.Top), new(body.Right, floor.Top + body.Height));
+            if (AabbCollisionDetector.Overlaps(corrected, floor) || staticObstacles.Any(obstacle =>
                 AabbCollisionDetector.Overlaps(corrected, obstacle.Bounds)))
                 continue;
             return new MovingPlatformOverlapCorrection(

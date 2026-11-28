@@ -197,10 +197,24 @@ public static class UnifiedCollisionEventScheduler
                     MotionSample2D bodyAtImpact = evaluate(time);
                     MovingPlatformSample platformAtImpact =
                         platform.Evaluate(worldStartSeconds + time);
-                    Vector2D platformDisplacement =
-                        platformAtImpact.Bounds.Min - platformStart.Bounds.Min;
-                    Aabb contactBounds = hit.MovingBoundsAtImpact.Translated(
-                        platformDisplacement);
+                    // The relative sweep certifies time/normal. Reconstruct
+                    // the tangential coordinate in world space and snap the
+                    // hit axis to the authoritative platform face, as in the
+                    // parabolic moving-platform detector. Translating a
+                    // relative-frame contact back can create a tiny overlap.
+                    Aabb worldBody = body.Translated(bodyAtImpact.Position);
+                    Aabb surface = platformAtImpact.Bounds;
+                    Aabb contactBounds = hit.Normal.X < 0.0
+                        ? new Aabb(new Vector2D(surface.Left - body.Width, worldBody.Bottom),
+                            new Vector2D(surface.Left, worldBody.Top))
+                        : hit.Normal.X > 0.0
+                        ? new Aabb(new Vector2D(surface.Right, worldBody.Bottom),
+                            new Vector2D(surface.Right + body.Width, worldBody.Top))
+                        : hit.Normal.Y > 0.0
+                        ? new Aabb(new Vector2D(worldBody.Left, surface.Top),
+                            new Vector2D(worldBody.Right, surface.Top + body.Height))
+                        : new Aabb(new Vector2D(worldBody.Left, surface.Bottom - body.Height),
+                            new Vector2D(worldBody.Right, surface.Bottom));
                     UnifiedCollisionHit candidate = new(
                         platform.Id, true, time, hit.Normal,
                         contactBounds, bodyAtImpact.Velocity,

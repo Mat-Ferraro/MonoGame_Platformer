@@ -76,6 +76,7 @@ public class Builder : ContentBuilder
         content.Include("Effects/L_BASIC_SurfaceLighting.fx");
         content.Include("Effects/L20_PolygonRim.fx");
         content.Include("Effects/L21_TangentTransform.fx");
+        content.Include("Effects/GPU01_ParticleInstances.fx");
 
         return content;
     }

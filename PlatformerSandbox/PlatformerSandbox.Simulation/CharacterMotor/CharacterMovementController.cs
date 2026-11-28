@@ -25,7 +25,7 @@ namespace PlatformerSandbox.Simulation.CharacterMotor;
 /// </summary>
 public sealed class CharacterMovementController
 {
-    private readonly StaticAabbCollider[] _obstacles;
+    private IReadOnlyList<StaticAabbCollider> _obstacles;
     private readonly HorizontalMotionProfile _groundMotion;
     private readonly HorizontalMotionProfile _airMotion;
     private readonly JumpFlightTrajectory _heldFlight;
@@ -33,7 +33,7 @@ public sealed class CharacterMovementController
     private readonly JumpDescentConstraints _descentConstraints;
     private readonly double _gravity;
     private readonly int _maxContactEvents;
-    private readonly MovingPlatformTrajectory[] _movingPlatforms;
+    private MovingPlatformTrajectory[] _movingPlatforms;
     private readonly PlatformObstructionPolicy _obstructionPolicy;
     private readonly CollisionAssistancePolicy _assistancePolicy;
     private MovingPlatformTrajectory? _supportPlatform;
@@ -109,7 +109,7 @@ public sealed class CharacterMovementController
             }
         }
 
-        _obstacles = staticObstacles.ToArray();
+        _obstacles = SpatialColliderSet.Wrap(staticObstacles);
         var ids = new HashSet<int>();
         foreach (StaticAabbCollider obstacle in _obstacles)
         {
@@ -171,6 +171,8 @@ public sealed class CharacterMovementController
     public double ElapsedSeconds => _elapsedSeconds;
     public double ExternalHorizontalSpeed => _externalHorizontalSpeed;
     public int? MovingSupportId => _supportPlatform?.Id;
+    public bool HasTransientMovingGeometry => _movingPlatforms.Any(p=>p.IsTickMotion);
+    public Vector2D MovingSupportVelocity(double time)=>_supportPlatform?.Evaluate(time).Velocity??Vector2D.Zero;
     public PlatformObstructionPolicy ObstructionPolicy => _obstructionPolicy;
     public CollisionAssistancePolicy AssistancePolicy => _assistancePolicy;
     public IReadOnlyList<CollisionAssistEvent> LastStepAssists { get; private set; } =
@@ -208,6 +210,45 @@ public sealed class CharacterMovementController
         var copy = (CharacterMovementController)MemberwiseClone();
         copy._jumpMotor = _jumpMotor?.Fork();
         return copy;
+    }
+
+    /// <summary>Replace the immutable obstacle view on a staged motor at a tick boundary.
+    /// The analytical jump phase is retained; no position or velocity is overwritten.
+    /// </summary>
+    public void UseTickGeometry(IReadOnlyList<StaticAabbCollider> geometry)
+    {
+        ArgumentNullException.ThrowIfNull(geometry);
+        if (ReferenceEquals(_obstacles, geometry)) return;
+        var next=SpatialColliderSet.Wrap(geometry);
+        if(next.Any(c=>AabbCollisionDetector.Overlaps(_bounds,c.Bounds)))
+            throw new InvalidOperationException("Character starts inside a solid tick collider.");
+        _obstacles=next;
+        _jumpMotor?.UseTickGeometry(next);
+        if(_jumpMotor is null && _supportPlatform is null)
+            _grounded=HasFloorSupport(_bounds,_velocity);
+    }
+
+    /// <summary>Install a staged moving-collider view, including any dynamic support
+    /// whose chronological motion was predicted by the prop solver.</summary>
+    public void UseTickMovingGeometry(IReadOnlyList<StaticAabbCollider> geometry,
+        MovingPlatformTrajectory[] moving, int? dynamicSupportId)
+    {
+        var prior=_supportPlatform;
+        var priorVelocity=prior?.Evaluate(_elapsedSeconds).Velocity??Vector2D.Zero;
+        _movingPlatforms=moving;
+        _supportPlatform=prior is null?null:moving.FirstOrDefault(p=>p.Id==prior.Id);
+        if(_supportPlatform is null&&_jumpMotor is null&&dynamicSupportId is int id)
+            _supportPlatform=moving.FirstOrDefault(p=>p.Id==id&&MovingPlatformRideSolver.IsSupported(_bounds,p.Evaluate(_elapsedSeconds).Bounds));
+        _onMovingPlatform=_supportPlatform is not null;
+        if(_onMovingPlatform&&_supportPlatform is { } support)
+        {
+            var velocity=support.Evaluate(_elapsedSeconds).Velocity;
+            _velocity=new(_velocity.X-priorVelocity.X+velocity.X,velocity.Y);
+            _grounded=true;
+        }
+        _jumpMotor?.UseTickMovingGeometry(moving);
+        UseTickGeometry(geometry);
+        if(_supportPlatform is null&&_jumpMotor is null)_grounded=HasFloorSupport(_bounds,_velocity);
     }
 
     /// <summary>
@@ -334,6 +375,7 @@ public sealed class CharacterMovementController
             if (nextGrounded)
             {
                 nextJump = null;
+                double processed = result.AdvancedSeconds;
                 // A simultaneous landing may include a wall/ceiling contact
                 // with a greater stable collider ID. The last contact in
                 // sorted order is not necessarily the supporting platform.
@@ -431,6 +473,41 @@ public sealed class CharacterMovementController
                             carried += ride.AdvancedSeconds;
                         }
                         contacts = landingContacts.ToArray();
+                        processed = Math.Min(durationSeconds, landingTime + carried);
+                    }
+                }
+                // Static landing (or walking off the moving support during
+                // landing carry) must still arbitrate moving walls for the
+                // rest of this tick. The jump result is at impact time.
+                // Retain the legacy static-only landing behavior.
+                if (nextSupport is null && _movingPlatforms.Length > 0)
+                {
+                    double resumeTime = _elapsedSeconds + processed;
+                    double remaining = endTime - resumeTime;
+                    if (remaining > 0.0 && resumeTime + remaining > resumeTime)
+                    {
+                        var continuation = Fork();
+                        continuation._bounds = nextBounds;
+                        continuation._velocity = nextVelocity;
+                        continuation._elapsedSeconds = resumeTime;
+                        continuation._grounded = nextGrounded;
+                        continuation._supportPlatform = null;
+                        continuation._jumpMotor = null;
+                        var tail = continuation.StepFreeOrGround(remaining, direction,
+                            faultSession, nextLedgeCatchUsed, nextVelocity, externalHorizontalSpeed);
+                        var combinedContacts = contacts.Concat(tail.Contacts.Select(c => new CharacterControlContact(
+                            c.ColliderId, processed + c.TimeWithinStepSeconds, c.Normal,
+                            c.IncomingVelocity, c.OutgoingVelocity))).ToList();
+                        if (combinedContacts.Count > _maxContactEvents)
+                            throw EventBudgetExceeded("Controller event limit exceeded during landing continuation.",
+                                combinedContacts);
+                        contacts = combinedContacts.ToArray();
+                        nextBounds = tail.Bounds;
+                        nextVelocity = tail.Velocity;
+                        nextGrounded = tail.Grounded;
+                        nextSupport = tail.Support;
+                        stepAssists = stepAssists.Concat(tail.Assists).ToArray();
+                        nextLedgeCatchUsed = tail.LedgeCatchUsed;
                     }
                 }
             }
@@ -492,6 +569,10 @@ public sealed class CharacterMovementController
             }
         }
 
+        if (OpposingSurfaceCrushDetector.AtPenetratingSideEndpoint(_bounds, nextBounds,
+                _elapsedSeconds, endTime, _obstacles, _movingPlatforms) is { } endpointCrush)
+            throw new CharacterCrushException(endpointCrush);
+
         // A static top contact can finish one or two binary64 ULPs below the
         // authored grid surface after multiple analytical motion phases.
         // Align ONLY such representational floor drift before committing.
@@ -505,6 +586,27 @@ public sealed class CharacterMovementController
                     throw new SimulationNoProgressException(
                         $"Motor ended penetrating static collider {obstacle.Id}; " +
                         "the failed step was not committed.");
+        }
+
+        // All motor paths (including analytical jump and rider handoffs)
+        // must publish a box valid against the authoritative moving geometry.
+        // Never defer a bad endpoint to the next tick's strict validator.
+        OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(nextBounds,
+            endTime, _obstacles, _movingPlatforms);
+        foreach (var platform in _movingPlatforms)
+        {
+            var endSample = platform.Evaluate(endTime);
+            if (!AabbCollisionDetector.Overlaps(nextBounds, endSample.Bounds)) continue;
+            var startSample = platform.Evaluate(_elapsedSeconds);
+            string contactTrace = string.Join("; ", contacts.Select(c =>
+                $"id={c.ColliderId},t={c.TimeWithinStepSeconds:R},normal={c.Normal}"));
+            throw new SimulationNoProgressException(
+                $"Motor ended penetrating moving platform {platform.Id}; the failed step was not committed. " +
+                $"time=[{_elapsedSeconds:R},{endTime:R}], " +
+                $"bodyStart={_bounds}, bodyEnd={nextBounds}, " +
+                $"platformStart={startSample.Bounds}, platformEnd={endSample.Bounds}, " +
+                $"velocity={nextVelocity}, grounded={nextGrounded}, jumping={nextJump is not null}, " +
+                $"support={nextSupport?.Id.ToString() ?? "none"}, contacts=[{contactTrace}]");
         }
 
         // An inward external transport has been consumed by a hard side
@@ -651,6 +753,9 @@ public sealed class CharacterMovementController
             // ambiguous intersections still fail with useful diagnostics.
             if (support is null)
             {
+                if (contacts.Count > 0)
+                    OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds,
+                        _elapsedSeconds + elapsed, _obstacles, _movingPlatforms);
                 bool corrected = false;
                 foreach (MovingPlatformTrajectory candidate in _movingPlatforms)
                 {
@@ -1124,6 +1229,11 @@ public sealed class CharacterMovementController
         // authoritative end time before the general bounded overlap resolver.
         // A lift brushing the player's far edge must not become a false
         // head-on vertical collision merely because X drifted a few ULPs.
+        if (OpposingSurfaceCrushDetector.AtPenetratingSideEndpoint(_bounds, bounds,
+                _elapsedSeconds, _elapsedSeconds + duration, _obstacles, _movingPlatforms) is { } endpointCrush)
+            throw new CharacterCrushException(endpointCrush);
+        OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds,
+            _elapsedSeconds + duration, _obstacles, _movingPlatforms);
         bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
             bounds, _elapsedSeconds + duration, _movingPlatforms, _obstacles);
 

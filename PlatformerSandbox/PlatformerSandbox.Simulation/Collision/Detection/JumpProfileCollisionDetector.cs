@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Spatial;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Simulation.Collision.Contacts;
 using PlatformerSandbox.Simulation.Motion.Profiles;
@@ -31,7 +32,16 @@ public static class JumpProfileCollisionDetector
 
         var ids = new HashSet<int>();
         JumpProfileSweepHit? first = null;
-        foreach (StaticAabbCollider collider in obstacles)
+        foreach (StaticAabbCollider collider in SpatialColliderSet.Select(obstacles, () =>
+        {
+            var bounds=SpatialBounds.From(initialBounds);
+            foreach(double time in plan.MonotonicBreakpoints)
+            {
+                var sample=plan.Reference.Evaluate(time);
+                bounds=bounds.Union(SpatialBounds.From(initialBounds.Translated(new Vector2D(sample.HorizontalPosition,sample.VerticalDisplacement))));
+            }
+            return bounds;
+        }, contactAlignmentTolerance))
         {
             ArgumentNullException.ThrowIfNull(collider);
             if (!ids.Add(collider.Id))
@@ -46,7 +56,7 @@ public static class JumpProfileCollisionDetector
                  (next.TimeSeconds == first.Value.TimeSeconds && next.ColliderId < first.Value.ColliderId)))
                 first = next;
         }
-        return first;
+        return SpatialColliderSet.Verify(obstacles, first, () => SweepFirst(initialBounds, plan, obstacles, contactAlignmentTolerance));
     }
 
     private static JumpProfileSweepHit? SweepOne(

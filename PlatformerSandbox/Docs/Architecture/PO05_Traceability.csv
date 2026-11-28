@@ -1,0 +1,10 @@
+Phase,Scope,Status,Validation
+HK03,Safe graphics baseline and GPU backlog,Partial,New prefs and existing regression suite; warning audit deferred
+A,Sparse index and reusable query API,Candidate,PO05SpatialTests membership radius random scaling
+B,Static ownership and committed dynamic snapshots,Partial,Snapshot lifecycle and lab import; incremental persistent dynamic tracking deferred
+C,Conservative static sweeps and reference/verify modes,Partial,Thin-wall turning point and differential replay; moving platform pruning deferred
+D,General query APIs,Candidate,PO05SpatialTests filtering radius nearest ray and random comparisons
+E,Trigger and graybox collider visibility integration,Partial,Trigger replay and fixed-tick visual checks; lighting artwork audio deferred
+F,Authored scalability lab and shared interactive panel,Partial,Content and path tests plus manual validation; runtime stress generation deferred
+G,One-command validation and headless scalability,Candidate,Python planning tests and C# suites; graphical throughput not included
+H,Documentation and final acceptance,Pending,Windows build runtime visual tests and cross-hardware manual acceptance

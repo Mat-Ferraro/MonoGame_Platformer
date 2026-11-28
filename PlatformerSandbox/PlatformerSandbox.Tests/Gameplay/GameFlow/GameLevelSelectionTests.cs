@@ -73,7 +73,7 @@ public sealed class GameLevelSelectionTests
         using var flow = new GameFlowController(new TestFactory());
         flow.Execute(GameUiCommand.OpenLevelSelect);
         string[] required = [GameLevelIds.LdtkConnectedA, GameLevelIds.LightingPerformanceLab, GameLevelIds.LightingQualityLab,
-            GameLevelIds.MovementGym, GameLevelIds.MaterialShowcaseTest, GameLevelIds.LightTypesLab];
+            GameLevelIds.EngineScalabilityLab, GameLevelIds.PhysicsInteractionLab, GameLevelIds.EngineIntegrationLab, GameLevelIds.MovementGym, GameLevelIds.MaterialShowcaseTest, GameLevelIds.LightTypesLab];
         Assert.Equal(required, flow.MenuItems.Where(x=>x.Destination is not null).Select(x=>x.Destination!.LevelId));
         Assert.Equal(GameUiCommand.Back, flow.MenuItems[^1].Command);
         Assert.DoesNotContain(flow.MenuItems, x=>GameLevelMenuCatalog.IsLegacy(x));

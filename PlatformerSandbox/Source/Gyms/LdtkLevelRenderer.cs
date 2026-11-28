@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using PlatformerSandbox.Foundation.Spatial;
+using PlatformerSandbox.Simulation.Collision.Detection;
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -18,6 +21,14 @@ namespace PlatformerSandbox.Gyms;
 /// </summary>
 internal static class LdtkLevelRenderer
 {
+    private static IReadOnlyList<StaticAabbCollider> VisibleColliders(WorldSession world,Camera2DView view)
+    {
+        var all=world.StaticColliders;
+        if(SpatialQueryPolicy.Rendering==SpatialQueryMode.Reference||all is not SpatialColliderSet set) return all;
+        // WorldRect rounds screen coordinates; include a two-pixel margin for outlines.
+        var bounds=new SpatialBounds(view.Left,view.Bottom,view.Left+view.VisibleWidth,view.Bottom+view.VisibleHeight).Expand(3/view.PixelsPerWorldUnit);
+        return set.Query(bounds,SpatialQueryPolicy.Rendering);
+    }
     private static Color Shade(Color baseColor, Color light) => new(
         (byte)(baseColor.R * (light.R / 255.0)),
         (byte)(baseColor.G * (light.G / 255.0)),
@@ -42,7 +53,8 @@ internal static class LdtkLevelRenderer
         Action? endLightingFrame = null,
         Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
             Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface = null,
-        LdtkLightingScene? animationScene = null)
+        LdtkLightingScene? animationScene = null,
+        Action<Camera2DView>? drawDynamicBodies = null)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         WorldPlayerSnapshot player = world.GetPlayer(1);
@@ -60,7 +72,7 @@ internal static class LdtkLevelRenderer
                 showCollisionDebug, showDebugHud, collisionBackdrop, view,
                 playerAnimations, characterSprites, drawParticleLayer, lightingScene,
                 lightTint, heroTint, contactShadow, beginLightingLayer,
-                composeLightingLayer, endLightingFrame, drawMaterialSurface);
+                composeLightingLayer, endLightingFrame, drawMaterialSurface,drawDynamicBodies);
             return;
         }
 
@@ -96,7 +108,7 @@ internal static class LdtkLevelRenderer
         // fed back into the simulator; all effects are presentation-only.
         if (showSolidBacking)
         {
-            foreach (var collider in world.StaticColliders)
+            foreach (var collider in VisibleColliders(world,view))
             {
                 Rectangle rect = WorldRect(collider.Bounds);
                 batch.Draw(pixel, rect, hasVisuals ? new Color(35, 56, 63) :
@@ -121,6 +133,7 @@ internal static class LdtkLevelRenderer
                 Math.Max(1, rect.Width), 2), new Color(189, 231, 235));
         }
 
+        drawDynamicBodies?.Invoke(view);
         if (composeLighting is not null)
         {
             // End the back-wall receiver pass. Light it and then draw sprites
@@ -150,7 +163,7 @@ internal static class LdtkLevelRenderer
         // F9 explicitly reveals invisible collision while testing art alignment.
         if (showCollisionDebug)
         {
-            foreach (var collider in world.StaticColliders)
+            foreach (var collider in VisibleColliders(world,view))
             {
                 Rectangle rect = WorldRect(collider.Bounds);
                 batch.Draw(pixel, new Rectangle(rect.Left, rect.Top, rect.Width, 2),
@@ -229,7 +242,8 @@ internal static class LdtkLevelRenderer
         Texture2D? contactShadow, Action beginLayer,
         Action<Camera2DView, SceneLightingLayer> composeLayer, Action? endFrame,
         Action<ProductionSurfaceSubmission, ProductionMaterialRegion, Action<SpriteBatch>,
-            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface)
+            Action<SpriteBatch>?, Action<SpriteBatch>?, Action<SpriteBatch>?>? drawMaterialSurface,
+        Action<Camera2DView>? drawDynamicBodies)
     {
         double scale = LdtkLevelImporter.PixelsPerWorldUnit;
         bool showBacking = collisionBackdrop ?? visuals?.Terrain?.DrawCollisionBackdrop ?? true;
@@ -239,6 +253,7 @@ internal static class LdtkLevelRenderer
         bool worldParticlesDrawn = false;
         bool foregroundParticlesDrawn = false;
         bool backdropDrawn = false;
+        bool dynamicBodiesDrawn = false;
 
         void Particles(ParticleVisualLayer layer)
         {
@@ -268,7 +283,7 @@ internal static class LdtkLevelRenderer
         {
             if (showBacking)
             {
-                foreach (var collider in world.StaticColliders)
+                foreach (var collider in VisibleColliders(world,view))
                 {
                     CameraScreenRect c = view.WorldRect(collider.Bounds);
                     Rectangle rect = new(c.X, c.Y, c.Width, c.Height);
@@ -286,6 +301,7 @@ internal static class LdtkLevelRenderer
                 batch.Draw(pixel, new Rectangle(rect.Left, rect.Top,
                     Math.Max(1, rect.Width), 2), new Color(189, 231, 235));
             }
+            if(!dynamicBodiesDrawn){ drawDynamicBodies?.Invoke(view);dynamicBodiesDrawn=true; }
         }
 
         foreach (SceneLightingLayer layer in scene.Layers.Layers)
@@ -350,7 +366,7 @@ internal static class LdtkLevelRenderer
         if (!foregroundParticlesDrawn) Particles(ParticleVisualLayer.Foreground);
         // Debug collision outlines remain unlit and never enter the shadow map.
         if (showCollisionDebug)
-            foreach (var collider in world.StaticColliders)
+            foreach (var collider in VisibleColliders(world,view))
             {
                 CameraScreenRect c = view.WorldRect(collider.Bounds);
                 Rectangle r = new(c.X, c.Y, c.Width, c.Height);
@@ -397,6 +413,7 @@ internal static class LdtkLevelRenderer
     {
         foreach (WorldPlayerSnapshot entity in world.Snapshot().Players)
         {
+            if(entity.IsDead) continue;
             CameraScreenRect screen = view.WorldRect(entity.Bounds);
             Rectangle rect = new(screen.X, screen.Y, screen.Width, screen.Height);
             // Existing graybox stays collider-aligned. Animation is cosmetic:

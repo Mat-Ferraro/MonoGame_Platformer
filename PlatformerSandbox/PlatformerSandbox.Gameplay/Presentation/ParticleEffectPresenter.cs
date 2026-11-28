@@ -122,6 +122,7 @@ public sealed class ParticleEffectPresenter
         switch (e.Kind)
         {
             case WorldGameplayEventKind.PlayerRemoved:
+            case WorldGameplayEventKind.PlayerDied:
                 ClearPlayer(e.PlayerId);
                 break;
             case WorldGameplayEventKind.PlayerRespawned:

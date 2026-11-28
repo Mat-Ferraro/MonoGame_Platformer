@@ -2,6 +2,7 @@ using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PlatformerSandbox.Foundation.Presentation.Particles;
+using PlatformerSandbox.Foundation.Performance;
 
 namespace PlatformerSandbox.Particles;
 
@@ -28,11 +29,21 @@ internal sealed class MonoGameParticleRenderer : IDisposable
     private const int SpriteSize = 32;
     private readonly Texture2D[] _sprites;
     private bool _disposed;
+    private readonly GpuParticleInstances _gpu;
+    private GpuParticleInstances.Instance[]? _instances;
+    private GpuParticleInstances.Instance[]? _stressSeeds;
+    public int LastGpuInstances=>_gpu.Instances;
+    public int LastGpuDraws=>_gpu.Draws;
+    public int LastGpuAnalytic=>_gpu.AnalyticInstances;
+    public int LastGpuFallbacks=>_gpu.Fallbacks;
+    public long LastGpuUploadBytes=>_gpu.UploadedBytes;
+    public string GpuStatus=>_gpu.Status;
     public int LastDrawCount { get; private set; }
 
-    public MonoGameParticleRenderer(GraphicsDevice device)
+    public MonoGameParticleRenderer(GraphicsDevice device,Effect? instanceEffect=null)
     {
         ArgumentNullException.ThrowIfNull(device);
+        _gpu=new GpuParticleInstances(device,instanceEffect);
         _sprites = new Texture2D[4];
         try
         {
@@ -65,6 +76,7 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         }
         catch
         {
+            _gpu.Dispose();
             foreach (Texture2D? sprite in _sprites) sprite?.Dispose();
             throw;
         }
@@ -82,6 +94,8 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(batch);
         viewport.Validate();
+        if(EnginePerformanceOptions.GpuInstancedParticles)
+            return DrawInstancedLayer(batch,viewport,sources,layer,onlyBlend,receivesSceneLight);
         int drawn = 0;
         for (int pass = 0; pass < 2; pass++)
         {
@@ -131,6 +145,75 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         return drawn;
     }
 
+    private int DrawInstancedLayer(SpriteBatch batch,in ParticleViewport viewport,
+        ReadOnlySpan<ParticleDrawSource> sources,ParticleVisualLayer layer,ParticleBlendMode? onlyBlend,bool? receivesSceneLight)
+    {
+        _instances??=new GpuParticleInstances.Instance[GpuParticleInstances.MaximumInstances];
+        int drawn=0;
+        for(int pass=0;pass<2;pass++)
+        {
+            var blend=(ParticleBlendMode)pass;
+            if(onlyBlend.HasValue && blend!=onlyBlend.Value)continue;
+            var state=blend==ParticleBlendMode.Alpha?BlendState.AlphaBlend:BlendState.Additive;
+            foreach(var source in sources)
+            {
+                if(source.Layer!=layer || source.Blend!=blend || (receivesSceneLight.HasValue && source.ReceivesSceneLight!=receivesSceneLight.Value))continue;
+                var texture=_sprites[(int)source.Sprite]; int n=0;
+                for(int j=0;j<source.Pool.ActiveCount;j++)
+                {
+                    var p=source.Pool.GetAt(j);double d=viewport.SizePixels(p.Size,source.Space);
+                    if(d<=.001)continue;
+                    var center=viewport.ToScreen(p.Position,source.Space);
+                    if(!viewport.IsVisible(center,d))continue;
+                    var rgba=ParticlePremultipliedRgba.From(p.Color);
+                    if(rgba.A==0)continue;
+                    _instances[n++]=new GpuParticleInstances.Instance(new Vector4((float)center.X,(float)center.Y,(float)d,
+                        (float)(source.Space==ParticleCoordinateSpace.World?-p.RotationRadians:p.RotationRadians)),new Color(rgba.R,rgba.G,rgba.B,rgba.A));
+                    if(n==_instances.Length){DrawInstanceChunk(batch,texture,state,n);drawn+=n;n=0;}
+                }
+                if(n>0){DrawInstanceChunk(batch,texture,state,n);drawn+=n;}
+            }
+        }
+        LastDrawCount+=drawn;return drawn;
+    }
+    private void DrawInstanceChunk(SpriteBatch batch,Texture2D texture,BlendState blend,int n)
+    {
+        if(_gpu.TryDraw(_instances!,n,texture,blend,false,0))return;
+        batch.Begin(blendState:blend,samplerState:SamplerState.LinearClamp);
+        try{for(int i=0;i<n;i++) DrawInstance(batch,texture,_instances![i]);}finally{batch.End();}
+    }
+    private static void DrawInstance(SpriteBatch batch,Texture2D texture,GpuParticleInstances.Instance p)
+        =>batch.Draw(texture,new Vector2(p.Data.X,p.Data.Y),null,p.Tint,p.Data.W,new Vector2(SpriteSize*.5f),p.Data.Z/SpriteSize,SpriteEffects.None,0);
+    // Explicit lab-only screen-space decorative workload. Immutable seed data;
+    // GPU analytic mode computes motion at vertices without per-frame uploads.
+    public void DrawStress(SpriteBatch batch,int count,int width,int height,float time,bool analytic)
+    {
+        if(count<=0)return;
+        count=Math.Min(count,GpuParticleInstances.MaximumInstances);
+        if(_stressSeeds is null)
+        {
+            _stressSeeds=new GpuParticleInstances.Instance[GpuParticleInstances.MaximumInstances];
+            var rng=new Random(7051);
+            for(int i=0;i<_stressSeeds.Length;i++)
+                _stressSeeds[i]=new GpuParticleInstances.Instance(new Vector4((float)rng.NextDouble(),(float)rng.NextDouble(),4f+(float)rng.NextDouble()*7f,(float)rng.NextDouble()),new Color(75,56,32,96));
+        }
+        var texture=_sprites[(int)ParticleSpriteShape.SoftDisc];
+        if(analytic && EnginePerformanceOptions.GpuInstancedParticles && _gpu.TryDraw(_stressSeeds,count,texture,BlendState.AlphaBlend,true,time))
+        {LastDrawCount+=count;return;}
+        _instances??=new GpuParticleInstances.Instance[GpuParticleInstances.MaximumInstances];
+        for(int i=0;i<count;i++)
+        {
+            var seed=_stressSeeds[i]; float phase=seed.Data.W;
+            float x=seed.Data.X+time*(.025f+phase*.035f),y=seed.Data.Y+time*(.04f+phase*.05f);
+            seed.Data=new Vector4((x-MathF.Floor(x))*width,(y-MathF.Floor(y))*height,seed.Data.Z,phase*6.2831853f+time*.6f);
+            _instances[i]=seed;
+        }
+        if(EnginePerformanceOptions.GpuInstancedParticles) DrawInstanceChunk(batch,texture,BlendState.AlphaBlend,count);
+        else
+        {batch.Begin(blendState:BlendState.AlphaBlend,samplerState:SamplerState.LinearClamp);try{for(int i=0;i<count;i++)DrawInstance(batch,texture,_instances[i]);}finally{batch.End();}}
+        LastDrawCount+=count;
+    }
+
     // Avoid an empty full-viewport lighting pass when all eligible particles
     // are outside the viewport or have faded out.
     public static bool HasVisibleLit(in ParticleViewport viewport,
@@ -151,12 +234,13 @@ internal sealed class MonoGameParticleRenderer : IDisposable
         return false;
     }
 
-    public void BeginFrame() => LastDrawCount = 0;
+    public void BeginFrame() {LastDrawCount=0;_gpu.BeginFrame(EnginePerformanceOptions.GpuInstancedParticles);}
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        _gpu.Dispose();
         foreach (Texture2D? texture in _sprites) texture?.Dispose();
     }
 }

@@ -490,6 +490,83 @@ technique SpriteDrawing
     }
 }
 
+// GPU01: production-only passes. Preserve ambient/alpha and additive semantics;
+// the old lab technique remains the reference implementation.
+float4 GPU01MaskTransform0; // scale.xy, offset.zw; identity for full-screen/white
+float4 GPU01MaskTransform1;
+float GPU01MappedMasks;
+float GPU01Mask0(float2 uv)
+{
+    float2 p = uv * GPU01MaskTransform0.xy + GPU01MaskTransform0.zw;
+    return tex2D(ProductionVisibility0Sampler, p).r *
+        step(0.0,p.x)*step(0.0,p.y)*step(p.x,1.0)*step(p.y,1.0);
+}
+float GPU01Mask1(float2 uv)
+{
+    float2 p = uv * GPU01MaskTransform1.xy + GPU01MaskTransform1.zw;
+    return tex2D(ProductionVisibility1Sampler, p).r *
+        step(0.0,p.x)*step(0.0,p.y)*step(p.x,1.0)*step(p.y,1.0);
+}
+float4 GPU01AmbientPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float4 albedo = tex2D(SpriteTextureSampler, uv) * vertexColor;
+    float mask = tex2D(EmissionSampler, uv).r;
+    float3 emitted = ProductionEmission.rgb * ProductionEmission.a * mask * albedo.a;
+    return float4(albedo.rgb * AmbientRgb + emitted, albedo.a);
+}
+float4 GPU01PairPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float4 albedo = tex2D(SpriteTextureSampler, uv) * vertexColor;
+    float visibility0 = tex2D(ProductionVisibility0Sampler, uv).r;
+    float visibility1 = tex2D(ProductionVisibility1Sampler, uv).r;
+    if (GPU01MappedMasks > 0.5) { visibility0 = GPU01Mask0(uv); visibility1 = GPU01Mask1(uv); }
+    float3 n = tex2D(NormalSampler, uv).xyz * 2.0 - 1.0;
+    n = normalize(float3(n.xy * NormalStrength, max(0.001, n.z)));
+    float4 edge = tex2D(EdgeSampler, uv);
+    float2 e = edge.xy * 2.0 - 1.0;
+    e = e / max(0.0001, length(e));
+    float useNormal = (ShadingMode > 0.5 && ShadingMode < 1.5) || (ShadingMode > 2.5) ? 1.0 : 0.0;
+    float useRim = ShadingMode > 1.5 ? 1.0 : 0.0;
+    float3 diffuse0, rim0, diffuse1, rim1;
+    EvaluateLight(uv * ViewportPixels, n, e, edge.a, useNormal, useRim,
+        Light0PositionRadius, Light0ColorIntensity, visibility0,
+        Light0Shape, Light0ShapeExtra, diffuse0, rim0);
+    EvaluateLight(uv * ViewportPixels, n, e, edge.a, useNormal, useRim,
+        Light1PositionRadius, Light1ColorIntensity, visibility1,
+        Light1Shape, Light1ShapeExtra, diffuse1, rim1);
+    return float4(max(0.0, albedo.rgb * (diffuse0 + diffuse1) + albedo.a * (rim0 + rim1)), 0.0);
+}
+technique GPU01Ambient { pass P0 { PixelShader = compile PS_SHADERMODEL GPU01AmbientPS(); } }
+technique GPU01LightPair { pass P0 { PixelShader = compile PS_SHADERMODEL GPU01PairPS(); } }
+
+// Fused opaque albedo copy and RGB multiplication. Alpha remains albedo alpha.
+Texture2D GPU01Illumination;
+sampler2D GPU01IlluminationSampler = sampler_state
+{
+    Texture = <GPU01Illumination>;
+    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+sampler2D GPU01IlluminationLinearSampler = sampler_state
+{
+    Texture = <GPU01Illumination>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = NONE;
+    AddressU = CLAMP; AddressV = CLAMP;
+};
+float4 GPU01LayerPS(float4 vertexColor : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+{
+    float4 a = tex2D(SpriteTextureSampler, uv) * vertexColor;
+    float3 l = tex2D(GPU01IlluminationSampler,uv).rgb;
+    return float4(a.rgb * l, a.a);
+}
+technique GPU01Layer { pass P0 { PixelShader = compile PS_SHADERMODEL GPU01LayerPS(); } }
+float4 GPU01LayerLinearPS(float4 vertexColor : COLOR0,float2 uv : TEXCOORD0) : COLOR0
+{
+    float4 a=tex2D(SpriteTextureSampler,uv)*vertexColor;
+    return float4(a.rgb*tex2D(GPU01IlluminationLinearSampler,uv).rgb,a.a);
+}
+technique GPU01LayerLinear { pass P0 { PixelShader = compile PS_SHADERMODEL GPU01LayerLinearPS(); } }
+
 // Reusable two-pass, full-resolution visibility filter. Production layers
 // multiply the SECOND pass directly into their illuminated layer; material
 // masks write the second pass back to a separate mask render target.
@@ -632,6 +709,20 @@ float4 L20SdrBloomPS(float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
     float3 scene = L20BloomOnly > 0.5 ? 0.0 : tex2D(L19SourceSampler, uv).rgb;
     return float4(saturate(scene + glow), 1);
 }
+// GPU01 quality experiment: fuse downsampling and a compact tent filter.
+float2 GPU01BloomStep;
+float4 GPU01BloomDownBlurPS(float4 color : COLOR0,float2 uv : TEXCOORD0) : COLOR0
+{
+    float2 dx=float2(GPU01BloomStep.x*1.5,0);
+    float2 dy=float2(0,GPU01BloomStep.y*1.5);
+    float3 c=tex2D(L19SourceSampler,uv).rgb*4.0;
+    c += 2.0*(tex2D(L19SourceSampler,uv+dx).rgb+tex2D(L19SourceSampler,uv-dx).rgb+
+              tex2D(L19SourceSampler,uv+dy).rgb+tex2D(L19SourceSampler,uv-dy).rgb);
+    c += tex2D(L19SourceSampler,uv+dx+dy).rgb+tex2D(L19SourceSampler,uv+dx-dy).rgb+
+         tex2D(L19SourceSampler,uv-dx+dy).rgb+tex2D(L19SourceSampler,uv-dx-dy).rgb;
+    return float4(c/16.0,1.0);
+}
+technique GPU01BloomDownBlur { pass P0 { PixelShader = compile PS_SHADERMODEL GPU01BloomDownBlurPS(); } }
 technique L20BloomDownsample { pass P0 { PixelShader = compile PS_SHADERMODEL L20DownsamplePS(); } }
 technique L20HdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L20HdrBloomPS(); } }
 technique L20SdrBloomComposite { pass P0 { PixelShader = compile PS_SHADERMODEL L20SdrBloomPS(); } }

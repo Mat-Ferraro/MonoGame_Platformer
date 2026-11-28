@@ -1,3 +1,5 @@
+using PlatformerSandbox.Simulation.Collision.Detection;
+using PlatformerSandbox.Foundation.Spatial;
 using PlatformerSandbox.Foundation.Performance;
 using System;
 using System.IO;
@@ -67,6 +69,28 @@ public sealed partial class Game1 : Game
     private SurfaceMaterialWorkbench? _materialWorkbench;
     // L01 P4-P6: scene-owned lighting is presentation only, independent of physics.
     private GameplayLightingRenderer? _gameLighting;
+    private readonly PlatformerSandbox.Presentation.GpuTimestampWindow _gpuTimer=new();
+    private static string GpuBackendName =>
+#if GPU01_WINDOWSDX
+        "WindowsDX";
+#elif GPU01_WINDOWSDX12
+        "WindowsDX12";
+#elif GPU01_DESKTOPVK
+        "DesktopVK";
+#else
+        "DesktopGL";
+#endif
+    private bool _gpuLabTiming;
+    private int _gpuStressCount;
+    private bool _gpuStressMotion;
+    private static int GpuStressFromEnvironment => int.TryParse(Environment.GetEnvironmentVariable("PS_PO_GPU_PARTICLE_STRESS"),out int n) ? Math.Clamp(n,0,50000) : 0;
+    private int GpuStressCount => AutomatedLaunch ? GpuStressFromEnvironment : _gpuStressCount;
+    private bool GpuStressMotion => AutomatedLaunch ? Environment.GetEnvironmentVariable("PS_PO_GPU_PARTICLE_MOTION")=="1" : _gpuStressMotion;
+    private Effect? LoadGpuParticleEffect()
+    {
+        try {return Content.Load<Effect>("Effects/GPU01_ParticleInstances");}
+        catch(Microsoft.Xna.Framework.Content.ContentLoadException ex) {System.Diagnostics.Debug.WriteLine("GPU01 particle effect fallback: "+ex);return null;}
+    }
     private LightingGameCatalog? _lightingCatalog;
     private GameplayLightingPresenter? _lightingEvents;
     private LdtkLightingScene? _ldtkLighting;
@@ -214,7 +238,7 @@ public sealed partial class Game1 : Game
             SynchronizeWithVerticalRetrace = EnginePerformanceOptions.InitialVSync
         };
         _processOverridesGraphics = HasBenchmarkEnvironment;
-        EnginePerformanceOptions.SavedGraphics = _processOverridesGraphics ? null : GraphicsPreferences.Load(_graphicsPath);
+        EnginePerformanceOptions.SavedGraphics = _processOverridesGraphics ? null : (GraphicsPreferences.Load(_graphicsPath) ?? GraphicsPreferences.EstablishedDefaults());
         if (EnginePerformanceOptions.SavedGraphics is { } saved)
         {
             var display=GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
@@ -370,7 +394,7 @@ public sealed partial class Game1 : Game
             try
             {
                 _particleVfx = new PlatformerParticleVfx(GraphicsDevice,
-                    Path.Combine(AppContext.BaseDirectory, "Content", "Particles"));
+                    Path.Combine(AppContext.BaseDirectory, "Content", "Particles"),LoadGpuParticleEffect());
                 ActivateParticleWorld(); // also handles direct --dev-level boot
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -592,12 +616,15 @@ public sealed partial class Game1 : Game
         if (!string.IsNullOrWhiteSpace(_poVisualOutput))
         {
             if (!IsActive) return;
-            if (!_poVisualStarted && IsPerformanceLab && _flow.ActiveScene == MajorSceneKind.Gameplay &&
+            if (!_poVisualStarted && (IsPerformanceLab || IsQualityLab || IsSpatialLab) && _flow.ActiveScene == MajorSceneKind.Gameplay &&
                 !_flow.IsMenuOpen && !_flow.IsTransitionActive && _worldClockTest is not null && _gameLighting is not null)
             {
                 ApplyPhase21LabPreset(5);
                 SetPerfQuality(LightingQuality.High);
-                _perfMask = 127;
+                string? visualMask = Environment.GetEnvironmentVariable("PS_PO_AUTO_MASK");
+                if (visualMask is not null && (!int.TryParse(visualMask, out int selectedMask) || selectedMask < 0 || selectedMask > 127))
+                    throw new InvalidOperationException("Invalid visual optimization mask.");
+                _perfMask = visualMask is null ? 127 : int.Parse(visualMask);
                 _perfFreeze = Environment.GetEnvironmentVariable("PS_PO_B_MOTION") != "1";
                 if (Environment.GetEnvironmentVariable("PS_PO_10_SOFT") == "1") _shadowEdgePreset = ShadowEdgePreset.Soft8Px;
                 _perfOverlay = false;
@@ -642,6 +669,9 @@ public sealed partial class Game1 : Game
                 _perfFixedRemainder += Math.Clamp(gameTime.ElapsedGameTime.Ticks,0L,MaxElapsedTime.Ticks);
                 while (_perfFixedRemainder >= tick)
                 {
+                    // Give Draw a chance to record the exact warmup/end boundary. Do not advance
+                    // an extra physics tick when one Update contains multiple catch-up steps.
+                    if(PbBenchmarkBoundaryReached) { _perfFixedRemainder=0;break; }
                     _perfFixedRemainder -= tick;
                     _perfFixedTotal += TargetElapsedTime;
                     _perfUpdates++;
@@ -795,7 +825,7 @@ public sealed partial class Game1 : Game
             _inputRouter.SelectSource(_inputRouter.Source,_inputRouter.Source == LocalInputSource.Keyboard ? keyboard : gamepad);
         _labInputWasCaptured=panelCaptured;
         toolClicked=panelHandled || graphicsHandled;
-        if (!IsPerformanceLab && !IsQualityLab && _ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
+        if (!IsPerformanceLab && !IsQualityLab && !IsSpatialLab && _ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
             !_flow.IsMenuOpen && !_flow.IsTransitionActive)
         {
             if (!toolClicked)
@@ -812,7 +842,7 @@ public sealed partial class Game1 : Game
         }
         if (!cancelledSmoke && !_sceneFlowSmoke.IsRunning && !graphicsHandled && !panelHandled)
             HandleSceneNavigation(keys, gamepadState, uiClicked && !toolClicked, uiPoint);
-        if (InteractiveLab || _flow.IsMenuOpen || _flow.ActiveScene != MajorSceneKind.Gameplay)
+        if (InteractiveLab || IsSpatialLab || _flow.IsMenuOpen || _flow.ActiveScene != MajorSceneKind.Gameplay)
             _lightingTools.Close();
         // Curtain timing uses presentation time, never world time. Scene
         // preparation runs only after the covered phase on a safe Update.
@@ -1137,12 +1167,16 @@ public sealed partial class Game1 : Game
         {
             if (_worldClockTest is WorldSession world)
             {
-                if (_authoredWorldMode || _motionLabMode || _routeLabMode || _ldtkLevelMode)
+                if (world.GetPlayer(1).IsDead)
+                {
+                    var life = world.GetPlayer(1).Life;
+                    if (life.Mode == WorldRespawnMode.Manual && life.RespawnAllowed) world.RequestPlayerRespawn(1);
+                }
+                else if (_authoredWorldMode || _motionLabMode || _routeLabMode || _ldtkLevelMode)
                     world.RespawnPlayer(1);
                 else
                     world.RespawnPlayer(SharedWorldClockGym.FirstPlayerId,
                         SharedWorldClockGym.SpawnBounds(world, SharedWorldClockGym.FirstPlayerId));
-                _worldP1Respawns++;
             }
             else
                 _gym.Reset();
@@ -1150,12 +1184,16 @@ public sealed partial class Game1 : Game
         if (_worldClockTest is WorldSession testWorld &&
             testWorld.HasPlayer(2) && JustPressed(keys, Keys.U))
         {
-            if (_authoredWorldMode || _motionLabMode || _routeLabMode)
+            if (testWorld.GetPlayer(2).IsDead)
+            {
+                var life = testWorld.GetPlayer(2).Life;
+                if (life.Mode == WorldRespawnMode.Manual && life.RespawnAllowed) testWorld.RequestPlayerRespawn(2);
+            }
+            else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
                 testWorld.RespawnPlayer(2);
             else
                 testWorld.RespawnPlayer(SharedWorldClockGym.SecondPlayerId,
                     SharedWorldClockGym.SpawnBounds(testWorld, SharedWorldClockGym.SecondPlayerId));
-            _worldP2Respawns++;
         }
         if (_worldClockTest is not null && JustPressed(keys, Keys.F3))
         {
@@ -1254,6 +1292,10 @@ public sealed partial class Game1 : Game
                 _worldCommands.Add(new WorldPlayerCommand(
                     SharedWorldClockGym.FirstPlayerId, resolved.Direction,
                     resolved.JumpPressed, resolved.JumpReleased));
+                if(IsSpatialLab && _poVisualStarted) _worldCommands[0]=new WorldPlayerCommand(1,HorizontalDirection.Right, clockWorld.WorldTick%90==20,clockWorld.WorldTick%90==45);
+                if (_ldtkLevel?.World.LevelId == GameLevelIds.EngineIntegrationLab && PbScriptEnabled)
+                    _worldCommands[0] = new WorldPlayerCommand(1, clockWorld.WorldTick % 240 < 120 ? HorizontalDirection.Right : HorizontalDirection.Left,
+                        clockWorld.WorldTick % 90 == 20, clockWorld.WorldTick % 90 == 45);
                 if (clockWorld.HasPlayer(SharedWorldClockGym.SecondPlayerId))
                     _worldCommands.Add(new WorldPlayerCommand(
                         SharedWorldClockGym.SecondPlayerId, secondDirection,
@@ -1311,6 +1353,7 @@ public sealed partial class Game1 : Game
                     _motionRequests);
                 _perfDiagnosticMs += PerfElapsed(diagStart);
                 long simulationStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+                ApplyPbScript(clockWorld);
                 WorldStepResult committed = clockWorld.Step(_worldCommands,
                     _characterStateRequests, _characterAbilityRequests,
                     _motionRequests);
@@ -1342,6 +1385,24 @@ public sealed partial class Game1 : Game
                     // This never calls from WorldSession.Step() or a solver.
                     _audioEvents?.Present(gameplayEvent);
                     _lightingEvents?.Present(gameplayEvent);
+                    if (gameplayEvent.Kind == WorldGameplayEventKind.PlayerRespawned)
+                    {
+                        if (gameplayEvent.PlayerId == 1) _worldP1Respawns++;
+                        if (gameplayEvent.PlayerId == 2) _worldP2Respawns++;
+                    }
+                    if(PbTickBenchmark&&_pbTickWarmupComplete)
+                    {
+                        if(gameplayEvent.Kind==WorldGameplayEventKind.PlayerDied) _pbMeasuredDeaths++;
+                        if(gameplayEvent.Kind==WorldGameplayEventKind.PlayerRespawned) _pbMeasuredRespawns++;
+                    }
+                    if ((gameplayEvent.Kind is WorldGameplayEventKind.PlayerRespawned or WorldGameplayEventKind.PlayerDied) &&
+                        gameplayEvent.PlayerId == 1 && _ldtkConnectedLevel is not null)
+                    {
+                        // Respawn clears the authoritative external-motion state.
+                        // Discard old wind membership before any destination entries.
+                        _ldtkActiveWindIds.Clear();
+                        _ldtkWindDirty = true;
+                    }
                     if (gameplayEvent.Kind == WorldGameplayEventKind.CharacterStateRequestDenied)
                         _latestStateFeedback = "DENIED P" + gameplayEvent.PlayerId + " " +
                             gameplayEvent.StateRequestKind + " " + gameplayEvent.Rejection;
@@ -1497,7 +1558,7 @@ public sealed partial class Game1 : Game
     private void StartAutomatedPerfCaptureIfReady()
     {
         if (string.IsNullOrWhiteSpace(_poAutoOutput) || _poAutoStarted ||
-            !IsPerformanceLab || !IsActive || !_perfVariableLoop ||
+            !(IsPerformanceLab || IsQualityLab) || !IsActive || !_perfVariableLoop ||
             _flow.ActiveScene != MajorSceneKind.Gameplay || _flow.IsMenuOpen ||
             _flow.IsTransitionActive || _worldClockTest is null) return;
         if (_gameLighting is null || _lightingEvents?.Scene is null)
@@ -1547,6 +1608,7 @@ public sealed partial class Game1 : Game
         BeginPerfCapture();
     }
     private double _poPresentWallMs;
+    private long _pbMeasurementStartTick;
     private string? _poCaptureScene;
     private long? _poCaptureWorld;
     private bool _poCaptureLighting, _poCaptureOverlay;
@@ -1633,15 +1695,26 @@ public sealed partial class Game1 : Game
 
     private void LeaveQualityLab()
     {
+        SpatialQueryPolicy.ResetLab();
         _qualityLabActive = false;
         RestoreLabState();
+        EnginePerformanceOptions.ManualGpuShadowBuffers = null;
+        EnginePerformanceOptions.ManualGpuShadowResident = EnginePerformanceOptions.ManualGpuShadowIndexed = null;
+        EnginePerformanceOptions.ManualGpuLocalMasks=null;
+        EnginePerformanceOptions.ManualGpuSpecializedMaterials=null;
+        EnginePerformanceOptions.ManualGpuFusedLayer=null;
+        EnginePerformanceOptions.ManualGpuBatchUnshadowed=null;
+        EnginePerformanceOptions.ManualGpuFastBloom=null;
+        EnginePerformanceOptions.ManualGpuInstancedParticles=null;
+        EnginePerformanceOptions.ManualGpuMaterialClear=null;
+        EnginePerformanceOptions.ManualGpuScopedBinds=null;
         if (EnginePerformanceOptions.ManualLightingLab is not null)
         {
             EnginePerformanceOptions.ManualLightingLab = null;
             _gameLighting?.ResetManualLightingProfile();
             _adaptiveAreaSamples.Clear();
         }
-        _labControls.Reset(); _labNormalMaps=true; _labAmbient=100; _labCap=0; _manualWarmup=60; _manualRecorded=120;
+        _labControls.Reset(); _labGpuPage=false; _gpuStressCount=0; _gpuStressMotion=false; _gpuLabTiming=false; _labNormalMaps=true; _labAmbient=100; _labCap=0; _manualWarmup=60; _manualRecorded=120;
         _qualityLabPan=false; _qualityLabSweepAxis=3; _qualityLabFixture="normal"; _labInputWasCaptured=false;
         _labPreserveSceneLights=true; _labLightSelection.Clear(); _labInspectedLightId=null;
     }
@@ -1694,7 +1767,7 @@ public sealed partial class Game1 : Game
     {
         SetPerfCaptureDimensions();
         _perfRunId = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
-        ResetPerfWindow(); _phase21Benchmark.Clear(); _phase21BenchmarkFrame = 0;
+        ResetPerfWindow(); ResetPbBenchmark(); _phase21Benchmark.Clear(); _phase21BenchmarkFrame = 0;
         _phase21BenchmarkStatus = $"WARMUP {ActivePerfWarmup} FRAMES";
     }
     private void SetPerfCaptureDimensions()
@@ -1722,10 +1795,10 @@ public sealed partial class Game1 : Game
         if (!string.IsNullOrWhiteSpace(_poVisualOutput))
         {
             if (!VisualReady || !IsActive) return;
-            if (_flow.IsMenuOpen || _flow.IsTransitionActive || !IsPerformanceLab || _paused || _worldClockTest is null)
+            if (_flow.IsMenuOpen || _flow.IsTransitionActive || !(IsPerformanceLab || IsQualityLab || IsSpatialLab) || _paused || _worldClockTest is null)
                 throw new InvalidOperationException("Visual capture scene changed.");
             DrawFrame(new GameTime(_perfFixedTotal, TimeSpan.Zero));
-            if (++_poVisualDraws == 2) { SaveVisualCapture(); Exit(); }
+            if (++_poVisualDraws == (Environment.GetEnvironmentVariable("PS_PO_GPU_VISUAL_WARMUP")=="1" ? GpuMaskAdmission.DefaultStableFrames + 2 : 2)) { SaveVisualCapture(); Exit(); }
             return;
         }
         StartAutomatedPerfCaptureIfReady();
@@ -1737,7 +1810,7 @@ public sealed partial class Game1 : Game
             if (_perfIntervalMs > 0)
             {
                 _frameIntervals.Add(_perfIntervalMs);
-                if (InteractiveLab)
+                if (InteractiveLab || IsSpatialLab)
                     _liveFrameReadout.Add(_perfIntervalMs, _perfUpdates, _perfUpdateMs, _perfLastDrawMs, _poPresentWallMs);
             }
         }
@@ -1818,7 +1891,7 @@ public sealed partial class Game1 : Game
     private void SaveVisualCapture()
     {
         int w = GraphicsDevice.PresentationParameters.BackBufferWidth, h = GraphicsDevice.PresentationParameters.BackBufferHeight;
-        if (w != 1280 || h != 720 || _gameLighting is null || _gameLighting.LastLights == 0)
+        if (w != 1280 || h != 720 || _gameLighting is null || (!IsSpatialLab && _gameLighting.LastLights == 0))
             throw new InvalidOperationException("Invalid visual capture dimensions or inactive lighting.");
         var pixels = new Color[checked(w*h)];
         GraphicsDevice.GetBackBufferData(pixels);
@@ -1826,9 +1899,10 @@ public sealed partial class Game1 : Game
         using (var output = new BinaryWriter(File.Create(Path.Combine(_poVisualOutput!, "frame.rgba"))))
             foreach (Color c in pixels) { output.Write(c.R); output.Write(c.G); output.Write(c.B); output.Write(c.A); }
         File.WriteAllLines(Path.Combine(_poVisualOutput!, "visual.txt"), new[] {
-            "Width: "+w, "Height: "+h, "Ticks: "+_poVisualTicks, "World tick: "+_worldClockTest!.WorldTick,
+            "Spatial mode: "+SpatialQueryPolicy.Current,"Spatial queries: "+SpatialCollisionDiagnostics.Snapshot.Queries,"Visual draws: "+_poVisualDraws,"Light coverage: "+(UseManualLightCoverage?"Preserve":"Budget"),"Width: "+w, "Height: "+h, "Ticks: "+_poVisualTicks, "World tick: "+_worldClockTest!.WorldTick,
             "Scene: "+_flow.Scenes.ActiveDestination?.LevelId, "Lights: "+_gameLighting.LastLights,
-            "Player bounds: "+_worldClockTest!.GetPlayer(1).Bounds, "Camera: "+_lastLightingView,
+            "PB visible bodies: "+_pbVisible,"PB visual target: "+PbVisualTargetId,"PB target visible: "+_pbVisualTargetVisible,"PB body signature: "+PbBodySignature(),"PB contacts: "+(_worldClockTest?.DynamicBodies?.Metrics.Contacts??0),"PB pair impacts: "+(_worldClockTest?.DynamicBodies?.PairContacts??0),
+            "Player bounds: "+_worldClockTest!.GetPlayer(1).Bounds, "Camera: "+(IsSpatialLab?_spatialVisualCamera:_lastLightingView.ToString()),
             "Fixture coordinates: "+(PoFixture == "normal" ? "authored" : BenchmarkLightingFixtureSet.CoordinateVersion),
             "Light positions: "+string.Join(";", _lastSelectedLights.Select(l => FormattableString.Invariant($"{l.Id}={l.Position.X:R},{l.Position.Y:R}"))),
             "Original mask: "+_perfMask, "Quality: "+_lightingQuality,
@@ -1841,10 +1915,24 @@ public sealed partial class Game1 : Game
             "Light scale: "+EnginePerformanceOptions.Po10LightScale, "Mask scale: "+EnginePerformanceOptions.Po10MaskScale,
             "Bloom scale: "+EnginePerformanceOptions.Po10bBloomScale, "Motion frozen: "+_perfFreeze,
             "Shadow edge: "+_shadowEdgePreset, "Adaptive: "+EnginePerformanceOptions.Po10bAdaptiveSamples,
-            "Static shadow fields: "+EnginePerformanceOptions.Po10fStaticShadowFields, "Static shadow hits: "+_gameLighting.LastStaticShadowFieldHits, "Static fields: "+EnginePerformanceOptions.Po10bStaticFields, "Fixture: "+PoFixture, "Camera locked: "+PoLockCamera, "Camera pan: "+PoPanCamera, "Camera convergence: "+EnginePerformanceOptions.CameraConvergence, "Static hits: "+_gameLighting.LastStaticFieldHits, "GPU: "+GraphicsDevice.Adapter.Description });
+            "Static shadow fields: "+EnginePerformanceOptions.Po10fStaticShadowFields, "Static shadow hits: "+_gameLighting.LastStaticShadowFieldHits, "Static fields: "+EnginePerformanceOptions.Po10bStaticFields, "Fixture: "+PoFixture, "Camera locked: "+PoLockCamera, "Camera pan: "+PoPanCamera, "Camera convergence: "+EnginePerformanceOptions.CameraConvergence, "Static hits: "+_gameLighting.LastStaticFieldHits, "GPU: "+GraphicsDevice.Adapter.Description,"GPU backend: "+GpuBackendName,"GPU GL renderer: "+_gpuTimer.Adapter,"GPU GL driver: "+_gpuTimer.Driver,"Process ID: "+Environment.ProcessId,"Executable: "+Environment.ProcessPath,
+            "GPU shadow buffers requested: "+EnginePerformanceOptions.GpuShadowBuffers,
+            "GPU buffered draws: "+_gameLighting.LastGpuBufferedDraws, "GPU reference draws: "+_gameLighting.LastGpuReferenceDraws,
+            "GPU fallback draws: "+_gameLighting.LastGpuFallbackDraws,
+            "GPU resident requested: "+EnginePerformanceOptions.GpuShadowResident, "GPU indexed requested: "+EnginePerformanceOptions.GpuShadowIndexed,
+            "GPU resident hits: "+_gameLighting.LastGpuResidentHits, "GPU resident misses: "+_gameLighting.LastGpuResidentMisses,
+            "GPU indexed draws: "+_gameLighting.LastGpuIndexedDraws, "GPU index bypasses: "+_gameLighting.LastGpuIndexBypasses,
+            "GPU skipped binds: "+_gameLighting.LastGpuSkippedBinds,"GPU skipped clear pixels: "+_gameLighting.LastGpuSkippedClearPixels,"GPU scoped_binds: "+EnginePerformanceOptions.GpuScopedBinds,"GPU material_clear: "+EnginePerformanceOptions.GpuMaterialClear,"GPU local_masks: "+EnginePerformanceOptions.GpuLocalMasks, "GPU specialized_materials: "+EnginePerformanceOptions.GpuSpecializedMaterials, "GPU fused_layer: "+EnginePerformanceOptions.GpuFusedLayer, "GPU batch_unshadowed: "+EnginePerformanceOptions.GpuBatchUnshadowed, "GPU fast_bloom: "+EnginePerformanceOptions.GpuFastBloom, "GPU instanced_particles: "+EnginePerformanceOptions.GpuInstancedParticles,
+            "GPU Local mask builds: "+_gameLighting.LastGpuLocalBuilds, "GPU Local mask hits: "+_gameLighting.LastGpuLocalHits, "GPU Local mask prior hits: "+_gameLighting.LastGpuLocalPriorHits, "GPU Local mask bypasses: "+_gameLighting.LastGpuLocalBypasses, "GPU Local mask bytes: "+_gameLighting.GpuLocalBytes, "GPU Specialized passes: "+_gameLighting.LastGpuSpecializedPasses, "GPU Fused layers: "+_gameLighting.LastGpuFusedLayers, "GPU Direct lights: "+_gameLighting.LastGpuDirectLights, "GPU Fast bloom: "+_gameLighting.LastGpuFastBloom, "GPU Particle instances: "+(_particleVfx?.LastGpuInstances??0), "GPU Particle draws: "+(_particleVfx?.LastGpuDraws??0), "GPU Particle analytic: "+(_particleVfx?.LastGpuAnalytic??0), "GPU Particle fallbacks: "+(_particleVfx?.LastGpuFallbacks??0), "GPU Particle upload bytes: "+(_particleVfx?.LastGpuUploadBytes??0), "GPU particle stress: "+GpuStressCount,"GPU particle motion: "+GpuStressMotion });
     }
 
     private void DrawFrame(GameTime gameTime)
+    {
+        _gpuTimer.Begin(EnginePerformanceOptions.GpuTiming || (InteractiveLab && _gpuLabTiming), GpuBackendName=="DesktopGL");
+        try {DrawFrameCore(gameTime);}
+        finally {_gpuTimer.End();}
+    }
+    private void DrawFrameCore(GameTime gameTime)
     {
         using var diagnosticDrawScope = _diagnostics?.MonitorOperation("Game1.Draw");
         GraphicsDevice.Clear(new Color(18, 23, 35));
@@ -1889,15 +1977,15 @@ public sealed partial class Game1 : Game
         if (_spriteBatch is not null && _pixel is not null)
         {
             _particleVfx?.BeginFrame();
-            int perfIsolation = IsPerformanceLab ? _perfIsolation : 0;
-            bool lightingWorldActive = perfIsolation is not (1 or 7 or 8) && _gameLighting is not null &&
+            int perfIsolation = (IsPerformanceLab || IsQualityLab) ? _perfIsolation : 0;
+            bool lightingWorldActive = !IsSpatialLab && perfIsolation is not (1 or 7 or 8) && _gameLighting is not null &&
                 _lightingCatalog is not null && _lightingEvents?.Scene is not null &&
                 _lightingEnabled && _ldtkLevelMode && _ldtkLevel is not null &&
                 _worldClockTest is not null && _flow.ActiveScene == MajorSceneKind.Gameplay;
             // L02 captures each authored render depth plane individually, so
             // the active layer (not the whole scene) is the light receiver.
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            bool showFullHud = !IsPerformanceLab && !IsQualityLab && !VisualReady && perfIsolation != 6 && _debugHudMode == GameDebugHudMode.Full;
+            bool showFullHud = !IsPerformanceLab && !IsQualityLab && !IsSpatialLab && !VisualReady && perfIsolation != 6 && _debugHudMode == GameDebugHudMode.Full;
             if (_flow.ActiveScene == MajorSceneKind.Title)
                 DrawTitleBackdrop(_spriteBatch, _pixel);
             else
@@ -1909,23 +1997,31 @@ public sealed partial class Game1 : Game
                         long cameraStarted=System.Diagnostics.Stopwatch.GetTimestamp();
                         Camera2DView camera = GetLdtkCameraView(imported, clockWorld,
                             _paused ? 0 : gameTime.ElapsedGameTime.TotalSeconds);
-                        if (PoAutomated && PoPanCamera)
+                        if (_poVisualStarted && clockWorld.DynamicBodies is { } dynamics && dynamics.Bodies.Count>0)
+                        {
+                            var focus=dynamics.Get(PbVisualTargetId).Bounds.Center;
+                            if(IsPhysicsLab && PbVisualTargetId==1) focus=new Vector2D((focus.X+clockWorld.GetPlayer(1).Bounds.Center.X)/2,focus.Y);
+                            camera=Camera2DView.FromFocus(focus,imported.WidthPx/LdtkLevelImporter.PixelsPerWorldUnit,
+                                imported.HeightPx/LdtkLevelImporter.PixelsPerWorldUnit,camera.ViewportWidth,camera.ViewportHeight,camera.PixelsPerWorldUnit);
+                        }
+                        else if (PoAutomated && PoPanCamera)
                         {
                             double ppu = LdtkLevelImporter.PixelsPerWorldUnit;
                             camera = BenchmarkCameraPath.View(camera, imported.WidthPx / ppu,
                                 imported.HeightPx / ppu, clockWorld.WorldTick);
                         }
-                        else if (InteractiveLab && _qualityLabPan)
+                        else if ((InteractiveLab && _qualityLabPan) || (IsSpatialLab && !AutomatedLaunch && _spatialCameraAxes!=0))
                         {
                             double ppu = LdtkLevelImporter.PixelsPerWorldUnit;
                             camera = BenchmarkCameraPath.ManualView(camera, imported.WidthPx / ppu, imported.HeightPx / ppu,
-                                clockWorld.WorldTick, (_qualityLabSweepAxis & 1) != 0, (_qualityLabSweepAxis & 2) != 0);
+                                clockWorld.WorldTick, ((IsSpatialLab?_spatialCameraAxes:_qualityLabSweepAxis) & 1) != 0, ((IsSpatialLab?_spatialCameraAxes:_qualityLabSweepAxis) & 2) != 0);
                         }
                         else if (PoAutomated && PoLockCamera)
                         {
                             _poLockedCamera ??= camera;
                             camera = _poLockedCamera.Value;
                         }
+                        if(IsSpatialLab) _spatialVisualCamera=camera.ToString();
                         _ldtkCharacterAnimations ??= new LdtkGrayboxAnimator(
                             _ldtkCharacterSprites?.Definition);
                         _ldtkCharacterAnimations.Advance(
@@ -1957,7 +2053,7 @@ public sealed partial class Game1 : Game
                         IReadOnlyList<RadialLight> lights = lightingWorldActive && _l19dWorldLightsEnabled
                             ? _lightingEvents!.BuildVisible(GameplayLightingRenderer.View(camera),
                                 EnumerateParticleLights(), LightingStressCandidates(camera), filterTag,
-                                InteractiveLab && IsQualityLab ? frameLightBudget : null,
+                                IsQualityLab ? frameLightBudget : null,
                                 InteractiveLab && IsQualityLab && fixture == "normal" ? _labLightSelection : null)
                             : Array.Empty<RadialLight>();
                         if (_ldtkLighting?.LevelId == GameLevelIds.EmissiveLightingLab && _emissionLabDarkWall)
@@ -2034,6 +2130,7 @@ public sealed partial class Game1 : Game
                         IReadOnlyList<LightingWorldSampler.PreparedSample>? CpuSamples() => EnginePerformanceOptions.LightingSamples
                             ? (preparedSamples ??= LightingWorldSampler.Prepare(lights, art!, CpuAreaSampleCount, EnginePerformanceOptions.SharedSamples ? _gameLighting?.PreparedLights : null)) : null;
                         long sceneStarted=System.Diagnostics.Stopwatch.GetTimestamp();
+                        _pbVisible=0;
                         if (perfIsolation != 8) LdtkLevelRenderer.Draw(_spriteBatch, _pixel,
                             GraphicsDevice.Viewport, clockWorld, imported, _paused,
                             _ldtkVisuals, _ldtkShowCollisionDebug, showFullHud,
@@ -2058,7 +2155,8 @@ public sealed partial class Game1 : Game
                                     frameLighting!.Occluders, art!,
                                     frameLighting.Layers.Get(submission.LayerId),
                                     albedo, InteractiveLab && !_labNormalMaps ? null : normals, edges, emission) : null,
-                            frameLighting);
+                            frameLighting, clockWorld.DynamicBodies is null ? null : view=>DrawPbBodies(view,clockWorld));
+                        if(IsSpatialLab && !_flow.IsMenuOpen && !AutomatedLaunch) DrawSpatialOverlay(camera,clockWorld);
                         _perfSceneDrawMs = PerfElapsed(sceneStarted);
                     }
                     else if (_authoredWorldMode || _motionLabMode || _routeLabMode)
@@ -2076,6 +2174,13 @@ public sealed partial class Game1 : Game
                 else
                     MovementGymRenderer.Draw(_spriteBatch, _pixel,
                         GraphicsDevice.Viewport, _gym, _paused, showFullHud);
+                if ((IsPerformanceLab||IsQualityLab) && GpuStressCount>0 && _particleVfx is not null)
+                {
+                    _spriteBatch.End();
+                    _particleVfx.DrawStress(_spriteBatch,GpuStressCount,GraphicsDevice.Viewport.Width,GraphicsDevice.Viewport.Height,
+                        (float)(gameTime.TotalGameTime.TotalSeconds%1000),GpuStressMotion);
+                    _spriteBatch.Begin(samplerState:SamplerState.PointClamp);
+                }
                 if (VisualReady) { _spriteBatch.End(); return; }
                 long debugHudStarted=System.Diagnostics.Stopwatch.GetTimestamp();
                 if (showFullHud)
@@ -2095,12 +2200,12 @@ public sealed partial class Game1 : Game
                     if (_flow.ShowFlowHints && !_flow.IsMenuOpen && !_routeLabMode)
                         DrawFlowHint(_spriteBatch, _pixel);
                 }
-                else if (!IsPerformanceLab && !IsQualityLab && perfIsolation != 6 && _debugHudMode == GameDebugHudMode.Compact)
+                else if (!IsPerformanceLab && !IsQualityLab && !IsSpatialLab && perfIsolation != 6 && _debugHudMode == GameDebugHudMode.Compact)
                     DrawCompactDebugHud(_spriteBatch, _pixel);
                 _perfHudMs += PerfElapsed(debugHudStarted);
             }
             long toolHudStarted=System.Diagnostics.Stopwatch.GetTimestamp();
-            if (!IsPerformanceLab && !IsQualityLab && perfIsolation != 6 && _ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
+            if (!IsPerformanceLab && !IsQualityLab && !IsSpatialLab && perfIsolation != 6 && _ldtkLevelMode && _flow.ActiveScene == MajorSceneKind.Gameplay &&
                 !_flow.IsMenuOpen)
             {
                 IReadOnlyList<string> lightStatuses = GetAuthoredLightStatuses();
@@ -2171,7 +2276,7 @@ public sealed partial class Game1 : Game
             _perfPreviousLightingActive=lightingWorldActive;
             if (IsPhase21Lab && !_flow.IsMenuOpen)
                 DrawPhase21LabHud(lightingWorldActive);
-            if (InteractiveLab && !_flow.IsMenuOpen && !_flow.IsTransitionActive)
+            if ((InteractiveLab || (IsSpatialLab && !AutomatedLaunch)) && !_flow.IsMenuOpen && !_flow.IsTransitionActive)
             {
                 long labHudStarted=System.Diagnostics.Stopwatch.GetTimestamp();
                 DrawManualLab();
@@ -2370,8 +2475,19 @@ public sealed partial class Game1 : Game
     {
         // Do not retain lab process overrides beyond host lifetime.
         EnginePerformanceOptions.ManualLightingLab = null;
+        EnginePerformanceOptions.ManualGpuShadowBuffers = null;
+        EnginePerformanceOptions.ManualGpuShadowResident = EnginePerformanceOptions.ManualGpuShadowIndexed = null;
+        EnginePerformanceOptions.ManualGpuLocalMasks=null;
+        EnginePerformanceOptions.ManualGpuSpecializedMaterials=null;
+        EnginePerformanceOptions.ManualGpuFusedLayer=null;
+        EnginePerformanceOptions.ManualGpuBatchUnshadowed=null;
+        EnginePerformanceOptions.ManualGpuFastBloom=null;
+        EnginePerformanceOptions.ManualGpuInstancedParticles=null;
+        EnginePerformanceOptions.ManualGpuMaterialClear=null;
+        EnginePerformanceOptions.ManualGpuScopedBinds=null;
         EnginePerformanceOptions.SavedGraphics = null;
         _qualityLabActive = false;
+        _gpuTimer.Dispose();
         _gameLighting?.Dispose();
         _gameLighting = null;
         _lightingEvents?.Clear();
@@ -2468,6 +2584,7 @@ public sealed partial class Game1 : Game
         LdtkLightingScene? lighting = null)
     {
         LeaveQualityLab();
+        SpatialQueryPolicy.ResetLab();
         _gym = gym;
         _worldClockTest = world;
         _authoredWorldMode = levelId == GameLevelIds.AuthoredWorld;
@@ -2480,11 +2597,13 @@ public sealed partial class Game1 : Game
         if (!_debugHudUserSelected)
             _debugHudMode = GameDebugHudModes.DefaultForScene(_ldtkLevelMode);
         _ldtkLevel = importedLdtk;
+        _bodyLabMaterials = null; _bodyLabMaterialError = null; _pbIntegrationPage=false;_pbSelected=1;_pbTerrainId=-1;_pbNotice="READY";
+        if(IsSpatialLab) { if(!AutomatedLaunch) SpatialQueryPolicy.LabMode=SpatialQueryMode.Reference; _spatialGrid=true; _spatialQuery=true; _spatialCameraAxes=0; }
         _ldtkConnectedLevel = connectedLdtk;
         _ldtkParticleZones = particleZones;
         _ldtkLighting = lighting;
         _benchmarkFixtureLights = null;
-        if (levelId is (GameLevelIds.LightingQualityLab or GameLevelIds.LightingPerformanceLab) &&
+        if (levelId is (GameLevelIds.LightingQualityLab or GameLevelIds.LightingPerformanceLab or GameLevelIds.EngineIntegrationLab) &&
             importedLdtk is not null && world is not null)
         {
             var spawnCenter = world.GetPlayer(1).Bounds.Center;
@@ -2494,7 +2613,7 @@ public sealed partial class Game1 : Game
         }
         // Phase 19D teaching lab: start with a visibly dramatic, curated look.
         // Existing gameplay/integration levels retain the user's lighting state.
-        if (levelId == GameLevelIds.LightingQualityLab)
+        if (levelId is GameLevelIds.LightingQualityLab or GameLevelIds.EngineIntegrationLab)
         {
             SaveLabState();
             _qualityLabActive = true;
@@ -2505,7 +2624,7 @@ public sealed partial class Game1 : Game
             _qualityLabPan = false;
             _qualityLabFixture = "normal";
             _perfUncappedRequested = !EffectiveVSync;
-            SetQualityLabProfile(2);
+            if (!AutomatedLaunch) SetQualityLabProfile(2);
         }
         else if (levelId == GameLevelIds.MaterialShowcaseTest)
         {
@@ -2688,6 +2807,7 @@ public sealed partial class Game1 : Game
                         preparedGym.AssistancePolicy, preparedGym.FaultSensitivity,
                         host._inputRouter.SourceId,
                         worldInstanceId: ++host._nextWorldInstanceId);
+                    PreparePbWorld(preparedLdtkWorld,destination!.LevelId);
                 }
                 catch (Exception ex) when (ex is IOException or
                     UnauthorizedAccessException or System.Text.Json.JsonException or
@@ -2913,7 +3033,23 @@ public sealed partial class Game1 : Game
             long serial = diagnostics?.MaskInvalidationSerial ?? 0;
             int invalidated = serial != _poPreviousMaskSerial ? 1 : 0;
             _poPreviousMaskSerial = serial;
-            if (_poAutoStarted && _phase21BenchmarkFrame < ActivePerfWarmup)
+            if(PbTickBenchmark&&!_pbTickWarmupComplete)
+            {
+                long tick=_worldClockTest!.WorldTick;
+                _pbWarmupStartTick??=tick;
+                _phase21BenchmarkFrame++;
+                if(tick>=PbTargetStartTick)
+                {
+                    if(tick!=PbTargetStartTick||tick-_pbWarmupStartTick.Value<PbWarmupTicks)
+                        throw new InvalidOperationException("PB benchmark missed its absolute warmup boundary.");
+                    _pbTickWarmupComplete=true;_poAutoWarmupFrames=_phase21BenchmarkFrame;
+                    _pbMeasurementStartTick=tick;
+                    var d=_worldClockTest.DynamicBodies;
+                    _pbStartSweeps=d?.Metrics.Sweeps??0;_pbStartContacts=d?.Metrics.Contacts??0;_pbStartPairContacts=d?.PairContacts??0;_pbStartCharacterPushes=d?.CharacterPushes??0;_pbStartCharacterImpacts=d?.CharacterBoundaryImpacts??0;_pbStartDynamicMs=d?.TotalStepMilliseconds??0;_pbStartPlatformContacts=d?.PlatformContacts??0;_pbStartPlatformStops=_worldClockTest?.PropPlatformStops??0;_pbStartDestroyed=d?.DestroyedByPlatform??0;
+                }
+                return;
+            }
+            if (_poAutoStarted && !PbTickBenchmark && _phase21BenchmarkFrame < ActivePerfWarmup)
             {
                 bool persist = lightingActive && (_perfMask & 64) != 0;
                 bool ready = (!lightingActive || (viewChanged == 0 && lightsChanged == 0 && invalidated == 0 &&
@@ -2933,6 +3069,7 @@ public sealed partial class Game1 : Game
             int total = warmup + ActivePerfRecorded;
             if (_phase21BenchmarkFrame >= warmup)
             {
+                if (!PbTickBenchmark && _phase21BenchmarkFrame == warmup) _pbMeasurementStartTick = _worldClockTest?.WorldTick ?? 0;
                 var invariant = System.Globalization.CultureInfo.InvariantCulture;
                 var r = lightingActive ? _gameLighting : null;
                 string F(double value) => value.ToString("F4", invariant);
@@ -2963,7 +3100,7 @@ public sealed partial class Game1 : Game
                     r?.LastVisibilityGeometryBuilds ?? 0, r?.LastVisibilityGeometryReuses ?? 0,
                     r?.LastAreaSamplesPruned ?? 0, r?.LastMaterialLightPasses ?? 0,
                     r?.LastBloomPasses ?? 0, GraphicsDevice.PresentationParameters.BackBufferWidth, GraphicsDevice.PresentationParameters.BackBufferHeight,
-                    IsPerformanceLab ? _perfMask : EnginePerformanceOptions.ProductionLightingMask, IsPerformanceLab ? _perfIsolation : 0, r?.LastPersistentGeometryHits ?? 0, r?.LastHardMaskHits ?? 0, IsPerformanceLab && _perfFreeze ? 1 : 0,
+                    (IsPerformanceLab || IsQualityLab) ? _perfMask : EnginePerformanceOptions.ProductionLightingMask, (IsPerformanceLab || IsQualityLab) ? _perfIsolation : 0, r?.LastPersistentGeometryHits ?? 0, r?.LastHardMaskHits ?? 0, (IsPerformanceLab || IsQualityLab) && _perfFreeze ? 1 : 0,
                     F(_perfSimulationMs),F(_perfAudioMs),F(_perfParticleUpdateMs),F(_perfLightUpdateMs),F(_perfDiagnosticMs),F(_perfEventsMs),
                     F(_perfSceneDrawMs),F(_perfParticleDrawMs),F(_perfLightPrepareMs),F(_perfHudMs),
                     _perfFrameAllocatedBytes,_perfFrameGc0,_perfFrameGc1,_perfFrameGc2,
@@ -2975,13 +3112,15 @@ public sealed partial class Game1 : Game
                     r?.LastLightCompositePixels??0,r?.LastMaskRasterPixels??0,r?.LastClearPixels??0,
                     r?.LastCompatibleFieldHits??0,r?.LastRegionalMasks??0,r?.LastStaticFieldHits??0,r?.LastBloomPixels??0,
                     viewChanged,lightsChanged,invalidated,r?.LastMaskEvictions??0,playerChanged,
-                    logicalSamples,sampleCounts,r?.LastStaticShadowFieldHits??0));
+                    logicalSamples,sampleCounts,r?.LastStaticShadowFieldHits??0,
+                    r?.LastGpuBufferedDraws??0,r?.LastGpuReferenceDraws??0,r?.LastGpuFallbackDraws??0,r?.LastGpuUploadBytes??0,r?.GpuBufferBytes??0,r?.LastGpuResidentHits??0,r?.LastGpuResidentMisses??0,r?.LastGpuResidentBypasses??0,r?.LastGpuIndexedDraws??0,r?.LastGpuIndexBypasses??0,r?.LastGpuIndexUploadBytes??0,r?.LastGpuLocalBuilds??0,r?.LastGpuLocalHits??0,r?.LastGpuLocalPriorHits??0,r?.LastGpuLocalBypasses??0,r?.GpuLocalBytes??0,r?.LastGpuSpecializedPasses??0,r?.LastGpuFusedLayers??0,r?.LastGpuDirectLights??0,r?.LastGpuFastBloom??0,_particleVfx?.LastGpuInstances??0,_particleVfx?.LastGpuDraws??0,_particleVfx?.LastGpuAnalytic??0,_particleVfx?.LastGpuFallbacks??0,_particleVfx?.LastGpuUploadBytes??0,F(_gpuTimer.LastMilliseconds),_gpuTimer.Samples,_gpuTimer.Skipped,F(r?.LastGpuShadowPrepareMs??0),F(r?.LastGpuShadowDrawMs??0),r?.LastGpuSkippedBinds??0,r?.LastGpuSkippedClearPixels??0));
             }
             _phase21BenchmarkFrame++;
-            _phase21BenchmarkStatus = "CAPTURE " +
+            _phase21BenchmarkStatus = PbTickBenchmark ? $"RECORDING TICKS {_worldClockTest!.WorldTick-_pbMeasurementStartTick}/{PbRecordedTicks}" : "CAPTURE " +
                 (_phase21BenchmarkFrame < warmup ? $"WARMUP {_phase21BenchmarkFrame}/{warmup}" :
                     $"RECORDING {_phase21BenchmarkFrame-warmup}/{total-warmup}");
-            if (_phase21BenchmarkFrame >= total)
+            bool complete=PbTickBenchmark ? _worldClockTest!.WorldTick-_pbMeasurementStartTick>=PbRecordedTicks : _phase21BenchmarkFrame>=total;
+            if (complete)
             {
                 _phase21BenchmarkFrame = -1;
                 try
@@ -2997,14 +3136,37 @@ public sealed partial class Game1 : Game
 #endif
                         File.WriteAllLines(Path.Combine(folder,_perfRunId+"-metadata.txt"),new[]{
                             "Build: "+build,"Debugger: "+System.Diagnostics.Debugger.IsAttached,
-                            "GPU adapter: "+GraphicsDevice.Adapter.Description,"OS: "+Environment.OSVersion,
+                            "GPU backend: "+GpuBackendName,"GPU adapter: "+GraphicsDevice.Adapter.Description,"OS: "+Environment.OSVersion,
+                            "Graphics profile: "+GraphicsDevice.GraphicsProfile,
+                            "HiDef supported: "+GraphicsDevice.Adapter.IsProfileSupported(GraphicsProfile.HiDef),
+                            "GPU shadow buffers requested: "+EnginePerformanceOptions.GpuShadowBuffers,
+                            "GPU shadow buffer status: "+(_gameLighting?.GpuBufferStatus??"NOT EXERCISED"),
+                            "GPU resident requested: "+EnginePerformanceOptions.GpuShadowResident,"GPU indexed requested: "+EnginePerformanceOptions.GpuShadowIndexed,
+                            "GPU resident status: "+(_gameLighting?.GpuResidentStatus??"NOT EXERCISED"),"GPU index status: "+(_gameLighting?.GpuIndexStatus??"NOT EXERCISED"),
+                            "GPU scoped_binds: "+EnginePerformanceOptions.GpuScopedBinds,"GPU material_clear: "+EnginePerformanceOptions.GpuMaterialClear,"GPU local_masks: "+EnginePerformanceOptions.GpuLocalMasks, "GPU specialized_materials: "+EnginePerformanceOptions.GpuSpecializedMaterials, "GPU fused_layer: "+EnginePerformanceOptions.GpuFusedLayer, "GPU batch_unshadowed: "+EnginePerformanceOptions.GpuBatchUnshadowed, "GPU fast_bloom: "+EnginePerformanceOptions.GpuFastBloom, "GPU instanced_particles: "+EnginePerformanceOptions.GpuInstancedParticles, "GPU particle stress: "+GpuStressCount,"GPU particle motion: "+GpuStressMotion,
+                            "Process ID: "+Environment.ProcessId,"Executable: "+Environment.ProcessPath,"Light coverage: "+(UseManualLightCoverage?"Preserve":"Budget"),"GPU timestamp status: "+_gpuTimer.Status,"GPU GL renderer: "+_gpuTimer.Adapter,"GPU GL driver: "+_gpuTimer.Driver,
                             "Runtime: "+Environment.Version,"Logical processors: "+Environment.ProcessorCount,
                             "Fixed timestep: "+IsFixedTimeStep,"Requested VSync: "+_graphics.SynchronizeWithVerticalRetrace,
                             "Target elapsed: "+TargetElapsedTime,"Lighting quality: "+_lightingQuality,
                             "Scene: "+_poCaptureScene,"Lighting enabled: "+_poCaptureLighting,"Lighting preset: "+_poCapturePreset,
                             "Lab mode: "+_phase21LabMode,"Isolation: "+_perfIsolation,"Motion frozen: "+_perfFreeze,
+                            "Spatial mode: "+SpatialQueryPolicy.Current,"Spatial queries: "+SpatialCollisionDiagnostics.Snapshot.Queries,
+                            "PB measurement start tick: "+_pbMeasurementStartTick,"PB measurement end tick: "+(_worldClockTest?.WorldTick??0),
                             "Automatic case: "+Environment.GetEnvironmentVariable("PS_PO_AUTO_CASE"),
-                            "Warmup frames: "+warmup,"Recorded frames: "+(total-warmup),
+                            "Warmup frames: "+warmup,"Recorded frames: "+_phase21Benchmark.Count,
+                            "PB tick benchmark: "+PbTickBenchmark,"PB warmup start tick: "+(_pbWarmupStartTick??0),
+                            "PB workload version: 5", "PB measured platform commands: "+_pbMeasuredPlaybackRequests,
+                            "PB measured deaths: "+_pbMeasuredDeaths,"PB measured respawns: "+_pbMeasuredRespawns,
+                            "PB dynamic bodies: "+(_worldClockTest?.DynamicBodies?.Bodies.Count??0),
+                            "PB dynamic sweeps: "+((_worldClockTest?.DynamicBodies?.Metrics.Sweeps??0)-_pbStartSweeps),
+                            "PB dynamic contacts: "+((_worldClockTest?.DynamicBodies?.Metrics.Contacts??0)-_pbStartContacts),
+                            "PB prop pair impacts: "+((_worldClockTest?.DynamicBodies?.PairContacts??0)-_pbStartPairContacts),
+                            "PB character pushes: "+((_worldClockTest?.DynamicBodies?.CharacterPushes??0)-_pbStartCharacterPushes),
+                            "PB character boundary impacts: "+((_worldClockTest?.DynamicBodies?.CharacterBoundaryImpacts??0)-_pbStartCharacterImpacts),
+                            "PB platform prop contacts: "+((_worldClockTest?.DynamicBodies?.PlatformContacts??0)-_pbStartPlatformContacts),
+                            "PB platform prop stops: "+((_worldClockTest?.PropPlatformStops??0)-_pbStartPlatformStops),
+                            "PB platform destroyed props: "+((_worldClockTest?.DynamicBodies?.DestroyedByPlatform??0)-_pbStartDestroyed),
+                            "PB dynamic CPU ms: "+FormattableString.Invariant($"{(_worldClockTest?.DynamicBodies?.TotalStepMilliseconds??0)-_pbStartDynamicMs:R}"),
                             "Warmup minimum: "+(_poAutoStarted?_poMinimumWarmup:warmup), "Warmup maximum: "+(_poAutoStarted?_poMaximumWarmup:warmup),
                             "Warmup status: "+_poWarmupStatus,"Fixture: "+(_poAutoStarted?PoFixture:InteractiveLab?_qualityLabFixture:"normal"),"Camera locked: "+(_poAutoStarted&&PoLockCamera), "Camera pan: "+(_poAutoStarted&&PoPanCamera || InteractiveLab&&_qualityLabPan), "Camera convergence: "+EnginePerformanceOptions.CameraConvergence,
                             "Fixture coordinates: "+((_poAutoStarted ? PoFixture : InteractiveLab ? _qualityLabFixture : "normal") == "normal" ? "authored" : BenchmarkLightingFixtureSet.CoordinateVersion),
@@ -3037,8 +3199,8 @@ public sealed partial class Game1 : Game
                     }
                     if (_poAutoStarted) File.WriteAllLines(Path.Combine(folder,"warmup_trace.tsv"),
                         new[]{"frame\tview_changed\tlights_changed\tmask_invalidated\tpersistent_hits\tmask_misses\tmask_evictions\tcapacity_fallbacks\tstatic_hits\tready\tplayer_changed\tview_focus_x\tview_focus_y"}.Concat(_poWarmupTrace));
-                    string name=_perfRunId+"-mode"+_phase21LabMode+"-"+_lightingQuality+"-mask"+(IsPerformanceLab ? _perfMask : EnginePerformanceOptions.ProductionLightingMask)+"-isolation"+(IsPerformanceLab ? _perfIsolation : 0)+"-case00.csv";
-                    File.WriteAllLines(Path.Combine(folder,name),new[]{"frame,preceding_frame_ms,update_cpu_ms,previous_draw_cpu_ms,updates,cpu_submit_ms,logical_lights,area_sample_evaluations,triangles,material_masks,layer_masks,estimated_target_mb,layer_cpu_ms,material_cpu_ms,material_geometry_cpu_ms,layer_geometry_cpu_ms,post_cpu_ms,layer_builds,layer_reuses,geometry_builds,geometry_reuses,pruned_samples,material_passes,bloom_passes,width,height,optimization_mask,isolation,persistent_hits,hard_mask_hits,freeze_lights,simulation_cpu_ms,audio_cpu_ms,particle_update_cpu_ms,light_update_cpu_ms,diagnostic_cpu_ms,event_cpu_ms,scene_draw_cpu_ms,particle_draw_cpu_ms,light_prepare_cpu_ms,debug_hud_cpu_ms,thread_alloc_bytes,gc0,gc1,gc2,draw_calls,primitives,sprites,target_changes,shared_mask_hits,persistent_mask_hits,shared_mask_misses,shared_mask_fallbacks,shared_mask_targets,lighting_target_binds,soft_filter_passes,soft_filter_pixels,material_shade_pixels,fixed_step,vsync,camera_animation_cpu_ms,drawn_particles,active_world_effects,active_ui_effects,present_wall_ms,mask_fallback_current_frame,mask_fallback_capacity,light_width,light_height,mask_width,mask_height,light_composite_pixels,mask_raster_bound_pixels,selected_clear_pixels,compatible_field_hits,regional_masks,static_field_hits,bloom_pixels,view_changed,lights_changed,mask_invalidated,mask_evictions,player_changed,logical_area_samples,area_sample_counts,static_shadow_field_hits"}.Concat(_phase21Benchmark));
+                    string name=_perfRunId+"-mode"+_phase21LabMode+"-"+_lightingQuality+"-mask"+((IsPerformanceLab || IsQualityLab) ? _perfMask : EnginePerformanceOptions.ProductionLightingMask)+"-isolation"+((IsPerformanceLab || IsQualityLab) ? _perfIsolation : 0)+"-case00.csv";
+                    File.WriteAllLines(Path.Combine(folder,name),new[]{"frame,preceding_frame_ms,update_cpu_ms,previous_draw_cpu_ms,updates,cpu_submit_ms,logical_lights,area_sample_evaluations,triangles,material_masks,layer_masks,estimated_target_mb,layer_cpu_ms,material_cpu_ms,material_geometry_cpu_ms,layer_geometry_cpu_ms,post_cpu_ms,layer_builds,layer_reuses,geometry_builds,geometry_reuses,pruned_samples,material_passes,bloom_passes,width,height,optimization_mask,isolation,persistent_hits,hard_mask_hits,freeze_lights,simulation_cpu_ms,audio_cpu_ms,particle_update_cpu_ms,light_update_cpu_ms,diagnostic_cpu_ms,event_cpu_ms,scene_draw_cpu_ms,particle_draw_cpu_ms,light_prepare_cpu_ms,debug_hud_cpu_ms,thread_alloc_bytes,gc0,gc1,gc2,draw_calls,primitives,sprites,target_changes,shared_mask_hits,persistent_mask_hits,shared_mask_misses,shared_mask_fallbacks,shared_mask_targets,lighting_target_binds,soft_filter_passes,soft_filter_pixels,material_shade_pixels,fixed_step,vsync,camera_animation_cpu_ms,drawn_particles,active_world_effects,active_ui_effects,present_wall_ms,mask_fallback_current_frame,mask_fallback_capacity,light_width,light_height,mask_width,mask_height,light_composite_pixels,mask_raster_bound_pixels,selected_clear_pixels,compatible_field_hits,regional_masks,static_field_hits,bloom_pixels,view_changed,lights_changed,mask_invalidated,mask_evictions,player_changed,logical_area_samples,area_sample_counts,static_shadow_field_hits,gpu_buffered_draws,gpu_reference_draws,gpu_fallback_draws,gpu_upload_bytes,gpu_buffer_bytes,gpu_resident_hits,gpu_resident_misses,gpu_resident_bypasses,gpu_indexed_draws,gpu_index_bypasses,gpu_index_upload_bytes,gpu_local_builds,gpu_local_hits,gpu_local_prior_hits,gpu_local_bypasses,gpu_local_bytes,gpu_specialized_passes,gpu_fused_layers,gpu_direct_lights,gpu_fast_bloom,gpu_particle_instances,gpu_particle_draws,gpu_particle_analytic,gpu_particle_fallbacks,gpu_particle_upload_bytes,gpu_timestamp_ms,gpu_timestamp_samples,gpu_timestamp_skipped,gpu_shadow_prepare_wall_ms,gpu_shadow_draw_wall_ms,gpu_skipped_binds,gpu_skipped_clear_pixels"}.Concat(_phase21Benchmark));
                     _phase21BenchmarkStatus="SAVED: " + name;
                     if (_poAutoStarted) _poAutoSaved = true;
                 }

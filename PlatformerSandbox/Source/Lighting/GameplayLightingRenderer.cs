@@ -15,10 +15,28 @@ namespace PlatformerSandbox.Lighting;
 /// surface, followed by per-light visibility masks, then composed BEFORE hero,
 /// translucent foreground art and UI. No simulation or collision ownership.
 /// </summary>
-internal sealed class GameplayLightingRenderer : IDisposable
+internal sealed partial class GameplayLightingRenderer : IDisposable
 {
     // Frame-local caches: the presenter supplies one immutable scene snapshot.
     // Never reuse masks across frames or differing owner/routing policies.
+    private GpuShadowVertexStream? _gpuShadowStream;
+    private GpuShadowVertexStream GpuShadowStream => _gpuShadowStream ??= new GpuShadowVertexStream(_device);
+    public int LastGpuBufferedDraws => _gpuShadowStream?.BufferedDraws ?? 0;
+    public int LastGpuReferenceDraws => _gpuShadowStream?.ReferenceDraws ?? 0;
+    public int LastGpuFallbackDraws => _gpuShadowStream?.FallbackDraws ?? 0;
+    public long LastGpuUploadBytes => _gpuShadowStream?.UploadedBytes ?? 0;
+    public double LastGpuShadowPrepareMs => _gpuShadowStream?.PrepareMilliseconds ?? 0;
+    public double LastGpuShadowDrawMs => _gpuShadowStream?.DrawMilliseconds ?? 0;
+    public long GpuBufferBytes => _gpuShadowStream?.ReservedBytes ?? 0;
+    public string GpuBufferStatus => _gpuShadowStream?.Status ?? "NOT EXERCISED";
+    public int LastGpuResidentHits => _gpuShadowStream?.ResidentHits ?? 0;
+    public int LastGpuResidentMisses => _gpuShadowStream?.ResidentMisses ?? 0;
+    public int LastGpuResidentBypasses => _gpuShadowStream?.ResidentBypasses ?? 0;
+    public int LastGpuIndexedDraws => _gpuShadowStream?.IndexedDraws ?? 0;
+    public int LastGpuIndexBypasses => _gpuShadowStream?.IndexBypasses ?? 0;
+    public long LastGpuIndexUploadBytes => _gpuShadowStream?.IndexUploadedBytes ?? 0;
+    public string GpuResidentStatus => _gpuShadowStream?.ResidentStatus ?? "NOT EXERCISED";
+    public string GpuIndexStatus => _gpuShadowStream?.IndexStatus ?? "NOT EXERCISED";
     public bool ReuseGeometry { get; set; }
     public bool ReuseLayerFields { get; set; }
     public bool PruneAreaSamples { get; set; }
@@ -142,13 +160,15 @@ internal sealed class GameplayLightingRenderer : IDisposable
     public void ResetManualLightingProfile()
     {
         InvalidateSharedVisibility();
+        ClearLocalMasks();
         ClearSharedMasks();
         ClearFieldTargets();
         _persistentGeometry.Clear();
         PreparedLights.Clear();
         CpuSubmitWindow.Clear();
+        _gpuShadowStream?.Reset();
     }
-    private void SharedMaskDeviceResetting(object? sender, EventArgs e) => InvalidateSharedVisibility();
+    private void SharedMaskDeviceResetting(object? sender, EventArgs e) { _gpuShadowStream?.Reset(); ClearLocalMasks(); _localMaskUnavailable=false; InvalidateSharedVisibility(); }
     private void ClearSharedMasks()
     {
         if (_sharedMasks.Count > 0) MaskInvalidationSerial++;
@@ -166,6 +186,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
     private void BeginSharedMasks()
     {
         _sharedFrame++;
+        BeginGpuExperiments();
+        GpuShadowStream.BeginFrame(EnginePerformanceOptions.GpuShadowBuffers, EnginePerformanceOptions.GpuShadowResident, EnginePerformanceOptions.GpuShadowIndexed);
         LastFallbackCurrentFrame = LastFallbackCapacity = LastMaskEvictions = 0;
         LastSharedMaskHits = LastPersistentMaskHits = LastSharedMaskMisses = LastSharedMaskFallbacks = LastTargetBinds = 0;
         if (_sharedMasks.Any(e => e.Target.IsDisposed)) ClearSharedMasks();
@@ -226,10 +248,12 @@ internal sealed class GameplayLightingRenderer : IDisposable
         IndexMask(free);
         return free;
     }
+    private RenderTarget2D? _lastBoundTarget;
     private void BindTarget(RenderTarget2D? target)
     {
         LastTargetBinds++;
         _device.SetRenderTarget(target);
+        _lastBoundTarget=target;
     }
 
     public int LastPersistentGeometryHits { get; private set; }
@@ -608,7 +632,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         TargetBytes(_productionMask0) + TargetBytes(_productionMask1) + TargetBytes(_softBlurScratch) +
         TargetBytes(_l19EmissionMap) + TargetBytes(_l19BloomA) + TargetBytes(_l19BloomB) +
         TargetBytes(_l20BloomMidA) + TargetBytes(_l20BloomMidB) + TargetBytes(_l20BloomWideA) + TargetBytes(_l20BloomWideB) +
-        _sharedMasks.Sum(e => TargetBytes(e.Target)) + _fieldSpareTargets.Sum(TargetBytes)) / (1024 * 1024);
+        _sharedMasks.Sum(e => TargetBytes(e.Target)) + _fieldSpareTargets.Sum(TargetBytes) + GpuLocalBytes) / (1024 * 1024);
 
     public GameplayLightingRenderer(GraphicsDevice device, Effect? basicSurfaceEffect = null,
         Effect? polygonRimEffect = null, Effect? mapTransformEffect = null)
@@ -695,6 +719,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             LightWidth == lw && LightHeight == lh && MaskWidth == mw && MaskHeight == mh &&
             !_fieldSpareTargets.Any(t => t.IsDisposed)) return;
         _productionTargets = production;
+        ClearLocalMasks();
         ClearFieldTargets();
         ResetMaskKeys();
         ClearSharedMasks();
@@ -943,22 +968,34 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l19BloomB.Height));
                 L19Fullscreen(batch, _l19BloomB, "L19BloomBlur", _l19BloomA,
                     _l19BloomA.Width, _l19BloomA.Height);
-                L19Fullscreen(batch, _l19BloomA, "L20BloomDownsample", _l20BloomMidA,
-                    _l20BloomMidA!.Width, _l20BloomMidA.Height);
-                fx.Parameters["L19BlurStep"].SetValue(new Vector2(1f / _l20BloomMidA.Width, 0));
-                L19Fullscreen(batch, _l20BloomMidA, "L19BloomBlur", _l20BloomMidB,
-                    _l20BloomMidB!.Width, _l20BloomMidB.Height);
-                fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l20BloomMidB.Height));
-                L19Fullscreen(batch, _l20BloomMidB, "L19BloomBlur", _l20BloomMidA,
-                    _l20BloomMidA.Width, _l20BloomMidA.Height);
-                L19Fullscreen(batch, _l20BloomMidA, "L20BloomDownsample", _l20BloomWideA,
-                    _l20BloomWideA!.Width, _l20BloomWideA.Height);
-                fx.Parameters["L19BlurStep"].SetValue(new Vector2(1f / _l20BloomWideA.Width, 0));
-                L19Fullscreen(batch, _l20BloomWideA, "L19BloomBlur", _l20BloomWideB,
-                    _l20BloomWideB!.Width, _l20BloomWideB.Height);
-                fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l20BloomWideB.Height));
-                L19Fullscreen(batch, _l20BloomWideB, "L19BloomBlur", _l20BloomWideA,
-                    _l20BloomWideA.Width, _l20BloomWideA.Height);
+                bool fastBloom = EnginePerformanceOptions.GpuFastBloom && HasGpuTechnique("GPU01BloomDownBlur");
+                if (fastBloom)
+                {
+                    fx.Parameters["GPU01BloomStep"].SetValue(new Vector2(1f/_l20BloomMidA!.Width,1f/_l20BloomMidA.Height));
+                    L19Fullscreen(batch,_l19BloomA,"GPU01BloomDownBlur",_l20BloomMidA,_l20BloomMidA.Width,_l20BloomMidA.Height);
+                    fx.Parameters["GPU01BloomStep"].SetValue(new Vector2(1f/_l20BloomWideA!.Width,1f/_l20BloomWideA.Height));
+                    L19Fullscreen(batch,_l20BloomMidA,"GPU01BloomDownBlur",_l20BloomWideA,_l20BloomWideA.Width,_l20BloomWideA.Height);
+                    LastGpuFastBloom++;
+                }
+                else
+                {
+                    L19Fullscreen(batch, _l19BloomA, "L20BloomDownsample", _l20BloomMidA,
+                        _l20BloomMidA!.Width, _l20BloomMidA.Height);
+                    fx.Parameters["L19BlurStep"].SetValue(new Vector2(1f / _l20BloomMidA.Width, 0));
+                    L19Fullscreen(batch, _l20BloomMidA, "L19BloomBlur", _l20BloomMidB,
+                        _l20BloomMidB!.Width, _l20BloomMidB.Height);
+                    fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l20BloomMidB.Height));
+                    L19Fullscreen(batch, _l20BloomMidB, "L19BloomBlur", _l20BloomMidA,
+                        _l20BloomMidA.Width, _l20BloomMidA.Height);
+                    L19Fullscreen(batch, _l20BloomMidA, "L20BloomDownsample", _l20BloomWideA,
+                        _l20BloomWideA!.Width, _l20BloomWideA.Height);
+                    fx.Parameters["L19BlurStep"].SetValue(new Vector2(1f / _l20BloomWideA.Width, 0));
+                    L19Fullscreen(batch, _l20BloomWideA, "L19BloomBlur", _l20BloomWideB,
+                        _l20BloomWideB!.Width, _l20BloomWideB.Height);
+                    fx.Parameters["L19BlurStep"].SetValue(new Vector2(0, 1f / _l20BloomWideB.Height));
+                    L19Fullscreen(batch, _l20BloomWideB, "L19BloomBlur", _l20BloomWideA,
+                        _l20BloomWideA.Width, _l20BloomWideA.Height);
+                }
                 fx.Parameters["L19BloomTexture"].SetValue((Texture2D)_l19BloomA);
                 fx.Parameters["L20BloomMidTexture"].SetValue((Texture2D)_l20BloomMidA);
                 fx.Parameters["L20BloomWideTexture"].SetValue((Texture2D)_l20BloomWideA);
@@ -966,10 +1003,10 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 fx.Parameters["L20BloomOnly"].SetValue(BloomOnly ? 1f : 0f);
                 L19Fullscreen(batch, _layeredCanvas,
                     HdrActive ? "L20HdrBloomComposite" : "L20SdrBloomComposite", null, w, h);
-                LastBloomPasses = 10;
-                LastBloomPixels = 3L * (_l19BloomA.Width * (long)_l19BloomA.Height +
-                    _l20BloomMidA.Width * (long)_l20BloomMidA.Height +
-                    _l20BloomWideA.Width * (long)_l20BloomWideA.Height) + (long)w * h;
+                LastBloomPasses = fastBloom ? 6 : 10;
+                LastBloomPixels = 3L * _l19BloomA.Width * _l19BloomA.Height +
+                    (fastBloom?1L:3L) * (_l20BloomMidA!.Width * (long)_l20BloomMidA.Height +
+                    _l20BloomWideA!.Width * (long)_l20BloomWideA.Height) + (long)w * h;
             }
             else if (HdrActive)
                 L19Fullscreen(batch, _layeredCanvas!, "L19ToneMap", null, w, h);
@@ -1379,7 +1416,12 @@ internal sealed class GameplayLightingRenderer : IDisposable
         _basicSurfaceEffect.Parameters["ProductionLightPassMode"].SetValue(1f);
         BindProductionVisibilityMode();
         BindTarget(_litLayer);
-        _device.Clear(Color.Transparent);
+        // Both ambient techniques write every pixel in region with opaque blending.
+        // Only that region is read in the final layer composite; outside pixels are irrelevant.
+        if (!EnginePerformanceOptions.GpuMaterialClear)
+        { _device.Clear(Color.Transparent); LastClearPixels+=(long)full.Width*full.Height; }
+        else LastGpuSkippedClearPixels+=(long)full.Width*full.Height;
+        if (EnginePerformanceOptions.GpuSpecializedMaterials && TryGpuTechnique("GPU01Ambient")) LastGpuSpecializedPasses++;
         DrawProductionMaterialRegion(batch, region, full, BlendState.Opaque);
         LastMaterialAmbientPasses++;
 
@@ -1424,7 +1466,9 @@ internal sealed class GameplayLightingRenderer : IDisposable
             _basicSurfaceEffect.Parameters["ProductionVisibility1"].SetValue(visibility1);
             _basicSurfaceEffect.Parameters["ProductionLightPassMode"].SetValue(2f);
             BindProductionVisibilityMode();
-            BindTarget(_litLayer);
+            // All target transitions between ambient and light pairs pass through BindTarget.
+            if (!EnginePerformanceOptions.GpuScopedBinds || !ReferenceEquals(_lastBoundTarget,_litLayer)) BindTarget(_litLayer);
+            else LastGpuSkippedBinds++;
             if (surface.Receiver.Active)
             {
                 for (int slot = 0; slot < configured.Count; slot++)
@@ -1436,6 +1480,14 @@ internal sealed class GameplayLightingRenderer : IDisposable
             }
             else if (frontLights.Count > 0)
             {
+                bool mapped = IsLocalMask(visibility0) || IsLocalMask(visibility1);
+                if ((mapped || EnginePerformanceOptions.GpuSpecializedMaterials) && TryGpuTechnique("GPU01LightPair"))
+                {
+                    _basicSurfaceEffect!.Parameters["GPU01MappedMasks"].SetValue(mapped ? 1f : 0f);
+                    _basicSurfaceEffect.Parameters["GPU01MaskTransform0"].SetValue(LocalMaskTransform(visibility0,viewport));
+                    _basicSurfaceEffect.Parameters["GPU01MaskTransform1"].SetValue(LocalMaskTransform(visibility1,viewport));
+                    if (EnginePerformanceOptions.GpuSpecializedMaterials) LastGpuSpecializedPasses++;
+                }
                 DrawProductionMaterialRegion(batch, region, full, _materialAdditive);
                 LastMaterialLightPasses++;
             }
@@ -1551,6 +1603,15 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 light.Shape != LightShape.Directional && surface.Receiver.Mode != ReceiverProjectionMode.Folded;
             float emitter = contact ? (ShadowEmitterOverrides.TryGetValue(light.Id, out float radius)
                 ? Math.Clamp(radius,0f,32f) : 8f) : 0f;
+            if (EnginePerformanceOptions.GpuLocalMasks && !back && !surface.Receiver.Active &&
+                _shadowSoftnessPixels <= 0f && MaskWidth == viewport.Width && MaskHeight == viewport.Height &&
+                HasGpuTechnique("GPU01LightPair") && TryLocalMask(batch,viewport,effectiveLight,nearby,
+                    _productionRadialSamples,true,out var local))
+            {
+                if (slot == 0) mask0 = local; else mask1 = local;
+                if (_shadowCounted.Add(light.Id)) LastShadowLights++;
+                continue;
+            }
             var shared = AcquireSharedMask(viewport,effectiveLight,projection,_productionRadialSamples,
                 !back,softness,contact,emitter,nearby,out bool sharedHit);
             if (shared is not null)
@@ -1700,7 +1761,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
             {
                 pass.Apply();
-                _device.DrawUserPrimitives(PrimitiveType.TriangleList, data, 0, triangleCount);
+                GpuShadowStream.Draw(data, triangleCount, EnginePerformanceOptions.GpuShadowBuffers, EnginePerformanceOptions.GpuShadowResident, EnginePerformanceOptions.GpuShadowIndexed);
             }
         }
         finally { _device.RasterizerState = RasterizerState.CullNone; _device.ScissorRectangle = Full(target); }
@@ -1723,9 +1784,23 @@ internal sealed class GameplayLightingRenderer : IDisposable
         }
         ClearTarget(batch, destination, Color.Black, _materialMaskRegion);
         if (boundary.Count < 3) return boundary;
-        var triangles = ShadowVertices(boundary.Count * 3);
+        bool compact = EnginePerformanceOptions.GpuShadowIndexed && boundary.Count <= ShadowFanIndexPlan.MaxTriangles;
+        var triangles = ShadowVertices(compact ? boundary.Count + 2 : boundary.Count * 3);
+        viewport.Validate();
         LightPoint center = viewport.ProjectWithValidatedViewport(receiver?.ProjectShadow(light.Position) ?? light.Position);
-        Vector3 source = new((float)center.X, (float)center.Y, 0);
+        var source = new Vector3((float)center.X, (float)center.Y, 0);
+        if(compact)
+        {
+            triangles[0]=new VertexPositionColor(source,Color.White);
+            for(int i=0;i<boundary.Count;i++)
+            {
+                LightPoint a=viewport.ProjectWithValidatedViewport(receiver?.ProjectShadow(boundary[i]) ?? boundary[i]);
+                triangles[i+1]=new VertexPositionColor(new Vector3((float)a.X,(float)a.Y,0),Color.White);
+            }
+            triangles[boundary.Count+1]=triangles[1];
+        }
+        else
+        {
         for (int i = 0; i < boundary.Count; i++)
         {
             LightPoint a = viewport.ProjectWithValidatedViewport(receiver?.ProjectShadow(boundary[i]) ?? boundary[i]);
@@ -1737,6 +1812,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             triangles[3 * i + 2] = new VertexPositionColor(
                 new Vector3((float)b.X, (float)b.Y, 0), Color.White);
         }
+        }
         LastShadowTriangles += boundary.Count;
         _device.BlendState = BlendState.Opaque;
         _device.DepthStencilState = DepthStencilState.None;
@@ -1747,7 +1823,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
             {
                 pass.Apply();
-                _device.DrawUserPrimitives(PrimitiveType.TriangleList, triangles, 0, boundary.Count);
+                GpuShadowStream.Draw(triangles, boundary.Count, EnginePerformanceOptions.GpuShadowBuffers, EnginePerformanceOptions.GpuShadowResident, EnginePerformanceOptions.GpuShadowIndexed, fan: true, compact: compact);
             }
         }
         finally { _device.RasterizerState = RasterizerState.CullNone; _device.ScissorRectangle = Full(destination); }
@@ -2200,6 +2276,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             ClearTarget(batch, _illumination!, ToColor(ambient.Clamp()));
             LastTubeLights += lights.Count(l => l.Shape == LightShape.Tube && LightLayerRouting.Illuminates(l, layer));
             LastAreaSampleEvaluations += lights.Where(l => l.Shape == LightShape.Tube && LightLayerRouting.Illuminates(l, layer)).Sum(l => AreaEmitterSampling.ResolveCount(l,sampleCount));
+            bool directOpen = false;
             foreach (RadialLight light in ExpandSamples(lights, sampleCount))
             {
                 if (!LightLayerRouting.Illuminates(light, layer)) continue;
@@ -2212,6 +2289,28 @@ internal sealed class GameplayLightingRenderer : IDisposable
                     lightQuad = new Rectangle((int)Math.Round(center.X-radius),(int)Math.Round(center.Y-radius),
                         Math.Max(1,(int)Math.Round(radius*2)),Math.Max(1,(int)Math.Round(radius*2)));
                 }
+                if (EnginePerformanceOptions.GpuBatchUnshadowed && light.Shape == LightShape.Point &&
+                    (!light.CastShadows || !layer.ReceivesShadows || !_shadowQuota.Contains(light.Id) || blockers.Count == 0))
+                {
+                    var directPasses = LightingEnergyPasses.Split(light.Color,light.Intensity * art.LightMultiplier);
+                    // Multi-energy lights must retain their original intermediate quantization.
+                    if (directPasses.Count <= 1)
+                    {
+                        if (directPasses.Count == 0) continue;
+                        if (!directOpen)
+                        {
+                            if (!EnginePerformanceOptions.GpuScopedBinds || !ReferenceEquals(_lastBoundTarget,_illumination)) BindTarget(_illumination);
+                            else LastGpuSkippedBinds++;
+                            batch.Begin(blendState:_additive,samplerState:SamplerState.LinearClamp,
+                                transformMatrix:LightWidth==w && LightHeight==h ? (Matrix?)null : Matrix.CreateScale(LightWidth/(float)w,LightHeight/(float)h,1f));
+                            directOpen = true;
+                        }
+                        batch.Draw(art.Posterize ? _posterizedFalloff : _falloff,lightQuad,ToColor(directPasses[0]));
+                        LastGpuDirectLights++;
+                        continue;
+                    }
+                }
+                if (directOpen) { batch.End(); directOpen=false; }
                 // Round once in logical screen coordinates, then scale the draw (not its clipping).
                 Rectangle work = ScaleRegion(lightQuad,w,h,LightWidth,LightHeight,1);
                 _lightRegion = EnginePerformanceOptions.Po10LightRegions && light.Shape == LightShape.Point ? work : null;
@@ -2289,16 +2388,31 @@ internal sealed class GameplayLightingRenderer : IDisposable
                 _lightRegion = null;
                 batch.End();
             }
+            if (directOpen) batch.End();
             if (canReuse || share || StaticEligible(key)) _lastLayerField = key;
         }
         BindTarget(_litLayer);
-        if (!EnginePerformanceOptions.Po10SkipClears) { _device.Clear(Color.Transparent); LastClearPixels += (long)w*h; }
-        batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
-        batch.Draw(_world, new Rectangle(0, 0, w, h), Color.White);
-        batch.End();
-        batch.Begin(blendState: _multiplyKeepAlpha, samplerState: MaskSampler(_illumination!));
-        batch.Draw(_illumination!, new Rectangle(0, 0, w, h), Color.White);
-        batch.End();
+        if (EnginePerformanceOptions.GpuFusedLayer && TryGpuTechnique(LightWidth==w && LightHeight==h ? "GPU01Layer" : "GPU01LayerLinear"))
+        {
+            var fx = _basicSurfaceEffect!;
+            fx.Parameters["SpriteTexture"].SetValue(_world);
+            fx.Parameters["GPU01Illumination"].SetValue(_illumination);
+            batch.Begin(SpriteSortMode.Immediate,BlendState.Opaque,SamplerState.PointClamp,
+                DepthStencilState.None,RasterizerState.CullNone,fx);
+            try { batch.Draw(_world,new Rectangle(0,0,w,h),Color.White); }
+            finally { batch.End(); fx.Parameters["GPU01Illumination"].SetValue(_whiteProductionVisibility); }
+            LastGpuFusedLayers++;
+        }
+        else
+        {
+            if (!EnginePerformanceOptions.Po10SkipClears) { _device.Clear(Color.Transparent); LastClearPixels += (long)w*h; }
+            batch.Begin(blendState: BlendState.Opaque, samplerState: SamplerState.PointClamp);
+            batch.Draw(_world, new Rectangle(0, 0, w, h), Color.White);
+            batch.End();
+            batch.Begin(blendState: _multiplyKeepAlpha, samplerState: MaskSampler(_illumination!));
+            batch.Draw(_illumination!, new Rectangle(0, 0, w, h), Color.White);
+            batch.End();
+        }
         BindTarget(_layeredCanvas);
         Rectangle fullScreen = new(0, 0, w, h);
         batch.Begin(blendState: additiveParticleComposite ? _particleAdditiveComposite : BlendState.AlphaBlend,
@@ -2530,6 +2644,21 @@ internal sealed class GameplayLightingRenderer : IDisposable
     private void ApplyVisibilityMask(SpriteBatch batch, LightingViewport view,
         RadialLight light, IReadOnlyList<LightingOccluder> occluders, int radialSamples, bool respectLitFaces = false)
     {
+        if (_productionTargets && EnginePerformanceOptions.GpuLocalMasks && _shadowSoftnessPixels <= 0f &&
+            MaskWidth == view.Width && MaskHeight == view.Height && LightWidth == view.Width && LightHeight == view.Height &&
+            TryLocalMask(batch,view,light,occluders,radialSamples,respectLitFaces,out var local))
+        {
+            BindTarget(_individual);
+            var full = Full(_individual!);
+            var dest = LocalMaskDestination(local,view);
+            batch.Begin(SpriteSortMode.Immediate,_multiply,SamplerState.PointClamp,DepthStencilState.None,
+                _lightRegion.HasValue ? _productionMaterialScissor : RasterizerState.CullNone);
+            try { if (_lightRegion.HasValue) _device.ScissorRectangle=_lightRegion.Value;
+                batch.Draw(local,dest,Color.White); }
+            finally { batch.End(); _device.ScissorRectangle=full; _device.RasterizerState=RasterizerState.CullNone; }
+            LastLightCompositePixels += (long)Math.Min(dest.Width,full.Width)*Math.Min(dest.Height,full.Height);
+            return;
+        }
         // A hard mask has the same representation as a material mask. For
         // uniform soft shadows retain the horizontally filtered RGBA8 mask;
         // the original vertical filter still multiplies directly into HDR
@@ -2604,10 +2733,23 @@ internal sealed class GameplayLightingRenderer : IDisposable
         }
         LastLegacyVisibilityMasks++;
         if (polygon.Count < 3) return;
-        var triangles = ShadowVertices(polygon.Count * 3);
+        bool compact = EnginePerformanceOptions.GpuShadowIndexed && polygon.Count <= ShadowFanIndexPlan.MaxTriangles;
+        var triangles = ShadowVertices(compact ? polygon.Count + 2 : polygon.Count * 3);
         view.Validate();
         LightPoint center = view.ProjectWithValidatedViewport(light.Position);
-        Vector3 p = new((float)center.X, (float)center.Y, 0);
+        var p = new Vector3((float)center.X, (float)center.Y, 0);
+        if(compact)
+        {
+            triangles[0]=new VertexPositionColor(p,Color.White);
+            for(int i=0;i<polygon.Count;i++)
+            {
+                LightPoint a=view.ProjectWithValidatedViewport(polygon[i]);
+                triangles[i+1]=new VertexPositionColor(new Vector3((float)a.X,(float)a.Y,0),Color.White);
+            }
+            triangles[polygon.Count+1]=triangles[1];
+        }
+        else
+        {
         for (int i = 0; i < polygon.Count; i++)
         {
             LightPoint a = view.ProjectWithValidatedViewport(polygon[i]);
@@ -2615,6 +2757,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
             triangles[i * 3] = new VertexPositionColor(p, Color.White);
             triangles[i * 3 + 1] = new VertexPositionColor(new Vector3((float)a.X, (float)a.Y, 0), Color.White);
             triangles[i * 3 + 2] = new VertexPositionColor(new Vector3((float)b.X, (float)b.Y, 0), Color.White);
+        }
         }
         LastShadowTriangles += polygon.Count;
         ClearTarget(batch, _visibility!, Color.Black);
@@ -2625,7 +2768,7 @@ internal sealed class GameplayLightingRenderer : IDisposable
         foreach (EffectPass pass in _geometryEffect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            _device.DrawUserPrimitives(PrimitiveType.TriangleList, triangles, 0, polygon.Count);
+            GpuShadowStream.Draw(triangles, polygon.Count, EnginePerformanceOptions.GpuShadowBuffers, EnginePerformanceOptions.GpuShadowResident, EnginePerformanceOptions.GpuShadowIndexed, fan: true, compact: compact);
         }
         if (_shadowSoftnessPixels > 0f && _basicSurfaceEffect is not null)
         {
@@ -2680,6 +2823,8 @@ internal sealed class GameplayLightingRenderer : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _gpuShadowStream?.Dispose();
+        ClearLocalMasks();
         _device.DeviceResetting -= SharedMaskDeviceResetting;
         ClearFieldTargets();
         _world?.Dispose(); _illumination?.Dispose(); _individual?.Dispose(); _visibility?.Dispose();

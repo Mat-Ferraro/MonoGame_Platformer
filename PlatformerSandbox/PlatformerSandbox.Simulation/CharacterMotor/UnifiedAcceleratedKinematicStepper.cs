@@ -79,6 +79,8 @@ public static class UnifiedAcceleratedKinematicStepper
                         SimulationRecoveryKind.SubResolutionTimeRemainder,
                         "Post-contact endpoint interval exceeds the safe motion bound.");
                 Aabb atEnd = bounds.Translated(tail.Position);
+                if (responseMode == CollisionResponseMode.Slide)
+                    OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(atEnd, worldEnd, staticColliders, movingPlatforms);
                 atEnd = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     atEnd, worldEnd, movingPlatforms, staticColliders);
                 // Bounded static-floor canonicalization is legal only AFTER
@@ -113,6 +115,8 @@ public static class UnifiedAcceleratedKinematicStepper
             // bypassed by this correction.
             if (contacts.Count > 0)
             {
+                if (responseMode == CollisionResponseMode.Slide)
+                    OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds, absoluteTime, staticColliders, movingPlatforms);
                 bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     bounds, absoluteTime, movingPlatforms, staticColliders);
                 // Only representationally tiny top-face overlap is aligned.
@@ -128,6 +132,8 @@ public static class UnifiedAcceleratedKinematicStepper
                 MotionSample2D sample = ConstantAcceleration2D.Evaluate(
                     Vector2D.Zero, velocity, activeAcceleration, remaining);
                 bounds = bounds.Translated(sample.Position);
+                if (responseMode == CollisionResponseMode.Slide)
+                    OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(bounds, worldEnd, staticColliders, movingPlatforms);
                 bounds = MovingPlatformOverlapResolver.AlignPrecisionSideOverlap(
                     bounds, worldStartSeconds + durationSeconds,
                     movingPlatforms, staticColliders);
@@ -156,6 +162,9 @@ public static class UnifiedAcceleratedKinematicStepper
             }
 
             UnifiedCollisionHit hit = next.Value;
+            if (responseMode == CollisionResponseMode.Slide)
+                OpposingSurfaceCrushDetector.ThrowIfClosingSideContact(hit.BodyBoundsAtImpact,
+                    absoluteTime + hit.TimeSeconds, staticColliders, movingPlatforms);
 
             // A vertical sweep can encounter a corner where the player's side
             // is a few binary64 ULPs inside a moving platform's side face.

@@ -24,8 +24,8 @@ public sealed partial class Game1
     private bool _labPreserveSceneLights = true;
     private readonly List<LightSelectionDiagnostic> _labLightSelection = new();
     private string? _labInspectedLightId;
-    private bool ManualCoverageAvailable => InteractiveLab && IsQualityLab &&
-        _qualityLabFixture == "normal" && !_lightingStress;
+    private bool ManualCoverageAvailable => IsQualityLab &&
+        (AutomatedLaunch ? PoFixture : _qualityLabFixture) == "normal" && !_lightingStress;
     private bool UseManualLightCoverage => ManualCoverageAvailable && _labPreserveSceneLights;
     private LightingFrameBudget EffectiveFrameLightBudget => UseManualLightCoverage
         ? LightingFrameBudget.ForManualCoverage(_lightingQuality) : LightingFrameBudget.For(_lightingQuality);
@@ -40,6 +40,17 @@ public sealed partial class Game1
     private void SaveLabState()
     {
         if(AutomatedLaunch) return;
+        EnginePerformanceOptions.ManualGpuShadowResident = _processOverridesGraphics && EnginePerformanceOptions.GpuShadowResident;
+        EnginePerformanceOptions.ManualGpuShadowIndexed = _processOverridesGraphics && EnginePerformanceOptions.GpuShadowIndexed;
+        EnginePerformanceOptions.ManualGpuShadowBuffers = _processOverridesGraphics && EnginePerformanceOptions.GpuShadowBuffers;
+        EnginePerformanceOptions.ManualGpuLocalMasks = _processOverridesGraphics && EnginePerformanceOptions.GpuLocalMasks;
+        EnginePerformanceOptions.ManualGpuSpecializedMaterials = _processOverridesGraphics && EnginePerformanceOptions.GpuSpecializedMaterials;
+        EnginePerformanceOptions.ManualGpuFusedLayer = _processOverridesGraphics && EnginePerformanceOptions.GpuFusedLayer;
+        EnginePerformanceOptions.ManualGpuBatchUnshadowed = _processOverridesGraphics && EnginePerformanceOptions.GpuBatchUnshadowed;
+        EnginePerformanceOptions.ManualGpuFastBloom = _processOverridesGraphics && EnginePerformanceOptions.GpuFastBloom;
+        EnginePerformanceOptions.ManualGpuInstancedParticles = _processOverridesGraphics && EnginePerformanceOptions.GpuInstancedParticles;
+        EnginePerformanceOptions.ManualGpuMaterialClear = _processOverridesGraphics && EnginePerformanceOptions.GpuMaterialClear;
+        EnginePerformanceOptions.ManualGpuScopedBinds = _processOverridesGraphics && EnginePerformanceOptions.GpuScopedBinds;
         var lighting=(_lightingEnabled,_lightingQuality,_lightingPresetId,_materialLightMode,_lightingStress,_lightingInspectionLight,_l19dWorldLightsEnabled,_perfOverlay);
         var material=(_l19bMaterialPreset,_l19ShowcaseFocus,_l19Hdr,_l19Emission,_l19Bloom,_l19Exposure,_l19BloomThreshold,_l19BloomStrength);
         var shadow=(_shadowEdgePreset,_shadowFilterMode,_shadowQualityPolicy,_l20BloomScatter,_l20BloomOnly,_l20LightFilter,_l20ReceiverNormals,_l20PolygonRims);
@@ -121,10 +132,11 @@ public sealed partial class Game1
             _perfFreeze=!IsQualityLab;
             _qualityLabFixture="normal"; _qualityLabPan=false; _qualityLabSweepAxis=3; _phase21HullOverlay=false;
             _labNormalMaps=true; _labAmbient=100; _labCap=0; _manualWarmup=60; _manualRecorded=120;
-            _labPreserveSceneLights=true; _labLightSelection.Clear(); _labInspectedLightId=null;
+            _labPreserveSceneLights=true; _gpuStressCount=0; _gpuStressMotion=false; _gpuLabTiming=false; _labLightSelection.Clear(); _labInspectedLightId=null;
             _perfUncappedRequested=!EffectiveVSync;
             _perfOverlay=true;
         });
+        EnginePerformanceOptions.ManualGpuShadowBuffers=false; EnginePerformanceOptions.ManualGpuShadowResident=EnginePerformanceOptions.ManualGpuShadowIndexed=false; EnginePerformanceOptions.ManualGpuLocalMasks=false; EnginePerformanceOptions.ManualGpuSpecializedMaterials=false; EnginePerformanceOptions.ManualGpuFusedLayer=false; EnginePerformanceOptions.ManualGpuBatchUnshadowed=false; EnginePerformanceOptions.ManualGpuFastBloom=false; EnginePerformanceOptions.ManualGpuInstancedParticles=false; EnginePerformanceOptions.ManualGpuMaterialClear=false; EnginePerformanceOptions.ManualGpuScopedBinds=false;
         ChangeLabProfile(LightingQualityLabProfile.For(IsQualityLab?2:1));
     }
     private void EnableAllLabOptimizations()
@@ -147,15 +159,80 @@ public sealed partial class Game1
         ? $"DRAW {_liveFrameReadout.FramesPerSecond:F1} FPS / SIM {_liveFrameReadout.TicksPerSecond:F1} TPS / {_liveFrameReadout.MeanMilliseconds:F2} MS"
         : "DRAW / SIM RATES - SAMPLING 1 SECOND";
     private string LabTiming(double value) => _liveFrameReadout.Ready ? $"{value:F2} MS" : "SAMPLING";
+    private bool _labGpuPage;
+    private void ApplyRecommendedGpu()
+    {
+        EnginePerformanceOptions.ManualGpuShadowBuffers=false;
+        EnginePerformanceOptions.ManualGpuShadowResident=EnginePerformanceOptions.ManualGpuShadowIndexed=false;
+        EnginePerformanceOptions.ManualGpuLocalMasks=false;
+        EnginePerformanceOptions.ManualGpuSpecializedMaterials=true;
+        EnginePerformanceOptions.ManualGpuFusedLayer=true;
+        EnginePerformanceOptions.ManualGpuBatchUnshadowed=true;
+        EnginePerformanceOptions.ManualGpuFastBloom=false;
+        EnginePerformanceOptions.ManualGpuInstancedParticles=false; EnginePerformanceOptions.ManualGpuMaterialClear=false; EnginePerformanceOptions.ManualGpuScopedBinds=false;
+        _gpuStressMotion=false;
+    }
     private void BuildLabControls()
     {
         var ui=_labControls; ui.Clear();
+        if(IsSpatialLab) { BuildSpatialControls(ui); return; }
         ui.CompactAction=PerfCaptureActive?CancelPerfCapture:null;
+        if(_ldtkLevel?.World.LevelId==GameLevelIds.EngineIntegrationLab)
+        {
+            ui.Add(_pbIntegrationPage?"BACK TO LIGHTING":"PHYSICS BODY CONTROLS",_pbIntegrationPage?"BACK":"OPEN",()=>{_pbIntegrationPage=!_pbIntegrationPage;ui.GoToFirstPage();});
+            if(_pbIntegrationPage) {BuildBodyFoundationControls(ui);return;}
+        }
+        if (_labGpuPage)
+        {
+            ui.Add("BACK TO LIGHTING CONTROLS","BACK",()=> { _labGpuPage=false; ui.GoToFirstPage(); });
+            ui.Add("GPU RECOMMENDED (SHADER CANDIDATE)","APPLY",()=>LabChange(ApplyRecommendedGpu));
+        ui.Add("GPU ADAPTER",GraphicsDevice.Adapter.Description,null);
+        ui.Add("NATIVE GL RENDERER",_gpuTimer.Adapter,null);
+        ui.Add("GPU BACKEND",GpuBackendName,null);
+        ui.Add("GRAPHICS PROFILE",GraphicsDevice.GraphicsProfile.ToString(),null);
+        ui.Choice("GPU SHADOW SUBMISSION",EnginePerformanceOptions.GpuShadowBuffers?"BUFFERED REQUESTED":"COMPATIBILITY",
+            new[]{"COMPATIBILITY","BUFFERED (EXPERIMENTAL)"},i=>LabChange(()=>EnginePerformanceOptions.ManualGpuShadowBuffers=i==1));
+        ui.Add("ENABLE ALL GPU EXPERIMENTS", "ENABLE", () => LabChange(()=> { EnginePerformanceOptions.ManualGpuShadowBuffers=true; EnginePerformanceOptions.ManualGpuShadowResident=true; EnginePerformanceOptions.ManualGpuShadowIndexed=true; EnginePerformanceOptions.ManualGpuLocalMasks=true; EnginePerformanceOptions.ManualGpuSpecializedMaterials=true; EnginePerformanceOptions.ManualGpuFusedLayer=true; EnginePerformanceOptions.ManualGpuBatchUnshadowed=true; EnginePerformanceOptions.ManualGpuInstancedParticles=true; EnginePerformanceOptions.ManualGpuMaterialClear=true; EnginePerformanceOptions.ManualGpuScopedBinds=true; }));
+        ui.Add("GPU COMPATIBILITY MODE", "DISABLE GPU EXPERIMENTS", () => LabChange(()=> { _gpuStressMotion=false; EnginePerformanceOptions.ManualGpuShadowBuffers=false; EnginePerformanceOptions.ManualGpuShadowResident=EnginePerformanceOptions.ManualGpuShadowIndexed=false; EnginePerformanceOptions.ManualGpuLocalMasks=false; EnginePerformanceOptions.ManualGpuSpecializedMaterials=false; EnginePerformanceOptions.ManualGpuFusedLayer=false; EnginePerformanceOptions.ManualGpuBatchUnshadowed=false; EnginePerformanceOptions.ManualGpuFastBloom=false; EnginePerformanceOptions.ManualGpuInstancedParticles=false; EnginePerformanceOptions.ManualGpuMaterialClear=false; EnginePerformanceOptions.ManualGpuScopedBinds=false;  }));
+        ui.Add("GPU RESIDENT SHADOW VERTICES",On(EnginePerformanceOptions.GpuShadowResident), EnginePerformanceOptions.GpuShadowBuffers?()=>LabChange(()=>EnginePerformanceOptions.ManualGpuShadowResident=!EnginePerformanceOptions.GpuShadowResident):null);
+        ui.Add("GPU INDEXED SHADOW FANS",On(EnginePerformanceOptions.GpuShadowIndexed), EnginePerformanceOptions.GpuShadowBuffers?()=>LabChange(()=>EnginePerformanceOptions.ManualGpuShadowIndexed=!EnginePerformanceOptions.GpuShadowIndexed):null);
+        ui.Add("RESIDENT HITS / MISSES / BYPASS",$"{_gameLighting?.LastGpuResidentHits??0} / {_gameLighting?.LastGpuResidentMisses??0} / {_gameLighting?.LastGpuResidentBypasses??0}",null);
+        ui.Add("INDEXED DRAWS / BYPASS",$"{_gameLighting?.LastGpuIndexedDraws??0} / {_gameLighting?.LastGpuIndexBypasses??0}",null);
+        ui.Add("GPU RESIDENT / INDEX STATUS",$"{_gameLighting?.GpuResidentStatus??"NOT EXERCISED"} / {_gameLighting?.GpuIndexStatus??"NOT EXERCISED"}",null);
+        ui.Add("SKIP REDUNDANT TARGET BINDS",On(EnginePerformanceOptions.GpuScopedBinds),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuScopedBinds=!EnginePerformanceOptions.GpuScopedBinds));
+        ui.Add("SKIP OVERWRITTEN MATERIAL CLEAR",On(EnginePerformanceOptions.GpuMaterialClear),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuMaterialClear=!EnginePerformanceOptions.GpuMaterialClear));
+        ui.Add("GPU BUFFER STATUS",_gameLighting?.GpuBufferStatus??"NOT EXERCISED",null);
+        ui.Add("BUFFERED / REFERENCE / FALLBACK",$"{_gameLighting?.LastGpuBufferedDraws??0} / {_gameLighting?.LastGpuReferenceDraws??0} / {_gameLighting?.LastGpuFallbackDraws??0}",null);
+        ui.Add("SHADOW UPLOAD / BUFFER BYTES",$"{_gameLighting?.LastGpuUploadBytes??0} / {_gameLighting?.GpuBufferBytes??0}",null);
+        ui.Add("LIGHT-LOCAL HARD MASKS",On(EnginePerformanceOptions.GpuLocalMasks),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuLocalMasks=!EnginePerformanceOptions.GpuLocalMasks));
+        ui.Add("SPECIALIZED MATERIAL SHADERS",On(EnginePerformanceOptions.GpuSpecializedMaterials),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuSpecializedMaterials=!EnginePerformanceOptions.GpuSpecializedMaterials));
+        ui.Add("FUSED LAYER COMPOSITION",On(EnginePerformanceOptions.GpuFusedLayer),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuFusedLayer=!EnginePerformanceOptions.GpuFusedLayer));
+        ui.Add("BATCH UNSHADOWED LIGHTS",On(EnginePerformanceOptions.GpuBatchUnshadowed),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuBatchUnshadowed=!EnginePerformanceOptions.GpuBatchUnshadowed));
+        ui.Add("FAST BLOOM (QUALITY EXPERIMENT)",On(EnginePerformanceOptions.GpuFastBloom),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuFastBloom=!EnginePerformanceOptions.GpuFastBloom));
+        ui.Add("INSTANCED PARTICLE DRAW",On(EnginePerformanceOptions.GpuInstancedParticles),()=>LabChange(()=>EnginePerformanceOptions.ManualGpuInstancedParticles=!EnginePerformanceOptions.GpuInstancedParticles));
+        ui.Add("LOCAL MASK BUILDS / HITS / BYPASS",$"{_gameLighting?.LastGpuLocalBuilds??0} / {_gameLighting?.LastGpuLocalHits??0} / {_gameLighting?.LastGpuLocalBypasses??0}",null);
+        ui.Add("LOCAL MASK BYTES",$"{_gameLighting?.GpuLocalBytes??0}",null);
+        ui.Add("MATERIAL SPECIALIZED / LAYER FUSED",$"{_gameLighting?.LastGpuSpecializedPasses??0} / {_gameLighting?.LastGpuFusedLayers??0}",null);
+        ui.Add("DIRECT LIGHT DRAWS / FAST BLOOM",$"{_gameLighting?.LastGpuDirectLights??0} / {_gameLighting?.LastGpuFastBloom??0}",null);
+        ui.Add("PARTICLE INSTANCES / DRAWS",$"{_particleVfx?.LastGpuInstances??0} / {_particleVfx?.LastGpuDraws??0}",null);
+        ui.Add("GPU PARTICLE STATUS",_particleVfx?.GpuStatus??"UNAVAILABLE",null);
+        ui.Choice("PARTICLE STRESS COUNT",GpuStressCount.ToString(),new[]{"0","1000","5000","10000","25000","50000"},i=>LabChange(()=>_gpuStressCount=new[]{0,1000,5000,10000,25000,50000}[i]));
+        ui.Add("GPU ANALYTIC STRESS MOTION",EnginePerformanceOptions.GpuInstancedParticles?On(_gpuStressMotion):"BYPASSED",EnginePerformanceOptions.GpuInstancedParticles?()=>LabChange(()=>_gpuStressMotion=!_gpuStressMotion):null);
+        ui.Add("GPU TIMESTAMP PROFILING",On(_gpuLabTiming),()=>LabChange(()=>_gpuLabTiming=!_gpuLabTiming));
+        ui.Add("GPU FRAME TIMESTAMP",_gpuTimer.Readout,null);
+        ui.Add("GPU PASS TIMES","EXTERNAL PROFILER",null);
+        ui.Add("SKIPPED TARGET BINDS / CLEAR PX",$"{_gameLighting?.LastGpuSkippedBinds??0} / {_gameLighting?.LastGpuSkippedClearPixels??0}",null);
+        ui.Add("SHADOW PREP / DRAW WALL MS (PROFILE RUN)",$"{(_gameLighting?.LastGpuShadowPrepareMs??0):F2} / {(_gameLighting?.LastGpuShadowDrawMs??0):F2}",null);
+            return;
+        }
         bool all = _perfMask==AllPerfOptimizations && LabProfile.AllRuntimeOptimizations;
         ui.Add("ENABLE ALL OPTIMIZATIONS",all?"ALL 14 ON":"ENABLE (QUALITY UNCHANGED)",EnableAllLabOptimizations,all);
-        ui.Add("DISABLE ALL LIVE OPTIMIZATIONS","DISABLE",() => { SetAllPerfOptimizations(false); CustomLab(LabProfile with { OptimizationMask=0, StaticFields=false, StaticShadowFields=false }); });
+        ui.Add("DISABLE ALL LIVE OPTIMIZATIONS","DISABLE",() => { EnginePerformanceOptions.ManualGpuShadowBuffers=false; EnginePerformanceOptions.ManualGpuShadowResident=EnginePerformanceOptions.ManualGpuShadowIndexed=false; EnginePerformanceOptions.ManualGpuLocalMasks=false; EnginePerformanceOptions.ManualGpuSpecializedMaterials=false; EnginePerformanceOptions.ManualGpuFusedLayer=false; EnginePerformanceOptions.ManualGpuBatchUnshadowed=false; EnginePerformanceOptions.ManualGpuFastBloom=false; EnginePerformanceOptions.ManualGpuInstancedParticles=false; EnginePerformanceOptions.ManualGpuMaterialClear=false; EnginePerformanceOptions.ManualGpuScopedBinds=false;  SetAllPerfOptimizations(false); CustomLab(LabProfile with { OptimizationMask=0, StaticFields=false, StaticShadowFields=false }); });
         ui.Choice("GRAPHICS PRESET",CurrentLabGraphicsPreset,GraphicsPresetLabels,ApplyLabGraphicsPreset);
         ui.Add("BUDGET / BLOOM / SAMPLES",$"{_lightingQuality} / {EnginePerformanceOptions.Po10bBloomScale}% / {Samples(EnginePerformanceOptions.AreaSamples,EnginePerformanceOptions.Po10bAdaptiveSamples)}",null);
+        ui.Add("GPU RECOMMENDED (SHADER CANDIDATE)","APPLY",()=>LabChange(ApplyRecommendedGpu));
+        ui.Add("GPU ADAPTER",GraphicsDevice.Adapter.Description,null);
+        ui.Add("GPU CONTROLS", "OPEN",()=> { _labGpuPage=true; ui.GoToFirstPage(); });
         ui.Add("BUILD / DEBUGGER",LabBuildMode+" / "+(System.Diagnostics.Debugger.IsAttached?"ATTACHED":"DETACHED"),null);
         bool processAll=EnginePerformanceOptions.Snapshots && EnginePerformanceOptions.HudAtlas && EnginePerformanceOptions.ArtworkPreparation && EnginePerformanceOptions.DiagnosticRecords && EnginePerformanceOptions.LightingValidation && EnginePerformanceOptions.LightingBuffers && EnginePerformanceOptions.LightingParameters && EnginePerformanceOptions.LightingSamples && EnginePerformanceOptions.SharedSamples && EnginePerformanceOptions.HashedVisibility && EnginePerformanceOptions.VisibleLayers && EnginePerformanceOptions.PreparedMaterials && EnginePerformanceOptions.CameraConvergence && EnginePerformanceOptions.Po10fCasterBuffers;
         ui.Add("PROCESS-ONLY OPTIMIZATIONS",processAll?"ALL ON / STARTUP":"SOME OFF / RESTART",null);
@@ -340,7 +417,7 @@ public sealed partial class Game1
             JustPressed(keys,Keys.Enter)||JustPressed(pad,Buttons.A),modal);
     private bool HandleManualLab(KeyboardState keys,GamePadState pad,bool click,Point point)
     {
-        if(!InteractiveLab || _flow.IsMenuOpen || _flow.IsTransitionActive) { _labControls.Release(); return false; }
+        if((!InteractiveLab && (!IsSpatialLab || AutomatedLaunch)) || _flow.IsMenuOpen || _flow.IsTransitionActive) { _labControls.Release(); return false; }
         bool input=click || JustPressed(keys,Keys.Tab)||JustPressed(pad,Buttons.RightShoulder)||
             JustPressed(keys,Keys.Escape)||JustPressed(pad,Buttons.B)||JustPressed(keys,Keys.Enter)||JustPressed(pad,Buttons.A)||
             JustPressed(keys,Keys.Up)||JustPressed(keys,Keys.Down)||JustPressed(keys,Keys.Left)||JustPressed(keys,Keys.Right)||
@@ -359,7 +436,7 @@ public sealed partial class Game1
         if(_labControls.Expanded && (_labUiRefresh==0 || now-_labUiRefresh>System.Diagnostics.Stopwatch.Frequency/8))
         { BuildLabControls(); _labUiRefresh=now; }
         _labControls.CompactAction=PerfCaptureActive?CancelPerfCapture:null;
-        _labControls.Draw(_spriteBatch!,_pixel!,GraphicsDevice.Viewport.Width,GraphicsDevice.Viewport.Height,IsQualityLab?"LIGHTING QUALITY LAB":"ENGINE PERFORMANCE LAB",PerfCaptureActive||_phase21BenchmarkStatus.StartsWith("SAVED:",StringComparison.Ordinal)?_phase21BenchmarkStatus:_perfOverlay?LiveLabStatus:"GRAPHICS "+CurrentLabGraphicsPreset);
+        _labControls.Draw(_spriteBatch!,_pixel!,GraphicsDevice.Viewport.Width,GraphicsDevice.Viewport.Height,IsSpatialLab?"ENGINE SCALABILITY LAB":IsQualityLab?"LIGHTING QUALITY LAB":"ENGINE PERFORMANCE LAB",PerfCaptureActive||_phase21BenchmarkStatus.StartsWith("SAVED:",StringComparison.Ordinal)?_phase21BenchmarkStatus:IsSpatialLab||_perfOverlay?LiveLabStatus:"GRAPHICS "+CurrentLabGraphicsPreset);
     }
     private void BeginGraphicsDraft()
     {
@@ -402,10 +479,24 @@ public sealed partial class Game1
         var p=_graphicsDraft!; var ui=_graphicsControls; ui.Clear();
         void Add(string label,string value,Action action) => ui.Add(label,value,_processOverridesGraphics?null:action);
         Add("ENABLE ALL ESTABLISHED OPTS",p.AllEstablishedOptimizations?"ALL 13 ON":"ENABLE",() => EditGraphics(v=>v.EnableAllOptimizations()));
-        Add("DISABLE ALL LIVE OPTIMIZATIONS",p.Profile==1&&!p.RenderProfile.StaticFields?"OFF":"DISABLE",() => EditGraphics(v=>v with { Profile=1, StaticFieldsOverride=false, StaticShadowFields=false }));
+        Add("DISABLE ALL LIVE OPTIMIZATIONS",p.Profile==1&&!p.RenderProfile.StaticFields?"OFF":"DISABLE",() => EditGraphics(v=>v with { Profile=1, StaticFieldsOverride=false, StaticShadowFields=false, GpuShadowBuffers=false, GpuShadowResident=false, GpuShadowIndexed=false, GpuLocalMasks=false, GpuSpecializedMaterials=false, GpuFusedLayer=false, GpuBatchUnshadowed=false, GpuFastBloom=false, GpuInstancedParticles=false, GpuScopedBinds=false, GpuMaterialClear=false }));
         ui.Choice("GRAPHICS PRESET (LIGHT/SHADOW)",GraphicsQualityPreset.CurrentLabel(p.Quality,p.LightScale,p.MaskScale,p.BloomScale,p.Adaptive,p.AreaSamples),
             GraphicsPresetLabels,_processOverridesGraphics?null:i=>EditGraphics(v=>GraphicsQualityPreset.For(i).Apply(v)));
         ui.Add("BUDGET / BLOOM / SAMPLES",$"{p.Quality} / {p.BloomScale}% / {Samples(p.AreaSamples,p.Adaptive)}",null);
+        Add("SKIP REDUNDANT TARGET BINDS",On(p.GpuScopedBinds),()=>EditGraphics(v=>v with { GpuScopedBinds=!v.GpuScopedBinds }));
+        Add("SKIP OVERWRITTEN MATERIAL CLEAR",On(p.GpuMaterialClear),()=>EditGraphics(v=>v with { GpuMaterialClear=!v.GpuMaterialClear }));
+        Add("GPU SHADOW SUBMISSION",p.GpuShadowBuffers?"BUFFERED (EXPERIMENTAL)":"COMPATIBILITY",() => EditGraphics(v=>v with { GpuShadowBuffers=!v.GpuShadowBuffers }));
+        Add("GPU RECOMMENDED (SHADER CANDIDATE)","APPLY",()=>EditGraphics(v=>v with { GpuShadowBuffers=false, GpuShadowResident=false, GpuShadowIndexed=false, GpuLocalMasks=false, GpuSpecializedMaterials=true, GpuFusedLayer=true, GpuBatchUnshadowed=true, GpuFastBloom=false, GpuInstancedParticles=false, GpuScopedBinds=false, GpuMaterialClear=false }));
+        Add("ENABLE ALL GPU EXPERIMENTS","ENABLE",() => EditGraphics(v=>v with { GpuShadowBuffers=true, GpuShadowResident=true, GpuShadowIndexed=true, GpuLocalMasks=true, GpuSpecializedMaterials=true, GpuFusedLayer=true, GpuBatchUnshadowed=true, GpuInstancedParticles=true, GpuScopedBinds=true, GpuMaterialClear=true }));
+        Add("GPU COMPATIBILITY MODE","DISABLE GPU EXPERIMENTS",() => EditGraphics(v=>v with { GpuShadowBuffers=false, GpuShadowResident=false, GpuShadowIndexed=false, GpuLocalMasks=false, GpuSpecializedMaterials=false, GpuFusedLayer=false, GpuBatchUnshadowed=false, GpuFastBloom=false, GpuInstancedParticles=false, GpuScopedBinds=false, GpuMaterialClear=false }));
+        ui.Add("GPU RESIDENT SHADOW VERTICES",p.GpuShadowBuffers?On(p.GpuShadowResident):"BYPASSED",_processOverridesGraphics||!p.GpuShadowBuffers?null:()=>EditGraphics(v=>v with { GpuShadowResident=!v.GpuShadowResident }));
+        ui.Add("GPU INDEXED SHADOW FANS",p.GpuShadowBuffers?On(p.GpuShadowIndexed):"BYPASSED",_processOverridesGraphics||!p.GpuShadowBuffers?null:()=>EditGraphics(v=>v with { GpuShadowIndexed=!v.GpuShadowIndexed }));
+        Add("LIGHT-LOCAL HARD MASKS",On(p.GpuLocalMasks),()=>EditGraphics(v=>v with { GpuLocalMasks=!v.GpuLocalMasks }));
+        Add("SPECIALIZED MATERIAL SHADERS",On(p.GpuSpecializedMaterials),()=>EditGraphics(v=>v with { GpuSpecializedMaterials=!v.GpuSpecializedMaterials }));
+        Add("FUSED LAYER COMPOSITION",On(p.GpuFusedLayer),()=>EditGraphics(v=>v with { GpuFusedLayer=!v.GpuFusedLayer }));
+        Add("BATCH UNSHADOWED LIGHTS",On(p.GpuBatchUnshadowed),()=>EditGraphics(v=>v with { GpuBatchUnshadowed=!v.GpuBatchUnshadowed }));
+        Add("FAST BLOOM (QUALITY EXPERIMENT)",On(p.GpuFastBloom),()=>EditGraphics(v=>v with { GpuFastBloom=!v.GpuFastBloom }));
+        Add("INSTANCED PARTICLE DRAW",On(p.GpuInstancedParticles),()=>EditGraphics(v=>v with { GpuInstancedParticles=!v.GpuInstancedParticles }));
         Add("APPLY AND SAVE","APPLY",ApplyGraphicsDraft);
         Add("STATIC HARD SHADOW (EXPERIMENT)",On(p.StaticShadowFields),() => EditGraphics(v=>v with { StaticShadowFields=!v.StaticShadowFields,StaticFieldsOverride=v.StaticShadowFields?v.StaticFieldsOverride:true }));
         ui.Add("BACK / DISCARD UNSAVED","BACK",() => { _graphicsDraft=null; _flow.Back(); });

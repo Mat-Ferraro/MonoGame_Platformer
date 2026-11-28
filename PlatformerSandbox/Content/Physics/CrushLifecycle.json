@@ -1,0 +1,6 @@
+{
+  "Version": 1,
+  "Crush": "Death",
+  "Respawn": { "Mode": "Immediate", "DelayTicks": 0, "MaximumRespawns": null },
+  "Levels": {}
+}

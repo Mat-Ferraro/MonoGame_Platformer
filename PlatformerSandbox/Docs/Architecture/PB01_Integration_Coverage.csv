@@ -1,0 +1,17 @@
+Capability,Dedicated feature lab,Integrated lab,Automated evidence,Status
+Existing kinematic movement,Yes,Yes,Fixed tick player state comparison,Local pending
+Static terrain,Yes,Yes,Authored geometry and replay,Local pending
+Analytical moving platforms,3,1,Fixed tick platform state comparison,Local pending
+Legacy crush recovery,Side and vertical fixtures,Current policy,Existing WorldCrushRespawnTests,Local pending
+Spatial query modes,Visible selection,Reference and Indexed in benchmark,Three headless modes and feature visual A/B,Local pending
+Body IDs and motion authority,Visible counters,Committed frame in headless replay,PB01FoundationTests,Local pending
+Physics materials,Live JSON pair preview,Not yet applied to contacts,Material catalog tests,Preview only
+Artwork and parallax,Graybox,Authored cavern layers,Content import and graphical capture,Local pending
+Character animation and audio,Existing presenters,Existing presenters,Manual and graphical subsystem metrics,Local pending
+Lights and particles,Not primary focus,Authored lights and particle zones,Graphical capture metrics,Local pending
+Wind and checkpoint,Not primary focus,Authored wind and checkpoint,Import and manual gameplay,Local pending
+Connected level routes,Separate existing Connected Cavern,Exits removed for capture stability,Existing scene regression,Existing fixture retained
+Advanced light types and material showcases,Existing separate showcase labs,Future integration expansion,Existing lighting regression,Not yet integrated in combined lab
+Dynamic rigid bodies and physical materials response,Future PB01D/E,Future PB01D/E,Future fixed tick tests,Not implemented
+Contact chains and configurable crush responses,Future PB01F–M,Future PB01F–M,Future multi-body differential tests,Not implemented
+Rotation,Future PB02,Future PB02,Future angular dynamics tests,Deferred

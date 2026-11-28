@@ -1,0 +1,77 @@
+ID,Task,Implementation status,Evidence / blocker,Runtime acceptance
+A01,Actual adapter,Candidate,GraphicsDevice.Adapter.Description,Pending
+A02,Supported capabilities,Partial,adapter HiDef check; WGL version and timer-query proc availability; no exhaustive capability matrix,Pending
+A03,Driver/backend info,Candidate,"backend/adapter metadata, WGL renderer/version when queried, optional NVIDIA telemetry",Pending
+A04,GPU frame execution,Candidate,opt-in asynchronous Windows DesktopGL timestamp span; no present or precise busy time; other backends external,Pending
+A05,GPU pass timing,Outstanding,external profilers; no native per-pass instrumentation,Not implemented / not accepted
+A06,GPU memory,Partial,tracked local-mask and buffer reservations; no total GPU residency,Pending
+A07,Upload bandwidth,Partial,explicit shadow and particle uploads; not total bus traffic,Pending
+A08,CPU/GPU synchronization,Partial,CPU/present data plus timestamp span; Nsight timeline still required,Pending
+A09,Lab diagnostics,Candidate,existing paged lab controls,Pending
+A10,Profiler workflow,Candidate,documented; captures pending,Pending
+B01,Shared acceleration interfaces,Partial,"shared renderer with optional shadow, local mask and particle adapters; no general strategy interface for every pass",Pending
+B02,Compatibility strategy,Candidate,reference user primitives,Pending
+B03,Advanced GPU strategy,Candidate,opt-in shared renderer experiments with original paths retained,Pending
+B04,Automatic selection,Partial,explicit selection with local eligibility checks and recoverable fallback; no automatic performance classifier,Pending
+B05,CPU alternatives,Candidate,original CPU geometry and CPU particle processing remain available; analytic stress CPU formula retained,Pending
+B06,Independent switches,Candidate,nine independently requested switches; resident/indexed depend on buffered; analytic stress depends on instancing,Pending
+B07,GPU resource lifecycle,Candidate,"bounded buffers, local textures and timer queries; reset/disposal paths wired",Pending
+B08,Initialization recovery,Partial,recognized pre-submission failures and unsupported paths; no replay after uncertain draw or shader-build failure,Pending
+B09,GPU memory budgets,Partial,"fixed bounds for local masks, vertices and particles; no adjustable global memory budget",Pending
+B10,Reset/shutdown validation,Partial,reset/disposal wiring; runtime testing pending,Pending
+C01,Persistent vertex buffers,Candidate,exact projected vertices cached,Pending
+C02,Persistent index buffers,Candidate,immutable fan index prefix,Pending
+C03,Reusable dynamic pools,Candidate,bounded dynamic stream and resident slots,Pending
+C04,Partial geometry updates,Outstanding,no dirty ranges,Not applicable until implemented
+C05,Instanced sprites,Partial,instanced particle sprites only; general scenery/sprites unchanged,Pending
+C06,Instanced shadows,Outstanding,indexed fans are not instancing,Not applicable until implemented
+C07,Material/texture batching,Partial,contiguous single-energy unshadowed point-light batches; no general material/texture reordering,Pending
+C08,Redundant state changes,Partial,fused layer pass and direct light submissions reduce targeted state changes; profiler verification pending,Pending
+C09,CPU-GPU transfers,Candidate,"resident, indexed and persistent analytic seed uploads; no measured benefit yet",Pending
+C10,Multi-buffered uploads,Outstanding,Discard only; no explicit ring,Not applicable until implemented
+D01,Light-relative masks,Candidate,world-centered bounded full-resolution hard point visibility masks,Pending
+D02,Camera-independent sampling,Candidate,world-relative cached textures sampled via transformed UV or translated rectangle; pixel rounding needs review,Pending
+D03,Regional allocation,Candidate,regional light-local allocation for eligible masks only,Pending
+D04,Atlas,Outstanding,"independent bounded regional textures, not atlas; packing/guard-band/shader contract pending",Not implemented / not accepted
+D05,Single-channel formats,Outstanding,RGBA8 masks retained; single-channel capability and blend semantics not validated,Not implemented / not accepted
+D06,Batched lighting,Partial,eligible unshadowed point lights directly batched; shadowed/area/directional retain reference,Pending
+D07,Batched shadow rasterization,Outstanding,"indexed individual fan draws, not multi-light shadow raster batching",Not implemented / not accepted
+D08,Tiled light selection,Outstanding,no tile binning,Not implemented / not accepted
+D09,Tiled GPU lighting,Outstanding,no tiled shader,Not implemented / not accepted
+D10,GPU geometry generation,Outstanding,CPU visibility geometry retained,Not implemented / not accepted
+D11,Static illumination caching,Partial,cross-frame local shadow mask reuse; existing illumination field cache unchanged,Pending
+D12,Static/dynamic contributions,Outstanding,no split static/dynamic accumulation,Not implemented / not accepted
+D13,Area-light sampling,Outstanding,existing PO10 area sampling retained,Not implemented / not accepted
+D14,Stable light budgets,Outstanding,existing HK02 manual coverage retained; production admission policy unchanged,Not implemented / not accepted
+E01,Combined material shaders,Candidate,specialized production ambient and front-light pair techniques; reference lab technique retained,Pending
+E02,Visibility and accumulation fusion,Partial,specialized pair consumes local or full masks; separate mask rasterization remains,Pending
+E03,Normal-map fusion,Candidate,normal and edge evaluation in specialized front-pair technique; exact comparison required,Pending
+E04,Emission integration,Partial,specialized ambient combines existing emission term; separate HDR/emission-map stages remain,Pending
+E05,Multiple render targets,Outstanding,no multiple render targets,Not implemented / not accepted
+E06,Intermediate target removal,Partial,fused albedo copy/multiply and eligible direct lights remove intermediate passes; existing resources retained for fallback,Pending
+E07,Bloom pass consolidation,Candidate,optional fast tent bloom quality experiment; independent from master,Pending
+E08,Texture format/precision optimization,Outstanding,existing texture formats and precision retained,Not implemented / not accepted
+F01,Gameplay/decorative split,Candidate,GPU analytic stress is presentation-only; existing gameplay particle state remains CPU,Pending
+F02,Instanced particle rendering,Candidate,bounded instanced quad rendering for visual particles and stress,Pending
+F03,GPU simulation prototype,Candidate,analytic vertex-motion stress prototype; not general GPU particle solver,Pending
+F04,Persistent GPU particle buffers,Candidate,reusable instance/quad/index buffers and persistent stress seeds,Pending
+F05,GPU emission/recycling,Outstanding,no general GPU emit/recycle,Not implemented / not accepted
+F06,GPU culling/lifetime,Outstanding,ordinary culling and lifetime remain CPU; stress uses wrapped analytic motion,Not implemented / not accepted
+F07,Transparency/sorting,Partial,existing blend grouping and source order retained; new path visual acceptance pending,Pending
+F08,CPU fallback and budgets for new GPU path,Candidate,"bounded 16384 instances per chunk, CPU SpriteBatch fallback",Pending
+G01,DesktopGL baseline,Candidate,DesktopGL baseline build/run comparisons scripted,Pending
+G02,DesktopGL4,Outstanding,DesktopGL4 package/runtime and content target integration not verified; not provided,Not implemented / not accepted
+G03,DirectX 11,Candidate,isolated WindowsDX project and comparison runner; build/runtime unverified,Pending
+G04,DirectX 12,Candidate,isolated WindowsDX12 native project; shader profile compatibility unverified,Pending
+G05,Vulkan,Candidate,isolated DesktopVK Windows runtime project; shader profile compatibility unverified,Pending
+G06,Production backend decision,Outstanding,retain DesktopGL pending cross-backend results,Not implemented / not accepted
+H01,Visible acceleration selector,Candidate,GPU compatibility and master experiment controls in existing UI,Pending
+H02,Independent GPU controls,Candidate,nine independent requests and separate lab analytic stress/timing controls,Pending
+H03,Enable all supported,Partial,"enable all eight non-fast-bloom experiments; eligibility on use, not blanket hardware certification",Pending
+H04,Compatibility/reset,Candidate,explicit bypass and existing reset,Pending
+H05,Persistent preferences,Candidate,serialized options; C# tests added,Pending
+H06,Scalability fixtures,Candidate,existing fixtures plus 1k/5k/10k analytic particle stress; manual widened lab retained,Pending
+H07,GPU performance benchmarks,Candidate,"quick 22 / standard 45 / full 58 performance cases; individual and combined, requested/actual checks",Pending
+H08,Visual regression,Candidate,quick 28 / expanded 56 captures at 720p; exact vs review-required metrics; temporal manual testing pending,Pending
+H09,Integrated/dedicated testing,Outstanding,integrated/dedicated hardware acceptance not run,Not implemented / not accepted
+H10,Production presets and acceptance,Outstanding,production presets unchanged; compatibility default pending acceptance,Not implemented / not accepted

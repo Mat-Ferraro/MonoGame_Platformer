@@ -1,0 +1,188 @@
+{
+  "Version": 1,
+  "Levels": {
+    "PHYSICS_INTERACTION_LAB": [
+      {
+        "Id": 1,
+        "Material": "Wood",
+        "X": 8,
+        "Y": 9,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 2,
+        "Material": "Rubber",
+        "X": 12,
+        "Y": 10,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 3,
+        "Material": "Ice",
+        "X": 6.5,
+        "Y": 4.5,
+        "VelocityX": 5,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 4,
+        "Material": "Metal",
+        "X": 26,
+        "Y": 8,
+        "GravityScale": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 5,
+        "Material": "Stone",
+        "X": 34,
+        "Y": 11,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 6,
+        "Material": "Wood",
+        "X": 17.5,
+        "Y": 4.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 7,
+        "Material": "Wood",
+        "X": 17.5,
+        "Y": 5.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 8,
+        "Material": "Wood",
+        "X": 16.5,
+        "Y": 4.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 9,
+        "Material": "Wood",
+        "X": 47,
+        "Y": 7,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character",
+        "CrushResponse": "StopPlatform"
+      },
+      {
+        "Id": 10,
+        "Material": "Wood",
+        "X": 34,
+        "Y": 4.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character",
+        "CrushResponse": "StopPlatform"
+      }
+    ],
+    "ENGINE_INTEGRATION_LAB": [
+      {
+        "Id": 1,
+        "Material": "Wood",
+        "X": 11.5,
+        "Y": 24.5,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 2,
+        "Material": "Rubber",
+        "X": 16,
+        "Y": 26,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 3,
+        "Material": "Metal",
+        "X": 22,
+        "Y": 25,
+        "VelocityX": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 4,
+        "Material": "Ice",
+        "X": 28,
+        "Y": 27,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 5,
+        "Material": "Wood",
+        "X": 40,
+        "Y": 26,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 6,
+        "Material": "Rubber",
+        "X": 50,
+        "Y": 25,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 7,
+        "Material": "Stone",
+        "X": 58,
+        "Y": 24,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 8,
+        "Material": "Metal",
+        "X": 67,
+        "Y": 25,
+        "VelocityX": 0,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 9,
+        "Material": "Wood",
+        "X": 46.5,
+        "Y": 18.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 10,
+        "Material": "Wood",
+        "X": 46.5,
+        "Y": 19.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 11,
+        "Material": "Wood",
+        "X": 45.5,
+        "Y": 18.5,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character"
+      },
+      {
+        "Id": 12,
+        "Material": "Wood",
+        "X": 42.625,
+        "Y": 21.75,
+        "Mass": 1,
+        "CollisionMask": "Terrain, Platform, Dynamic, Character",
+        "CrushResponse": "StopPlatform"
+      }
+    ]
+  }
+}

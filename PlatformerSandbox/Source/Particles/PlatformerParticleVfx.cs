@@ -23,6 +23,13 @@ internal sealed class PlatformerParticleVfx : IDisposable
 
     public ParticleEffectPresenter Presenter { get; }
     public int LastDrawCount => _renderer.LastDrawCount;
+    public int LastGpuInstances=>_renderer.LastGpuInstances;
+    public int LastGpuDraws=>_renderer.LastGpuDraws;
+    public int LastGpuAnalytic=>_renderer.LastGpuAnalytic;
+    public int LastGpuFallbacks=>_renderer.LastGpuFallbacks;
+    public long LastGpuUploadBytes=>_renderer.LastGpuUploadBytes;
+    public string GpuStatus=>_renderer.GpuStatus;
+    public void DrawStress(SpriteBatch batch,int count,int w,int h,float time,bool analytic)=>_renderer.DrawStress(batch,count,w,h,time,analytic);
     public int ActiveEnvironmentZones => _environment?.ActiveZones ?? 0;
     public int EnvironmentZones => _environment?.TotalZones ?? 0;
     public int EnvironmentParticles => _environment?.ActiveParticles ?? 0;
@@ -43,7 +50,7 @@ internal sealed class PlatformerParticleVfx : IDisposable
         _environment?.Update(center, deltaSeconds, paused);
 
 
-    public PlatformerParticleVfx(GraphicsDevice device, string particleFolder)
+    public PlatformerParticleVfx(GraphicsDevice device, string particleFolder,Effect? instanceEffect=null)
     {
         ArgumentNullException.ThrowIfNull(device);
         if (string.IsNullOrWhiteSpace(particleFolder))
@@ -60,7 +67,7 @@ internal sealed class PlatformerParticleVfx : IDisposable
             ParticleFaultPolicy.RecoverAndCount
 #endif
         );
-        _renderer = new MonoGameParticleRenderer(device);
+        _renderer = new MonoGameParticleRenderer(device,instanceEffect);
     }
 
     /// <summary>Only world-space effect instances may request cosmetic lights;

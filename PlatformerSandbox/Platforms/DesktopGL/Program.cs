@@ -29,7 +29,7 @@ using (diagnostics)
     using var watchdog = new DiagnosticHangWatchdog(diagnostics, build, contextRecorder.Snapshot,
         stallThreshold: devStall ? TimeSpan.FromSeconds(2) : TimeSpan.FromSeconds(8));
     diagnostics.Log(DiagnosticSeverity.Information, "app.start",
-        "DesktopGL startup", new Dictionary<string, string>
+        "Desktop renderer startup", new Dictionary<string, string>
         {
             ["version"] = build.Version,
             ["buildId"] = build.BuildId,
@@ -55,7 +55,7 @@ using (diagnostics)
     {
         // Preserve original exception + stack for debugger and Windows crash handling.
         // AppDomain hook is last resort for exceptions on other threads.
-        crashHooks.CaptureFatal(exception, "DesktopGL.Program.Main");
+        crashHooks.CaptureFatal(exception, "Desktop.Program.Main");
         throw;
     }
 }

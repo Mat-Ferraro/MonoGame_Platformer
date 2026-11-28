@@ -1,3 +1,4 @@
+using PlatformerSandbox.Foundation.Spatial;
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Simulation.Collision.Contacts;
 using PlatformerSandbox.Simulation.Motion.Integration;
@@ -39,7 +40,7 @@ public static class AnalyticalAabbCollisionDetector
 
         var ids = new HashSet<int>();
         AnalyticalSweepHit? best = null;
-        foreach (StaticAabbCollider obstacle in obstacles)
+        foreach (StaticAabbCollider obstacle in SpatialColliderSet.Select(obstacles, () => SpatialBounds.Swept(initialBounds, end.Position), contactAlignmentTolerance))
         {
             ArgumentNullException.ThrowIfNull(obstacle);
             if (!ids.Add(obstacle.Id))
@@ -57,7 +58,7 @@ public static class AnalyticalAabbCollisionDetector
                 best = hit;
             }
         }
-        return best;
+        return SpatialColliderSet.Verify(obstacles, best, () => SweepFirst(initialBounds, evaluate, durationSeconds, obstacles, contactAlignmentTolerance));
     }
 
     private static AnalyticalSweepHit? SweepOne(

@@ -1,0 +1,28 @@
+# PO05 spatial foundation candidate — implementation and validation
+
+Baseline: full pre-GPU project ZIP plus GPU01 A–H, automated comparison, and Refinement 01 overlays. Apply these replacement files over the validated GPU01 Refinement 01 tree. No GPU shader changes. Existing saved graphics preferences are honored; new preferences start with the existing production established optimization set (13; the lab's 14th hard-shadow cache remains explicitly experimental in production). New GPU experiments remain opt-in. GPU01 debt: HDR/fused composition visual discrepancy, local mask edge differences, integrated GPU retesting, alternative backends, native per-pass timings and compiler-warning audit. Do not promote these by default.
+
+## Ownership and contracts
+
+`Foundation.Spatial.SpatialIndex<T>` is a sparse uniform hash with finite inclusive bounds and stable integer IDs; objects can occupy multiple cells. Queries are single-owner, not thread-safe, and accept caller-owned result lists and deduplication sets. Default cell size 4 world units. Oversized entries/queries (over 4096 cells or unrepresentable grid coordinate) use conservative linear handling. This bounds per-entry membership, not total world memory. Query results are exact AABB matches; radius uses distance to AABB, not center. RayCandidates is the enclosing AABB, not an intersection test. Equal-distance nearest matches use stable ID. Use `SpatialFilter.All` rather than `default(SpatialFilter)` (the latter has zero category bits).
+
+`SpatialColliderSet` retains authored order, validates registration, and lazily builds a static index shared by motors. Bounded linear, constant-acceleration, monotone analytical, and piecewise reference-jump first-contact detectors can query conservative envelopes. Parabolic envelopes include turning points. The existing narrowphase, scheduler, support/crush scans and moving platform solver remain unchanged. Numerical envelope construction failures use the original list; no solver exceptions are swallowed. Verify mode runs both queries and compares the first-hit result. A mismatch is fatal, not a silent recovery. This is not a replacement physics engine.
+
+`WorldSession.CaptureSpatialSnapshot()` exposes static colliders and triggers, plus a separate detached dynamic index for committed players and moving platforms. Build on demand; no staged motor state and no presentation interpolation. Old snapshots do not change when entities leave. Query, Radius, Point, Swept, Nearest and RayCandidates are available; category bits use `1UL << (int)WorldSpatialKind`. The generic index additionally supports static/dynamic and excluded-ID filters. Trigger candidate selection retains previously occupied triggers for exit events. Existing LDtk graybox collider drawing can use viewport queries with conservative pixel margin; light/shadow caster/artwork/audio selection remains unchanged.
+
+Modes: Reference (default), Indexed, Verify. Process override `PS_PO05_MODE` can select all integrations; scoped `SpatialQueryPolicy.Use` is intended for differential tests. Lab-only overrides reset on scene exit; independent switches for static collision, trigger and graybox visibility queries. No change to authoritative simulation resolution or gameplay input. Production remains Reference until acceptance. Integration currently allocates per query; caller-owned core buffers are available but zero-allocation hot-path integration is not claimed.
+
+## Manual lab
+
+Level Select > Engine Scalability Lab. 6144 x 2048 px, 32 px/world unit, 197 merged rectangles (derived by matching importer merge algorithm), two moving platforms, continuous floor, terraces and dispersed obstacles. Existing test levels unchanged. Shared interactive panel: Reference/Indexed/Verify, three subsystem toggles, grid/query overlay, query radius, camera follow and axis sweeps, diagnostic report export, reset. The level uses authored geometry, not runtime-generated stress workloads; large-count testing is headless. Collision cell size is 4 and read-only in the lab. Process counters combine static collider query calls from collision and drawing. The generic index supports configurable size. Overlay query uses a square region; radius is its half extent. Query colors show exact bounds matches, not collision contacts. No GPU experiments required.
+
+## Known limits / deferred
+
+- No moving platform trajectory pruning in the collision scheduler (turnaround/obstruction fault semantics need proof); dynamic snapshots are committed-state queries only.
+- No new shadow-caster/light/independent artwork/parallax/audio query integrations. Existing paths are preserved. Graybox visibility integration is static collider drawing only.
+- No runtime stress entity generation or live grid size rebuild, nor continuous camera pixel analysis. The fixed authored lab is supplemented by headless synthetic workloads and discrete visual comparisons.
+- No complete simulation-state hashing or failure dump beyond test messages, seed/operation and TRX; replay compares public committed player state, events and moving platform samples each tick. Existing full regression suites run in all three modes.
+- New recovery paths for corruption have not been introduced; unsafe mismatch fails rather than silently omits objects. Capacity fallback is implemented for oversized operations. Existing fault policies remain untouched.
+- No end-to-end graphical throughput benchmark yet; headless query scalability and fixed-tick visual comparisons are included. GPU optimization is intentionally deferred.
+
+The C# code and content import have not been built or run in the delivery environment. Treat all implementation as candidate pending Windows validation.

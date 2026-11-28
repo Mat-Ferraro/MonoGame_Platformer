@@ -1,6 +1,7 @@
 using PlatformerSandbox.Foundation.Geometry;
 using PlatformerSandbox.Gameplay.States;
 using PlatformerSandbox.Gameplay.Abilities;
+using PlatformerSandbox.Simulation.CharacterMotor;
 
 namespace PlatformerSandbox.Gameplay.World;
 
@@ -27,7 +28,9 @@ public enum WorldGameplayEventKind
     AbilityInterrupted,
     AbilityRejected,
     EnvironmentMotionChanged,
-    HorizontalImpulseApplied
+    HorizontalImpulseApplied,
+    PlayerCrushed,
+    PlayerDied
 }
 
 /// <summary>
@@ -35,7 +38,8 @@ public enum WorldGameplayEventKind
 /// The host gives a fresh WorldInstanceId to every newly constructed world,
 /// including full restarts; identical replays use the same explicit ID.
 /// Position is an END-OF-TICK world-space point, not necessarily an exact
-/// time-of-impact position. Collision and trigger IDs occupy separate spaces.
+/// time-of-impact position. PlayerCrushed instead reports the classified pre-commit body.
+/// Collision and trigger IDs occupy separate spaces.
 /// </summary>
 public readonly record struct WorldGameplayEvent(
     long WorldInstanceId, long WorldTick, int Sequence,
@@ -46,7 +50,11 @@ public readonly record struct WorldGameplayEvent(
     CharacterStateRejection? Rejection = null,
     CharacterAbilityId? AbilityId = null,
     CharacterAbilityRejection? AbilityRejection = null,
-    CharacterAbilityEndReason? AbilityEndReason = null);
+    CharacterAbilityEndReason? AbilityEndReason = null)
+{
+    /// <summary>Physical crush details; populated only on PlayerCrushed.</summary>
+    public CharacterCrushEvent? Crush { get; init; }
+}
 
 /// <summary>
 /// Nonblocking, deterministic, data-only overlap volume. A trigger reports

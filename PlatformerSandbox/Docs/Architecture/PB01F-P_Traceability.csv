@@ -1,0 +1,12 @@
+Phase,Status,Scope,Outstanding
+F,Partial,Typed pairs and terrain filtering,Runtime character and prop pairs
+G,Candidate,Manual pause resume reverse,Automatic obstruction decisions
+H,Foundation,Linear relative sweep and deterministic contact graph,Coupled contact scheduling
+I,Pending,None,Multi-body pushing stacking carrying
+J,Foundation,Compression constraint graph on supplied contacts,Runtime compression detection
+K,Partial,Death and legacy throw/respawn,Pair ghosting and automatic stop/reverse
+L,Partial,Player death and configurable respawn,General entity lifecycle/destruction
+M,Partial,Platform and lifecycle world views,Coupled transaction integration
+N,Partial,JSON world policy and terrain materials,LDtk per-entity authoring
+O,Partial,Both existing labs extended with controls,Integrated multi-body fixtures
+P,Partial,New tests and exact-tick benchmark,C# execution and full acceptance

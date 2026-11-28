@@ -138,7 +138,9 @@ public sealed class GameDiagnosticBridge
             int recorded = 0;
             foreach (WorldGameplayEvent e in committed.Events)
             {
-                if (++recorded > 12) break;
+                // Always retain classified crush details, even if an unusually
+                // busy tick has exhausted the ordinary event diagnostic budget.
+                if (++recorded > 12 && e.Kind is not (WorldGameplayEventKind.PlayerCrushed or WorldGameplayEventKind.PlayerDied or WorldGameplayEventKind.PlayerRespawned)) continue;
                 if (EnginePerformanceOptions.DiagnosticRecords)
                     _recorder.RecordActivity("world.event", e, FormatEvent, committed.WorldTick);
                 else _recorder.RecordActivity("world.event", FormatEvent(e), committed.WorldTick);
@@ -150,7 +152,10 @@ public sealed class GameDiagnosticBridge
                     $"{e.WorldTick}/{e.Sequence} kind={e.Kind} player={e.PlayerId} " +
                     $"collider={e.ColliderId?.ToString() ?? "none"} " +
                     $"trigger={e.TriggerId?.ToString() ?? "none"} " +
-                    $"at=({Number(e.Position.X)},{Number(e.Position.Y)})";
+                    $"at=({Number(e.Position.X)},{Number(e.Position.Y)})" +
+                    (e.Crush is { } crush ?
+                        $" crushAxis={crush.Axis} pushingCollider={crush.PushingColliderId}" +
+                        $" opposingCollider={crush.OpposingColliderId} crushTime={Number(crush.WorldTimeSeconds)}" : "");
 
     public void BeginGymStep(GameFlowController flow, MovementGymSession gym,
         LocalPlayerInput input)

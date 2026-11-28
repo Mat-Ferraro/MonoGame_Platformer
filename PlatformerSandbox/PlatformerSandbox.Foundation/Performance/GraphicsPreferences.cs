@@ -15,6 +15,17 @@ public sealed record GraphicsPreferences
     public bool VSync { get; init; } = true;
     public int FpsLimit { get; init; }
     public int Profile { get; init; } = 1;
+    public bool GpuShadowBuffers { get; init; } // Opt-in until cross-hardware validation.
+    public bool GpuShadowResident { get; init; }
+    public bool GpuShadowIndexed { get; init; }
+    public bool GpuLocalMasks { get; init; }
+    public bool GpuSpecializedMaterials { get; init; }
+    public bool GpuFusedLayer { get; init; }
+    public bool GpuBatchUnshadowed { get; init; }
+    public bool GpuFastBloom { get; init; }
+    public bool GpuInstancedParticles { get; init; }
+    public bool GpuScopedBinds { get; init; }
+    public bool GpuMaterialClear { get; init; }
     public int LightScale { get; init; } = 100;
     public int MaskScale { get; init; } = 100;
     public int BloomScale { get; init; } = 100;
@@ -22,6 +33,7 @@ public sealed record GraphicsPreferences
     public bool Adaptive { get; init; }
     public bool? StaticFieldsOverride { get; init; }
     public bool StaticShadowFields { get; init; }
+    public static GraphicsPreferences EstablishedDefaults() => new GraphicsPreferences().EnableAllOptimizations();
     public GraphicsPreferences EnableAllOptimizations() => this with { Profile=2, StaticFieldsOverride=true };
     public bool AllEstablishedOptimizations => Profile!=1 && (StaticFieldsOverride ?? LightingQualityLabProfile.For(Profile).StaticFields);
     public LightingQuality Quality { get; init; } = LightingQuality.Balanced;
